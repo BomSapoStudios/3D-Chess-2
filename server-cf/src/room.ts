@@ -311,8 +311,15 @@ export class Room extends DurableObject<Env> {
       }
     }
 
+    // Only robots left in the game: nobody is playing, so end it
+    const live = engine.getState();
+    if (live.phase === 'playing' && !live.players.some(p => p.type !== 'ai' && !p.isEliminated)) {
+      this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
+      await this.persist();
+    }
+
     // Nobody here for a day: clear the room so its code can be reused
-    if (this.ctx.getWebSockets().length === 0 && now - this.meta.createdAt >= ABANDONED_ROOM_MS) {
+    if (this.ctx.getWebSockets().length === 0 && (now - this.meta.createdAt >= ABANDONED_ROOM_MS || this.gameOver)) {
       await this.ctx.storage.deleteAll();
       this.meta = null;
       this.engine = null;
@@ -323,13 +330,16 @@ export class Room extends DurableObject<Env> {
 
   private async scheduleAlarm(): Promise<void> {
     if (!this.engine || !this.meta) return;
-    const times = [this.meta.createdAt + ABANDONED_ROOM_MS, Date.now() + ABANDONED_ROOM_MS];
+    const times = [Date.now() + ABANDONED_ROOM_MS]; // only future times: past ones would fire every second
     const state = this.engine.getState();
     for (const p of state.players) {
-      if (!p.isConnected && p.disconnectedAt && state.phase === 'playing') times.push(p.disconnectedAt + DISCONNECT_GRACE_MS);
+      // Only players who can still come back; a deadline already handled must not be rescheduled
+      // (that made finished seats wake the room every second, all day)
+      const deadline = p.disconnectedAt ? p.disconnectedAt + DISCONNECT_GRACE_MS : 0;
+      if (!p.isConnected && !p.isEliminated && p.type !== 'ai' && deadline > Date.now() && state.phase === 'playing') times.push(deadline);
     }
     const deadline = this.clockDeadline();
-    if (deadline) times.push(deadline);
+    if (deadline && deadline > Date.now()) times.push(deadline);
     await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...times)));
   }
 
