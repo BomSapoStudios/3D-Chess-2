@@ -508,6 +508,11 @@ export class GameEngine {
     return { success: true, newState: this.getState() };
   }
 
+  /** End the game with no winner (everyone left, or a lobby that never filled) */
+  abandon(): void {
+    this.phase = 'gameover';
+  }
+
   forfeitByTimeout(color: PlayerColor): MoveResult {
     this.phase = 'gameover';
     const active = this.getActiveColors().filter(c => c !== color);

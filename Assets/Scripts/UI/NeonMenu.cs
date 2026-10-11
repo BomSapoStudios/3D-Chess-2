@@ -29,6 +29,7 @@ public class NeonMenu : MonoBehaviour
     private bool chaosMode;
     private int chaosInterval = 9;
     private bool timedPlay;
+    private bool slowPace;             // online "Take your time": up to a day per move
     private bool setupOnline;          // the setup screen is making an online game
     private bool quickPlay;
     private TextMeshProUGUI setupTitle, setupGoLabel;
@@ -40,7 +41,10 @@ public class NeonMenu : MonoBehaviour
     private TextMeshProUGUI playerHint;
     private Image chaosSwitch, timedSwitch;
     private RectTransform chaosKnob, timedKnob;
-    private TextMeshProUGUI chaosNote, timedNote;
+    private TextMeshProUGUI chaosNote, timedNote, paceNote;
+    private Image paceSwitch;
+    private RectTransform paceKnob;
+    private GameObject paceRow, timedRow;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Install()
@@ -92,6 +96,7 @@ public class NeonMenu : MonoBehaviour
     {
         if (Screen.safeArea != lastSafeArea) ApplySafeArea();
         PollFriendsIfNeeded();
+        UpdateLobbyCountdown();
     }
 
     // ───────────────────────── Canvas ─────────────────────────
@@ -332,6 +337,9 @@ public class NeonMenu : MonoBehaviour
             ("Every 15", () => chaosInterval = 15, () => chaosMode && chaosInterval == 15, () => chaosMode),
         }, NeonTheme.Cyan, 15);
         SwitchRow(right, "Speed round", out timedNote, out timedSwitch, out timedKnob, () => { timedPlay = !timedPlay; Refresh(); });
+        SwitchRow(right, "Take your time", out paceNote, out paceSwitch, out paceKnob, () => { slowPace = !slowPace; Refresh(); });
+        timedRow = right.Find("Speed round").gameObject;
+        paceRow = right.Find("Take your time").gameObject;
 
         Refresh();
     }
@@ -509,6 +517,12 @@ public class NeonMenu : MonoBehaviour
         chaosNote.text = chaosMode ? $"Cube spins every {chaosInterval} turns" : "Off";
         SetSwitch(timedSwitch, timedKnob, timedPlay);
         timedNote.text = timedPlay ? "10 minutes each" : "No clock";
+        // Online only: Take your time games replace the speed clock with a day per move
+        if (paceRow == null) return;
+        paceRow.SetActive(setupOnline);
+        timedRow.SetActive(!(setupOnline && slowPace));
+        SetSwitch(paceSwitch, paceKnob, slowPace);
+        paceNote.text = slowPace ? "Up to a day per move" : "Off: play live";
     }
 
     private void SetSwitch(Image track, RectTransform knob, bool on)
@@ -640,6 +654,10 @@ public class NeonMenu : MonoBehaviour
     private bool onlineBusy;
     private bool onlineStarting;
     private GameObject matchButtonRow, searchingPanel;
+    private Button extendButton;
+    private long lobbyClosesAt;        // Unix ms the waiting room closes; 0 when not waiting
+    private string lobbyCode;
+    private bool roomClosed;
     private TextMeshProUGUI searchingLabel;
 
     private void BuildOnlineScreen()
@@ -717,6 +735,36 @@ public class NeonMenu : MonoBehaviour
         onlineStatus.rectTransform.pivot = new Vector2(0.5f, 0);
         onlineStatus.rectTransform.sizeDelta = new Vector2(-40, 48);
         onlineStatus.rectTransform.anchoredPosition = new Vector2(0, 6);
+
+        // Host only, while waiting for players: keep the room open longer
+        extendButton = NeonButton(root, "Keep open", new Vector2(130, 40), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, ExtendRoom);
+        Place((RectTransform)extendButton.transform, new Vector2(1, 0), new Vector2(130, 40), new Vector2(-95, 30));
+        extendButton.gameObject.SetActive(false);
+    }
+
+    private void ExtendRoom()
+    {
+        if (OnlineClient.Instance != null && OnlineClient.Instance.IsConnected) OnlineClient.Instance.SendExtendRoom();
+    }
+
+    private void SetLobby(long closesAt, string code, bool host)
+    {
+        lobbyClosesAt = closesAt;
+        if (code != null) lobbyCode = code;
+        bool show = closesAt > 0 && host;
+        extendButton.gameObject.SetActive(show);
+        // Leave room for the button beside the status line
+        onlineStatus.rectTransform.sizeDelta = new Vector2(show ? -340 : -40, 48);
+    }
+
+    /// <summary>The waiting room's countdown, refreshed every frame while it's open</summary>
+    private void UpdateLobbyCountdown()
+    {
+        if (lobbyClosesAt <= 0 || onlineStarting || !onlineScreen.activeInHierarchy) return;
+        System.TimeSpan left = System.DateTimeOffset.FromUnixTimeMilliseconds(lobbyClosesAt) - System.DateTimeOffset.UtcNow;
+        if (left.TotalSeconds < 0) left = System.TimeSpan.Zero;
+        string time = left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes:00}m" : $"{left.Minutes}:{left.Seconds:00}";
+        onlineStatus.text = $"Your game code is {lobbyCode}. The game starts when every seat is filled. Room closes in {time}.";
     }
 
     // Shown in place of the Find match button while looking for an opponent
@@ -848,6 +896,7 @@ public class NeonMenu : MonoBehaviour
     {
         if (OnlineClient.Instance != null) OnlineClient.Instance.LeaveOnline();
         onlineBusy = false;
+        SetLobby(0, null, false);
         ShowMenu();
     }
 
@@ -961,6 +1010,8 @@ public class NeonMenu : MonoBehaviour
     private void OnOnlineClosed(string reason)
     {
         if (onlineStarting || !(onlineScreen.activeInHierarchy || friendsScreen.activeInHierarchy)) return;
+        if (roomClosed) { roomClosed = false; return; } // already explained
+        SetLobby(0, null, false);
         SetOnlineStatus("Couldn't join that game. Check the code, or it may already be full.");
         onlineBusy = false;
     }
@@ -975,13 +1026,31 @@ public class NeonMenu : MonoBehaviour
         }
         else if (msg.type == "room:joined")
         {
+            roomClosed = false;
             SetOnlineStatus($"Your game code is {msg.roomCode}. Waiting for your opponent to join…");
+            if (msg.state != null) SetLobby(msg.state.lobbyClosesAt, msg.roomCode, msg.isHost);
+        }
+        else if (msg.type == "room:extended")
+        {
+            SetLobby(msg.expiresAt, null, OnlineClient.Instance.IsHost);
+            ShowToast("Room kept open longer");
+        }
+        else if (msg.type == "room:closed")
+        {
+            // Nobody joined in time, or the host left the lobby
+            roomClosed = true;
+            onlineBusy = false;
+            SetLobby(0, null, false);
+            SetOnlineStatus(msg.reason == "host_left"
+                ? "The game closed because the host left."
+                : "The room closed because nobody joined. Tap Create game to make a new one.");
         }
     }
 
     private void StartOnlineGame(NetState state)
     {
         onlineStarting = true;
+        SetLobby(0, null, false);
         if (cancelChallengeButton != null) cancelChallengeButton.gameObject.SetActive(false);
         var client = OnlineClient.Instance;
         client.OnMessage -= OnOnlineMessage;
@@ -1537,6 +1606,7 @@ public class NeonMenu : MonoBehaviour
         public bool chaos;
         public int chaosInterval = 9;
         public bool timed;
+        public bool slow;
     }
 
     private string SetupKey => setupOnline ? "SetupPrefs.Online" : "SetupPrefs.Local";
@@ -1552,6 +1622,7 @@ public class NeonMenu : MonoBehaviour
         chaosMode = p.chaos;
         chaosInterval = p.chaosInterval == 5 || p.chaosInterval == 15 ? p.chaosInterval : 9;
         timedPlay = p.timed;
+        slowPace = p.slow;
         playerTypes.Clear();
         for (int i = 0; i < playerCount; i++)
             playerTypes.Add(p.types != null && i < p.types.Length ? (PlayerType)p.types[i] : (setupOnline ? PlayerType.Human : PlayerType.Computer));
@@ -1564,7 +1635,7 @@ public class NeonMenu : MonoBehaviour
         var p = new SetupPrefs
         {
             players = playerCount, board = (int)boardSize, difficulty = (int)difficulty,
-            types = playerTypes.ConvertAll(t => (int)t).ToArray(), chaos = chaosMode, chaosInterval = chaosInterval, timed = timedPlay,
+            types = playerTypes.ConvertAll(t => (int)t).ToArray(), chaos = chaosMode, chaosInterval = chaosInterval, timed = timedPlay, slow = slowPace,
         };
         PlayerPrefs.SetString(SetupKey, JsonUtility.ToJson(p));
         Debug.Log($"NeonMenu: saved setup {SetupKey} = {JsonUtility.ToJson(p)}");
@@ -1583,7 +1654,8 @@ public class NeonMenu : MonoBehaviour
         string size = boardSize == BoardSize.Large8x8x8 ? "8x8x8" : boardSize == BoardSize.Medium6x6x6 ? "6x6x6" : "4x4x4";
         return "{\"boardSize\":\"" + size + "\",\"playerCount\":" + playerCount
             + ",\"chaosMode\":" + (chaosMode ? "true" : "false") + ",\"chaosInterval\":" + chaosInterval
-            + ",\"timedMode\":" + (timedPlay ? "true" : "false") + ",\"timePerPlayerSeconds\":600"
+            + ",\"timedMode\":" + (timedPlay && !slowPace ? "true" : "false") + ",\"timePerPlayerSeconds\":600"
+            + ",\"pace\":\"" + (slowPace ? "slow" : "live") + "\""
             + ",\"aiDifficulty\":\"" + difficulty.ToString().ToLowerInvariant() + "\""
             + ",\"aiColors\":[" + string.Join(",", robots) + "]}";
     }

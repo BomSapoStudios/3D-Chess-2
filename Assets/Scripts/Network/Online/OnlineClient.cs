@@ -35,6 +35,8 @@ public class OnlineClient : MonoBehaviour
     // Session state
     public bool IsConnected => socket != null && socket.IsOpen;
     public string RoomCode { get; private set; }
+    /// <summary>Number of the last game event received from this room, for catching up after a drop</summary>
+    public int LastSeq { get; private set; }
     public PieceColor LocalColor { get; private set; }
     public bool IsHost { get; private set; }
     public string PlayerName => PlayerPrefs.GetString("OnlineName", "");
@@ -308,7 +310,9 @@ public class OnlineClient : MonoBehaviour
     public async void JoinRoom(string code)
     {
         await CloseRoom();
-        RoomCode = code.Trim().ToUpperInvariant();
+        string upper = code.Trim().ToUpperInvariant();
+        if (upper != RoomCode) LastSeq = 0; // a different room: nothing seen yet
+        RoomCode = upper;
         intentionalClose = false;
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
                      $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}";
@@ -389,6 +393,9 @@ public class OnlineClient : MonoBehaviour
 
     public void SendResign(PieceColor color) => Send("{\"type\":\"game:resign\"" + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
 
+    /// <summary>Keep the lobby open longer (host only); the server answers with room:extended</summary>
+    public void SendExtendRoom() => Send("{\"type\":\"room:extend\"}");
+
     private string As(PieceColor color) => color == LocalColor ? "" : "\"as\":\"" + color + "\",";
 
     /// <summary>Send a request; the server's ack (ok/error) goes to the callback if given</summary>
@@ -421,11 +428,21 @@ public class OnlineClient : MonoBehaviour
             return;
         }
 
+        // Game events are numbered; skip any already seen (a replay can overlap live messages)
+        if (msg.seq > 0)
+        {
+            if (msg.seq <= LastSeq) return;
+            LastSeq = msg.seq;
+        }
+
         if (msg.type == "room:joined")
         {
             RoomCode = msg.roomCode;
             IsHost = msg.isHost;
             if (Enum.TryParse(msg.yourColor, out PieceColor color)) LocalColor = color;
+            // Back after a drop (or hours away in a Take your time game): fetch what we missed
+            if (msg.state != null && msg.state.seq > LastSeq)
+                Send("{\"type\":\"room:replay\",\"since\":" + LastSeq + "}");
         }
         OnMessage?.Invoke(msg);
     }
@@ -492,6 +509,10 @@ public class ServerMessage
     public NetState state;
     public NetRotation rotation;
     public string conqueredBy;
+    public int seq;
+    public long expiresAt;   // room:extended
+    public long graceMs;     // room:playerLeft; 0 in Take your time games
+    public string pace;
 }
 
 [Serializable]
@@ -523,6 +544,9 @@ public class NetState
     public int turnNumber;
     public NetConfig config;
     public NetPlayer[] players;
+    public int seq;
+    public long lobbyClosesAt;  // while waiting for players (Unix ms)
+    public long moveDeadline;   // Take your time / timed games: when the player on move must move by (Unix ms)
 }
 
 [Serializable]
@@ -536,6 +560,7 @@ public class NetConfig
     public int timePerPlayerSeconds;
     public string aiDifficulty;
     public string[] aiColors;
+    public string pace;        // live | slow ("Take your time")
 }
 
 [Serializable]

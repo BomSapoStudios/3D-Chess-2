@@ -23,6 +23,13 @@ interface RoomMeta {
   hostUserId: string;
   isPublic: boolean;
   createdAt: number;
+  /** Lobby closes at this time if the game hasn't started (the host can extend it) */
+  expiresAt?: number;
+  /** Last time anyone did anything, for the idle cap */
+  lastActivityAt?: number;
+  /** When the last socket closed, for clearing finished rooms */
+  emptySince?: number | null;
+  placementStartedAt?: number | null;
 }
 
 interface Attachment {
@@ -36,26 +43,40 @@ interface GameOverInfo {
   reason: EndReason;
 }
 
-const DISCONNECT_GRACE_MS = 2 * 60 * 1000;      // seat is held this long for a dropped player
-const ABANDONED_ROOM_MS = 24 * 60 * 60 * 1000;   // empty rooms are cleared after a day
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DISCONNECT_GRACE_MS = 5 * MINUTE;      // Live: seat is held this long for a dropped player
+const SLOW_MOVE_MS = 24 * HOUR;              // Take your time: each move (and placement) may take this long
+const LOBBY_LIVE_MS = 10 * MINUTE;           // Live lobby closes if nobody joins
+const LOBBY_SLOW_MS = 24 * HOUR;             // Take your time lobby
+const LOBBY_EXTEND_MS = 10 * MINUTE;         // each Extend tap
+const LOBBY_LIVE_MAX_MS = HOUR;              // Live lobby can be extended up to an hour in total
+const HOST_GONE_MS = 2 * MINUTE;             // lobby closes this long after the host leaves it
+const FINISHED_EMPTY_MS = MINUTE;            // finished rooms are cleared a minute after the last player leaves
+const IDLE_CAP_MS = 7 * 24 * HOUR;           // any room nobody touches for a week is cleared
+
 
 export class Room extends DurableObject<Env> {
   private meta: RoomMeta | null = null;
   private engine: GameEngine | null = null;
   private seats: Record<string, PlayerColor> = {}; // userId → color
   private gameOver: GameOverInfo | null = null;
-  private turnStartedAt: number | null = null;     // for timed games
+  private turnStartedAt: number | null = null;     // for timed and Take your time games
+  private seq = 0;                                  // number of logged events
+  private readonly timeScale: number;               // local tests shrink every timer (ROOM_TIME_SCALE)
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    this.timeScale = Number(env.ROOM_TIME_SCALE) > 0 ? Number(env.ROOM_TIME_SCALE) : 1;
     ctx.blockConcurrencyWhile(async () => {
-      const stored = await ctx.storage.get(['meta', 'engine', 'seats', 'gameOver', 'turnStartedAt']);
+      const stored = await ctx.storage.get(['meta', 'engine', 'seats', 'gameOver', 'turnStartedAt', 'seq']);
       this.meta = (stored.get('meta') as RoomMeta) ?? null;
       const snap = stored.get('engine') as EngineSnapshot | undefined;
       this.engine = snap ? GameEngine.fromSnapshot(snap) : null;
       this.seats = (stored.get('seats') as Record<string, PlayerColor>) ?? {};
       this.gameOver = (stored.get('gameOver') as GameOverInfo) ?? null;
       this.turnStartedAt = (stored.get('turnStartedAt') as number) ?? null;
+      this.seq = (stored.get('seq') as number) ?? 0;
     });
   }
 
@@ -67,8 +88,10 @@ export class Room extends DurableObject<Env> {
     if (url.pathname === '/init' && request.method === 'POST') {
       if (this.meta) return Response.json({ error: 'exists' }, { status: 409 });
       const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig> };
-      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: Date.now() };
+      const now = Date.now();
       this.engine = new GameEngine(body.code, sanitizeConfig(body.config));
+      const lobbyMs = this.engine.config.pace === 'slow' ? this.t(LOBBY_SLOW_MS) : this.t(LOBBY_LIVE_MS);
+      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null };
       // Robot seats are filled now; the host's device plays them
       for (const color of this.engine.config.aiColors ?? []) {
         const robotId = `ai:${color}`;
@@ -77,7 +100,6 @@ export class Room extends DurableObject<Env> {
         this.seats[robotId] = color;
       }
       await this.persist();
-      await this.ctx.storage.setAlarm(Date.now() + ABANDONED_ROOM_MS);
       return Response.json({ code: body.code, config: this.engine.config });
     }
 
@@ -136,10 +158,12 @@ export class Room extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server, [userId]);
     server.serializeAttachment({ userId, name, color } satisfies Attachment);
     engine.setPlayerConnected(color, true);
+    this.meta!.emptySince = null;
 
     // Everyone seated: move on to piece placement
     if (engine.getState().phase === 'waiting' && engine.getState().players.length === engine.config.playerCount) {
       engine.startPlacement();
+      this.meta!.placementStartedAt = Date.now();
     }
     await this.persist();
 
@@ -181,23 +205,45 @@ export class Room extends DurableObject<Env> {
       case 'room:state':
         return reply(true, undefined, { state: this.stateForClients() });
 
+      case 'room:replay': {
+        // Resend the game events a reconnecting player missed, in order
+        const since = Math.max(0, Number(msg.since) || 0);
+        const events = await this.ctx.storage.list<string>({ prefix: 'ev:', start: eventKey(since + 1) });
+        for (const text of events.values()) {
+          try { ws.send(text); } catch { /* socket already gone */ }
+        }
+        return reply(true, undefined, { seq: this.seq });
+      }
+
+      case 'room:extend': {
+        // Host keeps the lobby open longer
+        const meta = this.meta!;
+        if (me.userId !== meta.hostUserId) return reply(false, 'Only the host can keep the room open');
+        if (engine.getState().phase !== 'waiting') return reply(false, 'The game has already started');
+        const cap = meta.createdAt + (engine.config.pace === 'slow' ? 7 * this.t(LOBBY_SLOW_MS) : this.t(LOBBY_LIVE_MAX_MS));
+        meta.expiresAt = Math.min(cap, Math.max(meta.expiresAt ?? Date.now(), Date.now()) + (engine.config.pace === 'slow' ? this.t(LOBBY_SLOW_MS) : this.t(LOBBY_EXTEND_MS)));
+        await this.persist();
+        reply(true, undefined, { expiresAt: meta.expiresAt });
+        return this.broadcast({ type: 'room:extended', expiresAt: meta.expiresAt, state: this.stateForClients() });
+      }
+
       case 'game:placePiece': {
         const result = engine.placePiece(me.color, msg.pieceType as PieceType, msg.position as BoardPosition);
         if (!result.success) return reply(false, result.error);
         await this.persist();
         reply(true);
-        this.broadcast({ type: 'game:piecePlaced', color: me.color, pieceType: msg.pieceType, position: msg.position });
+        await this.logEvent({ type: 'game:piecePlaced', color: me.color, pieceType: msg.pieceType, position: msg.position });
         return this.broadcast({ type: 'game:stateUpdate', reason: 'placement', state: this.stateForClients() });
       }
 
       case 'game:ready': {
         if (engine.getState().phase !== 'placement') return reply(false, 'Not in placement phase');
         engine.completePlacement(me.color);
-        this.broadcast({ type: 'game:playerReady', color: me.color });
+        await this.logEvent({ type: 'game:playerReady', color: me.color });
         if (engine.allPlacementsComplete()) {
           engine.startGame();
           this.startTurnClock();
-          this.broadcast({ type: 'game:phaseChanged', phase: 'playing' });
+          await this.logEvent({ type: 'game:phaseChanged', phase: 'playing' });
         }
         await this.persist();
         reply(true);
@@ -205,7 +251,7 @@ export class Room extends DurableObject<Env> {
       }
 
       case 'game:move': {
-        if (this.chargeClock()) return reply(false, 'Out of time');
+        if (this.chargeClock() || this.slowDeadlinePassed()) return reply(false, 'Out of time');
         const result = engine.executeMove(me.color, msg.from as BoardPosition, msg.to as BoardPosition);
         if (!result.success) {
           reply(false, result.error);
@@ -257,13 +303,13 @@ export class Room extends DurableObject<Env> {
       this.startTurnClock();
     }
     await this.persist();
-    this.broadcast(event);
-    if (result.chaosRotation) this.broadcast({ type: 'game:chaosRotation', rotation: result.chaosRotation });
+    await this.logEvent(event);
+    if (result.chaosRotation) await this.logEvent({ type: 'game:chaosRotation', rotation: result.chaosRotation });
     if (result.requiresPromotion) this.broadcast({ type: 'game:pawnPromotion', ...result.requiresPromotion });
     if (result.eliminatedPlayer && !result.gameOver) {
-      this.broadcast({ type: 'game:playerEliminated', color: result.eliminatedPlayer, conqueredBy: result.conqueredBy ?? null });
+      await this.logEvent({ type: 'game:playerEliminated', color: result.eliminatedPlayer, conqueredBy: result.conqueredBy ?? null });
     }
-    if (result.gameOver) this.broadcast({ type: 'game:over', ...result.gameOver });
+    if (result.gameOver) await this.logEvent({ type: 'game:over', ...result.gameOver });
     this.broadcast({ type: 'game:stateUpdate', reason: event.type, state: this.stateForClients() });
   }
 
@@ -283,15 +329,33 @@ export class Room extends DurableObject<Env> {
     // A replaced socket closing must not mark the player offline
     if (this.ctx.getWebSockets(me.userId).some(other => other !== ws)) return;
     this.engine.setPlayerConnected(me.color, false);
+    if (this.ctx.getWebSockets().every(other => other === ws)) this.meta!.emptySince = Date.now();
     await this.persist();
-    this.broadcast({ type: 'room:playerLeft', color: me.color, name: me.name, graceMs: DISCONNECT_GRACE_MS, state: this.stateForClients() }, ws);
-    await this.scheduleAlarm();
+    const graceMs = this.engine.config.pace === 'slow' ? null : this.t(DISCONNECT_GRACE_MS);
+    this.broadcast({ type: 'room:playerLeft', color: me.color, name: me.name, graceMs, pace: this.engine.config.pace, state: this.stateForClients() }, ws);
   }
 
   async alarm(): Promise<void> {
     const engine = this.engine;
-    if (!engine || !this.meta) return;
+    const meta = this.meta;
+    if (!engine || !meta) return;
     const now = Date.now();
+    const slow = engine.config.pace === 'slow';
+
+    // Lobby: nobody joined in time, or the host walked away
+    if (engine.getState().phase === 'waiting') {
+      const host = engine.getState().players.find(p => p.userId === meta.hostUserId);
+      if (now >= (meta.expiresAt ?? meta.createdAt + this.t(LOBBY_LIVE_MS))) return this.closeRoom('expired');
+      if (host && !host.isConnected && host.disconnectedAt && now - host.disconnectedAt >= this.t(HOST_GONE_MS)) return this.closeRoom('host_left');
+    }
+
+    // Placement that never finished: a Live player who never came back, or a day gone by
+    if (engine.getState().phase === 'placement') {
+      const stalled = slow
+        ? meta.placementStartedAt != null && now - meta.placementStartedAt >= this.t(SLOW_MOVE_MS)
+        : engine.getState().players.some(p => p.type !== 'ai' && !p.isConnected && p.disconnectedAt != null && now - p.disconnectedAt >= this.t(DISCONNECT_GRACE_MS));
+      if (stalled) await this.endAbandoned();
+    }
 
     // Timed games: the player on move ran out of time
     if (this.chargeClock()) {
@@ -300,11 +364,20 @@ export class Room extends DurableObject<Env> {
       await this.afterResult(result, { type: 'game:timeout', color: loser });
     }
 
-    // Seats held too long for players who never came back
+    // Take your time: a player who let a day pass without moving is out
+    if (this.slowDeadlinePassed()) {
+      const loser = engine.getState().currentTurn!;
+      const result = engine.resign(loser);
+      if (result.gameOver) result.gameOver.reason = 'timeout';
+      await this.afterResult(result, { type: 'game:timeout', color: loser });
+    }
+
+    // Live: seats held too long for players who never came back
     const state = engine.getState();
-    if (state.phase === 'playing') {
+    if (state.phase === 'playing' && !slow) {
       for (const p of state.players) {
-        if (!p.isConnected && !p.isEliminated && p.disconnectedAt && now - p.disconnectedAt >= DISCONNECT_GRACE_MS) {
+        if (p.type !== 'ai' && !p.isConnected && !p.isEliminated && p.disconnectedAt && now - p.disconnectedAt >= this.t(DISCONNECT_GRACE_MS)) {
+          if (engine.getState().phase !== 'playing') break;
           const result = engine.resign(p.color);
           await this.afterResult(result, { type: 'game:abandoned', color: p.color });
         }
@@ -313,47 +386,90 @@ export class Room extends DurableObject<Env> {
 
     // Only robots left in the game: nobody is playing, so end it
     const live = engine.getState();
-    if (live.phase === 'playing' && !live.players.some(p => p.type !== 'ai' && !p.isEliminated)) {
-      this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
-      await this.persist();
-    }
+    if (live.phase === 'playing' && !live.players.some(p => p.type !== 'ai' && !p.isEliminated)) await this.endAbandoned();
 
-    // Nobody here for a day: clear the room so its code can be reused
-    if (this.ctx.getWebSockets().length === 0 && (now - this.meta.createdAt >= ABANDONED_ROOM_MS || this.gameOver)) {
-      await this.ctx.storage.deleteAll();
-      this.meta = null;
-      this.engine = null;
-      return;
+    // Clear finished rooms shortly after everyone leaves, and any room left idle for a week
+    if (this.ctx.getWebSockets().length === 0) {
+      const finishedAndEmpty = this.gameOver && meta.emptySince != null && now - meta.emptySince >= this.t(FINISHED_EMPTY_MS);
+      const idle = now - (meta.lastActivityAt ?? meta.createdAt) >= this.t(IDLE_CAP_MS);
+      if (finishedAndEmpty || idle) {
+        await this.ctx.storage.deleteAll();
+        this.meta = null;
+        this.engine = null;
+        return;
+      }
     }
     await this.scheduleAlarm();
   }
 
+  /** The game can't go on: end it with no winner */
+  private async endAbandoned(): Promise<void> {
+    if (!this.engine || this.gameOver) return;
+    this.engine.abandon();
+    this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
+    this.turnStartedAt = null;
+    await this.persist();
+    await this.logEvent({ type: 'game:over', ...this.gameOver });
+  }
+
+  /** Close a lobby that never started: tell anyone still in it, then forget the room */
+  private async closeRoom(reason: 'expired' | 'host_left'): Promise<void> {
+    this.broadcast({ type: 'room:closed', reason });
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.close(4001, reason === 'expired' ? 'Room closed: nobody joined' : 'Room closed: the host left'); } catch { /* already closed */ }
+    }
+    await this.ctx.storage.deleteAll();
+    this.meta = null;
+    this.engine = null;
+  }
+
+  /** The next time something in this room needs to happen. Only future times: past ones would fire every second. */
+  private nextDeadline(): number {
+    const engine = this.engine!;
+    const meta = this.meta!;
+    const now = Date.now();
+    const state = engine.getState();
+    const slow = engine.config.pace === 'slow';
+    const times = [(meta.lastActivityAt ?? meta.createdAt) + this.t(IDLE_CAP_MS)];
+
+    if (state.phase === 'waiting') {
+      times.push(meta.expiresAt ?? meta.createdAt + this.t(LOBBY_LIVE_MS));
+      const host = state.players.find(p => p.userId === meta.hostUserId);
+      if (host && !host.isConnected && host.disconnectedAt) times.push(host.disconnectedAt + this.t(HOST_GONE_MS));
+    }
+    if (state.phase === 'placement' && slow && meta.placementStartedAt != null) times.push(meta.placementStartedAt + this.t(SLOW_MOVE_MS));
+    if ((state.phase === 'placement' || state.phase === 'playing') && !slow) {
+      for (const p of state.players) {
+        if (!p.isConnected && !p.isEliminated && p.type !== 'ai' && p.disconnectedAt) times.push(p.disconnectedAt + this.t(DISCONNECT_GRACE_MS));
+      }
+    }
+    const clock = this.clockDeadline();
+    if (clock) times.push(clock);
+    const move = this.slowDeadline();
+    if (move) times.push(move);
+    if (this.gameOver && meta.emptySince != null) times.push(meta.emptySince + this.t(FINISHED_EMPTY_MS));
+
+    const future = times.filter(t => t > now);
+    return future.length ? Math.min(...future) : now + this.t(IDLE_CAP_MS);
+  }
+
   private async scheduleAlarm(): Promise<void> {
     if (!this.engine || !this.meta) return;
-    const times = [Date.now() + ABANDONED_ROOM_MS]; // only future times: past ones would fire every second
-    const state = this.engine.getState();
-    for (const p of state.players) {
-      // Only players who can still come back; a deadline already handled must not be rescheduled
-      // (that made finished seats wake the room every second, all day)
-      const deadline = p.disconnectedAt ? p.disconnectedAt + DISCONNECT_GRACE_MS : 0;
-      if (!p.isConnected && !p.isEliminated && p.type !== 'ai' && deadline > Date.now() && state.phase === 'playing') times.push(deadline);
-    }
-    const deadline = this.clockDeadline();
-    if (deadline && deadline > Date.now()) times.push(deadline);
-    await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...times)));
+    await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, this.nextDeadline()));
   }
 
   // ── Chess clock (timed games) ─────────────────────────────────────────────────
 
   private startTurnClock(): void {
     const engine = this.engine;
-    this.turnStartedAt = engine && engine.config.timedMode && engine.getState().phase === 'playing' ? Date.now() : null;
+    const clocked = engine && (engine.config.timedMode || engine.config.pace === 'slow');
+    this.turnStartedAt = clocked && engine!.getState().phase === 'playing' ? Date.now() : null;
   }
 
   /** Charge elapsed time to the player on move; true if they have run out */
   private chargeClock(): boolean {
     const engine = this.engine;
-    if (!engine || this.turnStartedAt === null) return false;
+    if (!engine || !engine.config.timedMode || this.turnStartedAt === null) return false;
     const now = Date.now();
     const { timedOut } = engine.tickTimer(now - this.turnStartedAt);
     this.turnStartedAt = now;
@@ -367,7 +483,37 @@ export class Room extends DurableObject<Env> {
     return mover?.remainingTimeMs != null ? this.turnStartedAt + mover.remainingTimeMs : null;
   }
 
+  /** Take your time: when the player on move must have moved by. Robot turns wait for the host, so they have none. */
+  private slowDeadline(): number | null {
+    const engine = this.engine;
+    if (!engine || engine.config.pace !== 'slow' || this.turnStartedAt === null) return null;
+    const state = engine.getState();
+    if (state.phase !== 'playing') return null;
+    const mover = state.players.find(p => p.color === state.currentTurn);
+    if (!mover || mover.type === 'ai') return null;
+    return this.turnStartedAt + this.t(SLOW_MOVE_MS);
+  }
+
+  private slowDeadlinePassed(): boolean {
+    const deadline = this.slowDeadline();
+    return deadline !== null && Date.now() >= deadline;
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  private t(ms: number): number {
+    return ms * this.timeScale;
+  }
+
+  /** Broadcast a game event and keep it so a player who missed it can catch up */
+  private async logEvent(message: Record<string, unknown>): Promise<void> {
+    this.seq++;
+    const text = JSON.stringify({ ...message, seq: this.seq });
+    await this.ctx.storage.put({ [eventKey(this.seq)]: text, seq: this.seq });
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.send(text); } catch { /* socket already gone */ }
+    }
+  }
 
   private stateForClients() {
     const state = this.engine!.getState();
@@ -376,10 +522,14 @@ export class Room extends DurableObject<Env> {
       winner: this.gameOver?.winner ?? null,
       endReason: this.gameOver?.reason ?? null,
       drawOfferFrom: this.engine!.drawOfferFrom,
+      seq: this.seq,
+      lobbyClosesAt: state.phase === 'waiting' ? this.meta?.expiresAt ?? null : null,
+      moveDeadline: this.slowDeadline() ?? this.clockDeadline(),
     };
   }
 
   private async persist(): Promise<void> {
+    if (this.meta) this.meta.lastActivityAt = Date.now();
     await this.ctx.storage.put({
       meta: this.meta,
       engine: this.engine?.toSnapshot() ?? null,
@@ -403,6 +553,10 @@ export class Room extends DurableObject<Env> {
   }
 }
 
+function eventKey(seq: number): string {
+  return 'ev:' + String(seq).padStart(8, '0');
+}
+
 /** Only accept known settings, within the game's limits */
 export function sanitizeConfig(input: Partial<GameConfig> = {}): Partial<GameConfig> {
   const config: Partial<GameConfig> = {};
@@ -416,6 +570,8 @@ export function sanitizeConfig(input: Partial<GameConfig> = {}): Partial<GameCon
   if (config.playerCount === 4 && config.boardSize === '4x4x4') config.boardSize = '6x6x6';
   if (config.playerCount === 6) config.boardSize = '8x8x8';
   if (['easy', 'medium', 'hard'].includes(input.aiDifficulty as string)) config.aiDifficulty = input.aiDifficulty;
+  if (input.pace === 'live' || input.pace === 'slow') config.pace = input.pace;
+  if (config.pace === 'slow') config.timedMode = false; // the 24 hour move window is the clock
   // Robot seats: any seats but White (the host), and at least one seat left for a human opponent
   if (Array.isArray(input.aiColors)) {
     const seats = PLAYER_COLORS_BY_COUNT[config.playerCount ?? 2];

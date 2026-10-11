@@ -51,7 +51,12 @@ export interface GameConfig {
   aiDifficulty: AIDifficulty;
   /** Seats played by robots. The host's device runs their AI and moves for them. */
   aiColors?: PlayerColor[];
+  /** live: everyone plays now (a dropped player has 5 minutes to return).
+   *  slow: "Take your time", each move may take up to 24 hours. */
+  pace?: GamePace;
 }
+
+export type GamePace = 'live' | 'slow';
 
 export interface GameState {
   gameId: string;
@@ -145,4 +150,5 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   timedMode: false,
   timePerPlayerSeconds: 600,
   aiDifficulty: 'medium',
+  pace: 'live',
 };

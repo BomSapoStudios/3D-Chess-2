@@ -45,6 +45,8 @@ export interface Env {
   TOKEN_SECRET: string;
   APPLE_AUDIENCES: string;
   GOOGLE_CLIENT_IDS: string;
+  /** Local tests only: multiply every room timer by this */
+  ROOM_TIME_SCALE?: string;
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */

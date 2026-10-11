@@ -19,6 +19,8 @@ public class OnlineGameBridge : MonoBehaviour
     private float bannerUntil;
     private bool reconnecting;
     private bool gameOverShown;
+    private long moveDeadline;      // Unix ms the player on move must move by (Take your time); 0 if none
+    private string currentTurn;
 
     public static void Begin()
     {
@@ -64,6 +66,11 @@ public class OnlineGameBridge : MonoBehaviour
 
     private void Receive(ServerMessage msg)
     {
+        if (msg.state != null)
+        {
+            moveDeadline = msg.state.moveDeadline;
+            currentTurn = msg.state.currentTurn;
+        }
         if (GameReady() && backlog.Count == 0) Apply(msg);
         else backlog.Enqueue(msg);
     }
@@ -130,11 +137,23 @@ public class OnlineGameBridge : MonoBehaviour
                 break;
 
             case "room:playerLeft":
-                if (fromOpponent) Show("Your opponent disconnected. Waiting for them to come back…", 120f);
+                if (!fromOpponent) break;
+                if (msg.graceMs > 0)
+                    Show($"{Who(msg)} disconnected. They have {Mathf.RoundToInt(msg.graceMs / 60000f)} minutes to come back.", 120f);
+                else
+                    Show($"{Who(msg)} stepped away. The game waits for them.", 5f);
                 break;
 
             case "room:playerReconnected":
-                if (fromOpponent) Show("Your opponent is back!", 3f);
+                if (fromOpponent) Show($"{Who(msg)} is back!", 3f);
+                break;
+
+            case "game:timeout":
+                if (color.HasValue) Show(color.Value == OnlineSession.LocalColor ? "You ran out of time." : $"{color.Value} ran out of time.", 6f);
+                break;
+
+            case "game:abandoned":
+                if (fromOpponent) Show($"{color.Value} didn't come back and is out of the game.", 6f);
                 break;
 
             case "room:joined":
@@ -145,6 +164,16 @@ public class OnlineGameBridge : MonoBehaviour
                 }
                 break;
         }
+    }
+
+    private static string Who(ServerMessage msg) => !string.IsNullOrEmpty(msg.name) ? msg.name : msg.color ?? "Your opponent";
+
+    // iOS suspends the app in the background and its connection with it; catch up on return
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused || !OnlineSession.IsActive) return;
+        var client = OnlineClient.Instance;
+        if (client != null && !client.IsConnected) Resync();
     }
 
     private static void Remote(Action action)
@@ -225,7 +254,17 @@ public class OnlineGameBridge : MonoBehaviour
 
         // Who you are, so it's clear which side to play
         string you = $"Online · You are {OnlineSession.LocalColor}";
-        if (!TurnPlannerUI.IsOpen) GUI.Label(new Rect(20, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
+        string clock = null;
+        if (moveDeadline > 0 && currentTurn == OnlineSession.LocalColor.ToString())
+        {
+            // Take your time games: how long is left to make this move
+            TimeSpan left = DateTimeOffset.FromUnixTimeMilliseconds(moveDeadline) - DateTimeOffset.UtcNow;
+            if (left.TotalSeconds > 0) clock = left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m left to move" : $"{Math.Max(1, left.Minutes)}m left to move";
+        }
+        if (!TurnPlannerUI.IsOpen) {
+            GUI.Label(new Rect(20, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
+            if (clock != null) GUI.Label(new Rect(20, ui.y - 56, 300, 24), clock, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14));
+        }
 
         if (!string.IsNullOrEmpty(banner) && Time.time < bannerUntil)
         {
