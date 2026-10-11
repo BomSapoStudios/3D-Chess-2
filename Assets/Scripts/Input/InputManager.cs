@@ -184,6 +184,13 @@ public class InputManager : MonoBehaviour
             return;
         }
 
+        // While the Turn Planner is open, board taps only pick which piece to plan; they never move anything
+        if (TurnPlannerUI.IsOpen)
+        {
+            if (gameCamera != null) TurnPlannerUI.Instance.OnBoardTap(gameCamera.ScreenPointToRay(screenPosition));
+            return;
+        }
+
         // Check if game state allows any interaction
         if (GameStateManager.Instance == null)
         {

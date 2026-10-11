@@ -101,7 +101,6 @@ public class TurnPlannerUI : MonoBehaviour
     /// <summary>Rebuild the piece and move lists (the board changed or the turn passed)</summary>
     private void Recompute(bool keepSelection)
     {
-        Debug.Log($"TurnPlanner: recompute keep={keepSelection}");
         ChessPiece keepPiece = keepSelection && pieceIndex < pieces.Count ? pieces[pieceIndex] : null;
         side = CurrentPlayer;
         pieces = TurnPlannerAnalysis.MovablePieces(side);
@@ -121,7 +120,6 @@ public class TurnPlannerUI : MonoBehaviour
     {
         if (pieces.Count == 0) return;
         pieceIndex = (pieceIndex + delta + pieces.Count) % pieces.Count;
-        Debug.Log($"TurnPlanner: piece {pieceIndex + 1}/{pieces.Count} {pieces[pieceIndex].pieceType} (event {Event.current?.type})");
         LoadMoves(0);
     }
 
@@ -130,6 +128,29 @@ public class TurnPlannerUI : MonoBehaviour
         if (moves.Count == 0) return;
         moveIndex = (moveIndex + delta + moves.Count) % moves.Count;
         ApplyFocus();
+    }
+
+    /// <summary>A tap on the board while planning: plan that piece (if it's one of yours and visible)</summary>
+    public void OnBoardTap(Ray ray)
+    {
+        RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Infinity);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit h in hits)
+        {
+            ChessPiece piece = h.collider.GetComponentInParent<ChessPiece>();
+            if (piece == null || piece.IsInTray()) continue;
+            if (hidden.Count > 0 && !Involved().Contains(piece)) continue; // hidden while focused: tap goes through
+            int index = pieces.IndexOf(piece);
+            if (index < 0)
+            {
+                note = piece.pieceColor == side ? $"Your {piece.pieceType} has no moves" : $"That's {piece.pieceColor}'s {piece.pieceType}";
+                return;
+            }
+            note = null;
+            pieceIndex = index;
+            LoadMoves(0);
+            return;
+        }
     }
 
     private TurnPlannerAnalysis.MoveOutcome Current => moveIndex < moves.Count ? moves[moveIndex] : null;
@@ -315,7 +336,7 @@ public class TurnPlannerUI : MonoBehaviour
         GUI.Label(new Rect(x, y, inner - 50, 30), "TURN PLANNER", NeonTheme.GUILabelStyle(NeonTheme.Lime, 20, true, TextAnchor.MiddleLeft, display: true));
         if (TouchGUI.NeonButton(new Rect(panel.xMax - 50, y, 40, 32), "X", NeonTheme.Pink, NeonTheme.Ground, fontSize: 16)) { Close(); TouchGUI.End(); return; }
         y += 34;
-        GUI.Label(new Rect(x, y, inner, 20), $"{side} to move" + (CanMoveNow() ? "" : " (planning only)"), NeonTheme.GUILabelStyle(NeonTheme.Lavender, 13));
+        GUI.Label(new Rect(x, y, inner, 20), $"{side} to move" + (CanMoveNow() ? "" : " (planning only)") + (focus ? "" : " · tap a piece to plan it"), NeonTheme.GUILabelStyle(NeonTheme.Lavender, 13));
         y += 22;
 
         if (pieces.Count == 0)
@@ -361,12 +382,14 @@ public class TurnPlannerUI : MonoBehaviour
         {
             focus = !focus;
             if (!focus) { foreach (Renderer r in hidden) if (r != null) r.enabled = true; hidden.Clear(); }
+            else ApplyFocus(); // focus on whichever piece was picked while showing all
         }
         if (o != null && CanMoveNow())
         {
             if (TouchGUI.NeonButton(new Rect(x + inner - 150, bottom, 150, 40), "Make this move", NeonTheme.Lime, NeonTheme.Pink, fontSize: 15))
             {
                 var move = o;
+                // (logged so stray moves can be traced)
                 Debug.Log($"TurnPlanner: make move {move.piece.pieceType} {TurnPlannerAnalysis.Label(move.from)}->{TurnPlannerAnalysis.Label(move.to)} (piece index {pieceIndex})");
                 Close();
                 if (InputManager.Instance == null || !InputManager.Instance.PlannerMove(move.piece, move.to)) note = "Couldn't make that move";
