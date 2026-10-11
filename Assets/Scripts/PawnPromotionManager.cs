@@ -434,6 +434,9 @@ public class PawnPromotionManager : MonoBehaviour
                 }
             }
             
+            // The pawn morphs into its new piece (the effect uses a copy of the pawn)
+            PieceEffects.Promote(promotingPawn, newPiece);
+
             // Destroy the old pawn
             Destroy(promotingPawn.gameObject);
             

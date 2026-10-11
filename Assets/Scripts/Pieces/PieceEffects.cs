@@ -14,7 +14,7 @@ public class PieceEffects : MonoBehaviour
 {
     private static PieceEffects runner;
     private static Material glowMaterial;
-    private static Mesh orbMesh, shardMesh;
+    private static Mesh orbMesh, shardMesh, columnMesh;
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     private static PieceEffects Runner
@@ -400,6 +400,97 @@ public class PieceEffects : MonoBehaviour
         var block = new MaterialPropertyBlock();
         r.GetPropertyBlock(block);
         return block.GetColor(ColorId);
+    }
+
+    // ───────────────────────── Promotion: morph ─────────────────────────
+
+    /// <summary>
+    /// The pawn spins up and stretches into a thin column of light, and the new piece spins
+    /// out of the column into its own shape. Call before the pawn is destroyed; the new piece
+    /// must already be on its square.
+    /// </summary>
+    public static void Promote(ChessPiece pawn, ChessPiece promoted)
+    {
+        if (promoted == null) return;
+        GameObject copy = pawn != null ? VisualCopy(pawn) : null;
+        if (copy != null) copy.transform.SetPositionAndRotation(promoted.transform.position, copy.transform.rotation);
+        Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, GlowColor(promoted.pieceColor)));
+    }
+
+    private IEnumerator PromoteRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
+    {
+        Transform t = promoted.transform;
+        // Let the new piece finish setting itself up (model, facing) before reading its pose
+        SetSquash(t, 0f, 0f);
+        yield return null;
+        if (t == null) { if (pawnCopy != null) Destroy(pawnCopy); yield break; }
+        Transform container = PiecesContainer;
+        Vector3 up = container != null ? container.up : Vector3.up;
+        Quaternion restRotation = t.localRotation;
+        RestScale(t);
+        SetSquash(t, 0f, 0f); // hidden until the column opens
+        float cell = Cell;
+        Mesh cylinder = PrimitiveMesh(PrimitiveType.Cylinder, ref columnMesh);
+
+        // A column of light rises around the pawn
+        Vector3 floor = t.position;
+        GameObject column = Solid("Promotion Column", cylinder, color, floor, new Vector3(0.05f, 0.01f, 0.05f) * cell);
+        column.transform.rotation = Quaternion.FromToRotation(Vector3.up, up);
+
+        // 1. The pawn spins faster and faster and stretches into a thin streak
+        const float windUp = 0.55f;
+        Quaternion pawnRest = pawnCopy != null ? pawnCopy.transform.rotation : Quaternion.identity;
+        Vector3 pawnScale = pawnCopy != null ? pawnCopy.transform.localScale : Vector3.one;
+        float angle = 0f;
+        for (float time = 0; time < windUp; time += Time.deltaTime)
+        {
+            float k = time / windUp;
+            angle += Mathf.Lerp(200f, 1400f, k * k) * Time.deltaTime;
+            if (pawnCopy != null)
+            {
+                pawnCopy.transform.rotation = Quaternion.AngleAxis(angle, up) * pawnRest;
+                pawnCopy.transform.localScale = new Vector3(pawnScale.x * Mathf.Lerp(1f, 0.15f, k * k), pawnScale.y * Mathf.Lerp(1f, 1.7f, k), pawnScale.z * Mathf.Lerp(1f, 0.15f, k * k));
+            }
+            float h = Mathf.Lerp(0.01f, 1.4f, k) * cell;
+            column.transform.localScale = new Vector3(0.22f * cell, h, 0.22f * cell);
+            column.transform.position = floor + up * h; // a cylinder is 2 units tall around its middle
+            Color c = color; c.a = Mathf.Lerp(0.15f, 0.6f, k);
+            SetColor(column.GetComponent<Renderer>(), c);
+            yield return null;
+        }
+        if (pawnCopy != null) Destroy(pawnCopy);
+
+        // A flash at the swap
+        GameObject flash = Solid("Promotion Flash", PrimitiveMesh(PrimitiveType.Sphere, ref orbMesh), color, floor + up * cell * 0.45f, Vector3.one * 0.3f);
+        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 1.1f * cell));
+
+        // 2. The new piece spins out of the streak, slowing down, and settles with a bounce
+        const float reveal = 0.6f;
+        for (float time = 0; time < reveal && t != null; time += Time.deltaTime)
+        {
+            float k = time / reveal;
+            angle += Mathf.Lerp(1400f, 0f, Mathf.Sqrt(k)) * Time.deltaTime;
+            // Wide: thin streak to full width with a little overshoot; tall: stretched, then settles
+            float wide = Mathf.Clamp01(k * 1.6f);
+            wide = wide * wide * (3f - 2f * wide) + Mathf.Sin(k * Mathf.PI) * 0.12f;
+            float tall = Mathf.Lerp(1.6f, 1f, Mathf.Clamp01(k * 1.4f)) - Mathf.Sin(Mathf.Clamp01((k - 0.7f) / 0.3f) * Mathf.PI) * 0.12f;
+            SetSquash(t, Mathf.Max(0.05f, wide), tall);
+            t.localRotation = Quaternion.AngleAxis(angle, Vector3.up) * restRotation;
+
+            float h = Mathf.Lerp(1.4f, 0.01f, k) * cell;
+            column.transform.localScale = new Vector3(0.22f * cell * (1f - k * 0.5f), h, 0.22f * cell * (1f - k * 0.5f));
+            column.transform.position = floor + up * h;
+            Color c = color; c.a = 0.6f * (1f - k);
+            SetColor(column.GetComponent<Renderer>(), c);
+            yield return null;
+        }
+        Destroy(column);
+        if (t != null)
+        {
+            SetSquash(t, 1f, 1f);
+            t.localRotation = restRotation;
+            LandingRing(t.position, color);
+        }
     }
 
     // ───────────────────────── Squash and pulse ─────────────────────────

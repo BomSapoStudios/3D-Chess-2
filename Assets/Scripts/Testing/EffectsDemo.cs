@@ -66,6 +66,19 @@ public class EffectsDemo : MonoBehaviour
             Debug.Log("EFFECTS DEMO: conquest");
             PlayerManager.Instance.TransferPiecesToPlayer(PieceColor.Black, PieceColor.White);
             yield return new WaitForSecondsRealtime(8f);
+
+            // Promotion: a pawn morphs into a queen
+            Clear();
+            Put<King>(PieceColor.White, P(0, 0, 0));
+            Put<King>(PieceColor.Black, P(3, 3, 3));
+            ChessPiece pawn = Put<Pawn>(PieceColor.White, P(3, 1, 1));
+            board.SetPieceAt(P(3, 1, 1), null);
+            ChessPiece queen = Put<Queen>(PieceColor.White, P(3, 1, 1));
+            board.DisableSimulationMode();
+            Debug.Log("EFFECTS DEMO: promotion");
+            PieceEffects.Promote(pawn, queen);
+            Destroy(pawn.gameObject);
+            yield return new WaitForSecondsRealtime(6f);
             Time.timeScale = 1f;
         }
     }
