@@ -13,10 +13,10 @@ export class ChaosRotationEngine {
    * Generate a random chaos rotation and apply it to the board.
    * Returns the rotation descriptor (for broadcast to clients).
    */
-  static applyRandom(board: ChessBoard): ChaosRotation {
+  static applyRandom(board: ChessBoard, only?: ChaosRotationType): ChaosRotation {
     const types: ChaosRotationType[] = ['face', 'layer', 'diagonal'];
     const axes: ('x' | 'y' | 'z')[] = ['x', 'y', 'z'];
-    const type = types[Math.floor(Math.random() * types.length)];
+    const type = only ?? types[Math.floor(Math.random() * types.length)];
     const axis = axes[Math.floor(Math.random() * axes.length)];
     const maxIndex = board.size - 1;
     const index = Math.floor(Math.random() * board.size);

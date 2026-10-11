@@ -157,5 +157,24 @@ const notHost = await g.request({ type: 'game:placePiece', as: 'Purple', pieceTy
 check(!notHost.ok, 'only the host can act for robots');
 h.close(); g.close();
 
+// Chaos Mode: the server picks the spin and tells everyone, so all boards stay identical
+{
+  const cr = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, chaosMode: true, chaosInterval: 3 } }, alice.token)).body;
+  const ca = await client(`${WS_BASE}/rooms/${cr.code}/connect?token=${alice.token}`);
+  await ca.wait(m => m.type === 'room:joined');
+  const cb = await client(`${WS_BASE}/rooms/${cr.code}/connect?token=${carol.token}`);
+  await cb.wait(m => m.type === 'room:joined');
+  await ca.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 0, z: 0 } });
+  await cb.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } });
+  await ca.request({ type: 'game:ready' }); await cb.request({ type: 'game:ready' });
+  await ca.wait(m => m.type === 'game:phaseChanged');
+  await ca.request({ type: 'game:move', from: { x: 1, y: 0, z: 0 }, to: { x: 2, y: 0, z: 0 } });
+  await cb.request({ type: 'game:move', from: { x: 3, y: 3, z: 3 }, to: { x: 3, y: 2, z: 3 } });
+  await ca.request({ type: 'game:move', from: { x: 0, y: 0, z: 0 }, to: { x: 0, y: 1, z: 0 } });
+  const spin = await cb.wait(m => m.type === 'game:chaosRotation');
+  check(spin.rotation?.type === 'layer' && spin.rotation.positionMap.length === 16, `after 3 moves both players get the same Chaos spin (${spin.rotation?.axis}${spin.rotation?.index})`);
+  ca.close(); cb.close();
+}
+
 console.log(failures === 0 ? '\nAll checks passed' : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

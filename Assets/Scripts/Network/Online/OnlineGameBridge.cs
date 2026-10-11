@@ -225,7 +225,7 @@ public class OnlineGameBridge : MonoBehaviour
 
         // Who you are, so it's clear which side to play
         string you = $"Online · You are {OnlineSession.LocalColor}";
-        GUI.Label(new Rect(20, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
+        if (!TurnPlannerUI.IsOpen) GUI.Label(new Rect(20, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
 
         if (!string.IsNullOrEmpty(banner) && Time.time < bannerUntil)
         {

@@ -509,6 +509,20 @@ public class InputManager : MonoBehaviour
         Debug.Log($"Selected {piece.pieceColor} {piece.pieceType} at {piece.CurrentPosition}");
     }
     
+    /// <summary>Make a move chosen in the Turn Planner, through the same path as tapping it</summary>
+    public bool PlannerMove(ChessPiece piece, BoardPosition target)
+    {
+        if (piece == null || isProcessingInput) return false;
+        if (GameStateManager.Instance == null || !GameStateManager.Instance.CanMovePiece(piece)) return false;
+        DeselectPiece();
+        SelectPiece(piece);
+        TryMovePiece(target);
+        return true;
+    }
+
+    /// <summary>True while a planner should not interfere (a piece is selected or moving)</summary>
+    public bool IsBusy => isProcessingInput;
+
     private void DeselectPiece()
     {
         if (selectedPiece != null)

@@ -118,7 +118,7 @@ public class LayerViewUI : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!InGame()) return;
+        if (!InGame() || TurnPlannerUI.IsOpen) return;
 
         Vector2 ui = TouchGUI.Begin();
         GUI.skin.button.fontSize = 14;

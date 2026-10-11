@@ -37,7 +37,7 @@ public class PlayerViewUI : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!InGame()) return;
+        if (!InGame() || TurnPlannerUI.IsOpen) return;
         List<PieceColor> players = Players();
         if (players.Count == 0) return;
 

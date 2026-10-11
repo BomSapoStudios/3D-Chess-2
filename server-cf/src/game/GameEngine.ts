@@ -1,4 +1,5 @@
 import type {
+  ChaosRotation,
   GameState, GameConfig, PlayerState, PlayerColor, PieceType,
   BoardPosition, MoveRecord, CheckStatus, EndReason, BoardSize,
 } from '../types/game.js';
@@ -26,7 +27,7 @@ export interface MoveResult {
   conqueredBy?: PlayerColor;
   gameOver?: { winner: PlayerColor | null; reason: EndReason };
   requiresPromotion?: { position: BoardPosition; color: PlayerColor };
-  chaosRotation?: GameState['moveHistory'][number]; // rotation record if triggered
+  chaosRotation?: ChaosRotation; // the spin applied after this move, if any
 }
 
 export interface EngineSnapshot {
@@ -334,6 +335,7 @@ export class GameEngine {
     // Check for end conditions on the NEXT player(s)
     let eliminatedPlayer: PlayerColor | undefined;
     let conqueredBy: PlayerColor | undefined;
+    let chaosRotation: ChaosRotation | undefined;
     let gameOver: MoveResult['gameOver'];
 
     const nextColors = this.getNextTurnColors(movedColor);
@@ -400,7 +402,9 @@ export class GameEngine {
         this.turnsSinceChaos++;
         if (this.turnsSinceChaos >= this.config.chaosInterval) {
           this.turnsSinceChaos = 0;
-          const rotation = ChaosRotationEngine.applyRandom(this.board);
+          // One slice turned a quarter (like the game's own Chaos Mode); every device plays this exact spin
+          const rotation = ChaosRotationEngine.applyRandom(this.board, 'layer');
+          chaosRotation = rotation;
           // Record chaos rotation in move history
           const chaosRecord: MoveRecord = {
             moveNumber: this.turnNumber,
@@ -426,6 +430,7 @@ export class GameEngine {
       eliminatedPlayer,
       conqueredBy,
       gameOver,
+      chaosRotation,
     };
   }
 
