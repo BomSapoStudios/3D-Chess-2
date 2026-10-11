@@ -47,6 +47,8 @@ export interface Env {
   GOOGLE_CLIENT_IDS: string;
   /** Local tests only: multiply every room timer by this */
   ROOM_TIME_SCALE?: string;
+  /** Local tests only: multiply friend request expiry by this */
+  REQUEST_TIME_SCALE?: string;
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */

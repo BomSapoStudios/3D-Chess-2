@@ -62,6 +62,19 @@ await post('/friends/dismiss', { roomCode: ch.body.code }, b.token);
 check(!(await get('/friends', b.token)).body.challenges.some(x => x.roomCode === ch.body.code), 'challenge can be dismissed');
 check((await post('/friends/challenge', { friendId: c.userId }, a.token)).status === 403, "can't challenge a non-friend");
 
+// Declining: the sender can't ask again, but the decliner can
+{
+  const d = (await post('/auth/guest', {})).body;
+  await post('/friends/request', { name: a.name }, d.token);
+  check((await post('/friends/respond', { friendId: d.userId, accept: false }, a.token)).body.ok, 'request declined');
+  check(!(await get('/friends', d.token)).body.friends.some(f => f.userId === a.userId), 'a declined request disappears for the sender');
+  const again = await post('/friends/request', { name: a.name }, d.token);
+  check(again.status === 403, `a declined player can't send another request (${again.body.error})`);
+  const back = await post('/friends/request', { name: d.name }, a.token);
+  check(back.body.status === 'outgoing', 'the player who declined can still send a request later');
+  await post('/friends/remove', { friendId: d.userId }, a.token);
+}
+
 // Blocking
 await post('/friends/request', { name: a.name }, c.token);
 await post('/friends/block', { friendId: c.userId }, a.token);

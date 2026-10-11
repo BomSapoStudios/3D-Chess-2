@@ -1,5 +1,5 @@
 // Room lifecycle checks: lobby expiry, Extend, reconnect windows, Take your time pace, replay, cleanup.
-//   npx wrangler dev --var ROOM_TIME_SCALE:0.0002   then   node scripts/lifecycle-e2e.mjs
+//   npx wrangler dev --var ROOM_TIME_SCALE:0.0002 --var REQUEST_TIME_SCALE:0.000001   then   node scripts/lifecycle-e2e.mjs
 import WebSocket from 'ws';
 
 const BASE = process.argv[2] ?? 'http://localhost:8787';
@@ -59,6 +59,7 @@ function client(url) {
 
 // Run against `npx wrangler dev --var ROOM_TIME_SCALE:0.0002` so every room timer is 5000x shorter:
 // lobby 10 min → 0.12 s (alarms fire no sooner than 1 s), reconnect 5 min → 0.06 s, move day → 17 s.
+const get = (path, token) => fetch(BASE + path, { headers: { Authorization: `Bearer ${token}` } }).then(async r => ({ status: r.status, body: await r.json() }));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const info = code => fetch(`${BASE}/rooms/${code}`).then(r => r.status);
 
@@ -133,6 +134,16 @@ check(liveRoom.config.pace === 'live', 'rooms are Live by default');
   const over = await a.wait(m => m.type === 'game:over', 30000).catch(() => null);
   check(over?.winner === 'White' && over.reason === 'timeout', 'Take your time: a player who doesn\'t move in a day loses');
   a.close(); b2.close();
+}
+
+// Friend requests expire (REQUEST_TIME_SCALE shrinks 30 days to about 2.6 s); an expired request can be sent again
+{
+  await post('/friends/request', { name: alice.name }, bob.token);
+  check((await get('/friends', alice.token)).body.friends.some(f => f.userId === bob.userId && f.status === 'incoming'), 'friend request arrives');
+  await sleep(4000);
+  check(!(await get('/friends', alice.token)).body.friends.some(f => f.userId === bob.userId), 'an unanswered request expires');
+  const again = await post('/friends/request', { name: alice.name }, bob.token);
+  check(again.body.status === 'outgoing', 'an expired request can be sent again');
 }
 
 console.log(failures === 0 ? '\nAll checks passed' : `\n${failures} check(s) failed`);

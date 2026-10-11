@@ -20,6 +20,7 @@ const DAY = 24 * 3600_000;
 const NAME_EXPIRY_MS = 90 * DAY;           // a name unused this long goes back into the pool
 const ONLINE_WINDOW_MS = 45_000;           // "online" = checked in within this window
 const CHALLENGE_LIFETIME_MS = 10 * 60_000; // an unanswered challenge disappears after 10 minutes
+const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60_000; // an unanswered friend request expires after 30 days (and can be sent again)
 const LINK_CODE_LIFETIME_MS = 10 * 60_000;
 const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60 } as const; // per account per day
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -34,16 +35,20 @@ interface AccountRow { id: string; name: string | null; last_seen: number }
 
 export class Accounts extends DurableObject<Env> {
   private sql: SqlStorage;
+  private readonly requestLifetimeMs: number;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
+    // Local tests can shorten request expiry with REQUEST_TIME_SCALE
+    this.requestLifetimeMs = REQUEST_LIFETIME_MS * (Number(env.REQUEST_TIME_SCALE) > 0 ? Number(env.REQUEST_TIME_SCALE) : 1);
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, name TEXT UNIQUE, created_at INTEGER, last_seen INTEGER, active_at INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS logins (provider TEXT, subject TEXT, account_id TEXT, created_at INTEGER, PRIMARY KEY (provider, subject));
       CREATE TABLE IF NOT EXISTS link_codes (code TEXT PRIMARY KEY, account_id TEXT, expires INTEGER);
       CREATE TABLE IF NOT EXISTS friends (account_id TEXT, friend_id TEXT, status TEXT, created_at INTEGER, PRIMARY KEY (account_id, friend_id));
       CREATE TABLE IF NOT EXISTS blocks (account_id TEXT, blocked_id TEXT, PRIMARY KEY (account_id, blocked_id));
+      CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
     `);
@@ -193,6 +198,7 @@ export class Accounts extends DurableObject<Env> {
     this.account(userId);
     this.sql.exec('UPDATE accounts SET active_at = ?, last_seen = ? WHERE id = ?', now, now, userId);
     this.sql.exec('DELETE FROM challenges WHERE created_at < ?', now - CHALLENGE_LIFETIME_MS);
+    this.expireRequests();
     const friends = this.sql.exec(`
       SELECT f.friend_id AS userId, a.name AS name, f.status AS status, a.active_at AS activeAt
       FROM friends f JOIN accounts a ON a.id = f.friend_id
@@ -203,6 +209,11 @@ export class Accounts extends DurableObject<Env> {
       FROM challenges c JOIN accounts a ON a.id = c.from_id
       WHERE c.to_id = ? ORDER BY c.created_at DESC`, userId).toArray();
     return { friends, challenges };
+  }
+
+  /** Unanswered requests lapse after 30 days; unlike a decline, the sender may then ask again */
+  private expireRequests() {
+    this.sql.exec("DELETE FROM friends WHERE status IN ('outgoing', 'incoming') AND created_at < ?", Date.now() - this.requestLifetimeMs);
   }
 
   private isBlocked(a: string, b: string): boolean {
@@ -244,11 +255,18 @@ export class Accounts extends DurableObject<Env> {
     if (!target || this.isBlocked(userId, target.id as string)) throw new HttpError(404, 'No player has that name');
     const friendId = target.id as string;
     if (friendId === userId) throw new HttpError(400, "That's you!");
+    this.expireRequests();
     const current = this.status(userId, friendId);
     if (current === 'friends') return { status: 'friends' };
     if (current === 'incoming') { this.setPair(userId, friendId, 'friends', 'friends'); return { status: 'friends' }; }
     if (current === 'outgoing') return { status: 'outgoing' };
+    // Declined once means no more requests to that player (they can still send one to you)
+    if (this.sql.exec('SELECT 1 FROM declines WHERE decliner_id = ? AND sender_id = ?', friendId, userId).toArray().length) {
+      throw new HttpError(403, 'That player declined your friend request');
+    }
     this.spend(userId, 'friendRequest');
+    // Asking someone you once declined clears that decline
+    this.sql.exec('DELETE FROM declines WHERE decliner_id = ? AND sender_id = ?', userId, friendId);
     this.setPair(userId, friendId, 'outgoing', 'incoming');
     return { status: 'outgoing' };
   }
@@ -256,7 +274,10 @@ export class Accounts extends DurableObject<Env> {
   private respond(userId: string, friendId: string, accept: boolean) {
     if (this.status(userId, friendId) !== 'incoming') throw new HttpError(404, 'No request from that player');
     if (accept) this.setPair(userId, friendId, 'friends', 'friends');
-    else this.removeFriend(userId, friendId);
+    else {
+      this.removeFriend(userId, friendId);
+      this.sql.exec('INSERT OR REPLACE INTO declines (decliner_id, sender_id, created_at) VALUES (?, ?, ?)', userId, friendId, Date.now());
+    }
     return { ok: true };
   }
 
