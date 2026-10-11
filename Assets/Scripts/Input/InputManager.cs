@@ -530,6 +530,16 @@ public class InputManager : MonoBehaviour
     /// <summary>True while a planner should not interfere (a piece is selected or moving)</summary>
     public bool IsBusy => isProcessingInput;
 
+    /// <summary>A Deselect button under Turn Planner while a piece is picked up during play</summary>
+    private void OnGUI()
+    {
+        if (selectedPiece == null || TurnPlannerUI.IsOpen) return;
+        if (GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
+        TouchGUI.Begin();
+        if (TouchGUI.NeonButton(new Rect(16, 130, 150, 44), "Deselect", NeonTheme.Cyan, NeonTheme.Pink, fontSize: 16)) DeselectPiece();
+        TouchGUI.End();
+    }
+
     private void DeselectPiece()
     {
         if (selectedPiece != null)
