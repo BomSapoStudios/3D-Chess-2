@@ -136,6 +136,28 @@ check(liveRoom.config.pace === 'live', 'rooms are Live by default');
   a.close(); b2.close();
 }
 
+// Live: both players connected but nobody moves (app left open) - the player on move times out,
+// then the finished room closes even though both are still connected
+{
+  const { room, a, b } = await startGame({ pace: 'live' });
+  const over = await a.wait(m => m.type === 'game:over', 8000).catch(() => null);
+  check(over?.reason === 'timeout' && over.winner === 'Black', 'Live: a game nobody plays ends (the player on move times out)');
+  const closed = await b.wait(m => m.type === 'room:closed', 8000).catch(() => null);
+  check(closed?.reason === 'finished', 'a finished room closes itself even with players still connected');
+  await sleep(500);
+  check(await info(room.code) === 404, 'the finished room is deleted');
+  a.close(); b.close();
+}
+
+// Find Match: nobody waits in the queue forever
+{
+  const q = await client(`${WS_BASE}/matchmaking/connect?token=${alice.token}`);
+  q.ws.send(JSON.stringify({ type: 'matchmaking:join', config: { boardSize: '8x8x8', playerCount: 6 } }));
+  const timedOut = await q.wait(m => m.type === 'matchmaking:timeout', 8000).catch(() => null);
+  check(!!timedOut, 'Find Match gives up after a while instead of waiting forever');
+  q.close();
+}
+
 // Friend requests expire (REQUEST_TIME_SCALE shrinks 30 days to about 2.6 s); an expired request can be sent again
 {
   await post('/friends/request', { name: alice.name }, bob.token);

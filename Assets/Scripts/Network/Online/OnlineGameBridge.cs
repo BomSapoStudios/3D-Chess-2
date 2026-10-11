@@ -19,6 +19,7 @@ public class OnlineGameBridge : MonoBehaviour
     private float bannerUntil;
     private bool reconnecting;
     private bool gameOverShown;
+    private bool roomClosed;
     private long moveDeadline;      // Unix ms the player on move must move by (Take your time); 0 if none
     private string currentTurn;
 
@@ -156,6 +157,10 @@ public class OnlineGameBridge : MonoBehaviour
                 if (fromOpponent) Show($"{color.Value} didn't come back and is out of the game.", 6f);
                 break;
 
+            case "room:closed":
+                roomClosed = true;
+                break;
+
             case "room:joined":
                 if (reconnecting)
                 {
@@ -171,7 +176,7 @@ public class OnlineGameBridge : MonoBehaviour
     // iOS suspends the app in the background and its connection with it; catch up on return
     private void OnApplicationPause(bool paused)
     {
-        if (paused || !OnlineSession.IsActive) return;
+        if (paused || !OnlineSession.IsActive || gameOverShown || roomClosed) return;
         var client = OnlineClient.Instance;
         if (client != null && !client.IsConnected) Resync();
     }
@@ -218,6 +223,8 @@ public class OnlineGameBridge : MonoBehaviour
     private void Lost(string reason)
     {
         if (!OnlineSession.IsActive) return;
+        // A finished or closed room is meant to close: don't keep knocking on it
+        if (gameOverShown || roomClosed || (GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.GameOver)) return;
         Show("Connection lost. Reconnecting…", 60f);
         Resync();
     }

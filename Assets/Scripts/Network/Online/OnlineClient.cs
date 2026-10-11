@@ -359,6 +359,7 @@ public class OnlineClient : MonoBehaviour
         {
             var msg = JsonUtility.FromJson<ServerMessage>(text);
             if (msg.type == "matchmaking:found") onFound(msg.roomCode);
+            else if (msg.type == "matchmaking:timeout") onError("No opponent found right now. Try again in a bit.");
         };
         queue.OnError += error =>
         {

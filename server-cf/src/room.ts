@@ -30,6 +30,10 @@ interface RoomMeta {
   /** When the last socket closed, for clearing finished rooms */
   emptySince?: number | null;
   placementStartedAt?: number | null;
+  /** Last placement, ready or move, for the Live idle limit */
+  lastPlayAt?: number;
+  /** When the game ended; the room closes a few minutes later even if players stay on the result screen */
+  gameOverAt?: number | null;
 }
 
 interface Attachment {
@@ -54,6 +58,8 @@ const LOBBY_LIVE_MAX_MS = HOUR;              // Live lobby can be extended up to
 const HOST_GONE_MS = 2 * MINUTE;             // lobby closes this long after the host leaves it
 const FINISHED_EMPTY_MS = MINUTE;            // finished rooms are cleared a minute after the last player leaves
 const IDLE_CAP_MS = 7 * 24 * HOUR;           // any room nobody touches for a week is cleared
+const LIVE_IDLE_MS = 30 * MINUTE;            // Live: nobody places or moves for this long (app left open) ends the game
+const GAME_OVER_LINGER_MS = 5 * MINUTE;      // finished games close this long after they end, connected or not
 
 
 export class Room extends DurableObject<Env> {
@@ -164,6 +170,7 @@ export class Room extends DurableObject<Env> {
     if (engine.getState().phase === 'waiting' && engine.getState().players.length === engine.config.playerCount) {
       engine.startPlacement();
       this.meta!.placementStartedAt = Date.now();
+      this.meta!.lastPlayAt = Date.now();
     }
     await this.persist();
 
@@ -230,6 +237,7 @@ export class Room extends DurableObject<Env> {
       case 'game:placePiece': {
         const result = engine.placePiece(me.color, msg.pieceType as PieceType, msg.position as BoardPosition);
         if (!result.success) return reply(false, result.error);
+        this.meta!.lastPlayAt = Date.now();
         await this.persist();
         reply(true);
         await this.logEvent({ type: 'game:piecePlaced', color: me.color, pieceType: msg.pieceType, position: msg.position });
@@ -239,6 +247,7 @@ export class Room extends DurableObject<Env> {
       case 'game:ready': {
         if (engine.getState().phase !== 'placement') return reply(false, 'Not in placement phase');
         engine.completePlacement(me.color);
+        this.meta!.lastPlayAt = Date.now();
         await this.logEvent({ type: 'game:playerReady', color: me.color });
         if (engine.allPlacementsComplete()) {
           engine.startGame();
@@ -296,9 +305,11 @@ export class Room extends DurableObject<Env> {
 
   /** Persist and broadcast the outcome of any rule-engine action */
   private async afterResult(result: MoveResult, event: Record<string, unknown>): Promise<void> {
+    if (this.meta) this.meta.lastPlayAt = Date.now();
     if (result.gameOver) {
       this.gameOver = result.gameOver;
       this.turnStartedAt = null;
+      if (this.meta) this.meta.gameOverAt = Date.now();
     } else {
       this.startTurnClock();
     }
@@ -384,12 +395,41 @@ export class Room extends DurableObject<Env> {
       }
     }
 
+    // Live: everyone stayed connected but nobody placed or moved for a long time (app left open)
+    const idleState = engine.getState();
+    if (!slow && !this.gameOver && (idleState.phase === 'placement' || idleState.phase === 'playing')
+        && now - (meta.lastPlayAt ?? meta.createdAt) >= this.t(LIVE_IDLE_MS)) {
+      const mover = idleState.players.find(p => p.color === idleState.currentTurn);
+      if (idleState.phase === 'playing' && mover && mover.type !== 'ai' && !mover.isEliminated) {
+        const result = engine.forfeitByTimeout(mover.color);
+        await this.afterResult(result, { type: 'game:timeout', color: mover.color });
+      } else {
+        await this.endAbandoned();
+      }
+    }
+
     // Only robots left in the game: nobody is playing, so end it
     const live = engine.getState();
     if (live.phase === 'playing' && !live.players.some(p => p.type !== 'ai' && !p.isEliminated)) await this.endAbandoned();
 
+    // Rooms that finished before gameOverAt existed: start their closing time now
+    if (this.gameOver && meta.gameOverAt == null) {
+      meta.gameOverAt = now;
+      await this.ctx.storage.put('meta', meta);
+    }
+
+    // A finished game closes a few minutes after it ends, even if players sit on the result screen
+    if (this.gameOver && meta.gameOverAt != null && now - meta.gameOverAt >= this.t(GAME_OVER_LINGER_MS)) {
+      return this.closeRoom('finished');
+    }
+
     // Clear finished rooms shortly after everyone leaves, and any room left idle for a week
     if (this.ctx.getWebSockets().length === 0) {
+      // Rooms from before emptySince existed: count them as empty from now
+      if (meta.emptySince == null) {
+        meta.emptySince = now;
+        await this.ctx.storage.put('meta', meta);
+      }
       const finishedAndEmpty = this.gameOver && meta.emptySince != null && now - meta.emptySince >= this.t(FINISHED_EMPTY_MS);
       const idle = now - (meta.lastActivityAt ?? meta.createdAt) >= this.t(IDLE_CAP_MS);
       if (finishedAndEmpty || idle) {
@@ -408,15 +448,17 @@ export class Room extends DurableObject<Env> {
     this.engine.abandon();
     this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
     this.turnStartedAt = null;
+    this.meta!.gameOverAt = Date.now();
     await this.persist();
     await this.logEvent({ type: 'game:over', ...this.gameOver });
   }
 
   /** Close a lobby that never started: tell anyone still in it, then forget the room */
-  private async closeRoom(reason: 'expired' | 'host_left'): Promise<void> {
+  private async closeRoom(reason: 'expired' | 'host_left' | 'finished'): Promise<void> {
     this.broadcast({ type: 'room:closed', reason });
+    const why = reason === 'expired' ? 'Room closed: nobody joined' : reason === 'host_left' ? 'Room closed: the host left' : 'Room closed: game over';
     for (const ws of this.ctx.getWebSockets()) {
-      try { ws.close(4001, reason === 'expired' ? 'Room closed: nobody joined' : 'Room closed: the host left'); } catch { /* already closed */ }
+      try { ws.close(4001, why); } catch { /* already closed */ }
     }
     await this.ctx.storage.deleteAll();
     this.meta = null;
@@ -448,6 +490,11 @@ export class Room extends DurableObject<Env> {
     const move = this.slowDeadline();
     if (move) times.push(move);
     if (this.gameOver && meta.emptySince != null) times.push(meta.emptySince + this.t(FINISHED_EMPTY_MS));
+    if (this.gameOver && meta.gameOverAt != null) times.push(meta.gameOverAt + this.t(GAME_OVER_LINGER_MS));
+    if (this.gameOver && meta.emptySince == null && this.ctx.getWebSockets().length === 0) times.push(now + this.t(FINISHED_EMPTY_MS));
+    if (!slow && !this.gameOver && (state.phase === 'placement' || state.phase === 'playing')) {
+      times.push((meta.lastPlayAt ?? meta.createdAt) + this.t(LIVE_IDLE_MS));
+    }
 
     const future = times.filter(t => t > now);
     return future.length ? Math.min(...future) : now + this.t(IDLE_CAP_MS);

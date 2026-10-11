@@ -20,7 +20,34 @@ interface Waiting {
   since: number;
 }
 
+const QUEUE_LIMIT_MS = 5 * 60 * 1000; // nobody waits in the queue longer than this
+
 export class Matchmaker extends DurableObject<Env> {
+  private limit(): number {
+    const scale = Number(this.env.ROOM_TIME_SCALE);
+    return QUEUE_LIMIT_MS * (scale > 0 ? scale : 1);
+  }
+
+  /** Wake when the longest-waiting player's time is up (only while someone is waiting) */
+  private async scheduleAlarm(): Promise<void> {
+    const waiting = this.ctx.getWebSockets().map(ws => (ws.deserializeAttachment() as Waiting | null)?.since ?? Date.now());
+    if (waiting.length === 0) return;
+    await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...waiting) + this.limit()));
+  }
+
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    for (const ws of this.ctx.getWebSockets()) {
+      const me = ws.deserializeAttachment() as Waiting | null;
+      if (me && now - me.since < this.limit()) continue;
+      try {
+        ws.send(JSON.stringify({ type: 'matchmaking:timeout' }));
+        ws.close(4003, 'No match found');
+      } catch { /* already closed */ }
+    }
+    await this.scheduleAlarm();
+  }
+
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected WebSocket', { status: 426 });
     const userId = request.headers.get('X-User-Id')!;
@@ -32,6 +59,7 @@ export class Matchmaker extends DurableObject<Env> {
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [userId]);
     pair[1].serializeAttachment({ userId, name, key: null, config: null, since: Date.now() } satisfies Waiting);
+    await this.scheduleAlarm();
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -52,6 +80,7 @@ export class Matchmaker extends DurableObject<Env> {
       ws.serializeAttachment(me);
       ws.send(JSON.stringify({ type: 'matchmaking:queued', key: me.key, waiting: this.group(me.key).length }));
       await this.tryMatch(me.key);
+      await this.scheduleAlarm();
     } else if (msg.type === 'matchmaking:leave') {
       ws.close(1000, 'Left queue');
     } else if (msg.type === 'ping') {

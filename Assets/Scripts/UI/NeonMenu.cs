@@ -1099,7 +1099,9 @@ public class NeonMenu : MonoBehaviour
     private string lastFriendsJson = "";
     private float nextFriendsPoll;
     private bool pollingFriends;
-    private const float FriendsPollSeconds = 8f;
+    // Each check is a server request: every 30 s on Friends, every 60 s on Play Online (for the badge)
+    private const float FriendsPollSeconds = 30f;
+    private const float OnlinePollSeconds = 60f;
 
     private void BuildFriendsScreen()
     {
@@ -1229,7 +1231,7 @@ public class NeonMenu : MonoBehaviour
         if (friendsScreen == null || pollingFriends || onlineStarting) return;
         if (!(onlineScreen.activeSelf || friendsScreen.activeSelf)) return;
         if (Time.unscaledTime < nextFriendsPoll) return;
-        nextFriendsPoll = Time.unscaledTime + FriendsPollSeconds;
+        nextFriendsPoll = Time.unscaledTime + (friendsScreen.activeSelf ? FriendsPollSeconds : OnlinePollSeconds);
         StartCoroutine(PollFriendsRoutine());
     }
 
