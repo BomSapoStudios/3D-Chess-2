@@ -84,13 +84,17 @@ public class ConquestSelfTest : MonoBehaviour
         {
             Expect(p != null && p.pieceColor == PieceColor.White, $"Purple {p?.GetType().Name} should now be White");
             Expect(board.GetPieceAt(p.CurrentPosition) == p, $"Converted {p.GetType().Name} should stay on its square");
-            Expect(StripColorIs(p, NeonTheme.Cyan), $"Converted {p.GetType().Name} should glow White's color");
         }
         var pawnMoves = purplePawn.GetValidMoves();
         Expect(pawnMoves.Contains(P(2, 1, 6)), $"Converted pawn should now advance like White (+X); moves: {string.Join(", ", pawnMoves)}");
         Expect(PlayerManager.Instance.GetActivePlayerCount() == 5, $"5 players should remain, got {PlayerManager.Instance.GetActivePlayerCount()}");
         Expect(GameStateManager.Instance.currentState == GameState.Playing, "The game should continue");
         Expect(TurnManager.Instance.GetCurrentPlayer() == PieceColor.Black, "It should still be Black's turn");
+
+        // Each piece keeps its old look until the conquest orb reaches it
+        yield return new WaitForSeconds(3f);
+        foreach (ChessPiece p in new[] { purpleKnight, purplePawn, purpleQueen })
+            Expect(StripColorIs(p, NeonTheme.Cyan), $"Converted {p.GetType().Name} should glow White's color once the orb arrives");
 
         // ───── 2. White mates Green; Green is next to move ─────
         board.EnableSimulationMode();

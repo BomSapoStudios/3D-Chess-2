@@ -562,6 +562,9 @@ public class ChessBoard : MonoBehaviour
             {
                 Debug.Log($"🎯 CAPTURE: {piece.pieceColor} {piece.pieceType} captures {targetPiece.pieceColor} {targetPiece.pieceType}");
                 
+                // The captured piece shatters when the attacker reaches it (a copy; the real one goes now)
+                if (!_isSimulationMode) PieceEffects.Shatter(targetPiece, piece);
+
                 // CRITICAL FIX: Clean removal of captured piece
                 RemovePieceFromBoard(targetPiece, to);
             }

@@ -502,19 +502,44 @@ public abstract class ChessPiece : MonoBehaviour
             yield break;
         }
         
+        // Board moves hop: a quick crouch, an arc through the air, then a squash on landing
+        bool hop = context == AnimationContext.UserMove || context == AnimationContext.AIMove;
+        float cell = ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
+        if (hop)
+        {
+            const float crouch = 0.08f;
+            for (float c = 0f; c < crouch; c += Time.deltaTime)
+            {
+                float k = c / crouch;
+                PieceEffects.SetSquash(transform, 1f + 0.08f * k, 1f - 0.14f * k);
+                yield return null;
+            }
+        }
+
         float elapsedTime = 0f;
+        float distance = Vector3.Distance(startPos, endPos);
+        float hopHeight = Mathf.Max(cell * 0.45f, distance * 0.35f) * (pieceType == ChessPieceType.Knight ? 1.5f : 1f);
         
         while (elapsedTime < duration)
         {
             elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
+            float t = Mathf.Clamp01(elapsedTime / duration);
             
             // Apply animation curve for smooth easing
             float curveValue = movementCurve.Evaluate(t);
             
             Vector3 currentPos;
             
-            if (useLiftAnimation && liftHeight > 0f)
+            if (hop)
+            {
+                // Arc up and down along the board's own up (the cube can be turned)
+                Vector3 basePos = Vector3.Lerp(startPos, endPos, curveValue);
+                currentPos = basePos + Vector3.up * Mathf.Sin(curveValue * Mathf.PI) * hopHeight;
+                // Stretch on take-off, back to normal at the top
+                float stretch = Mathf.Clamp01(1f - t * 3f);
+                PieceEffects.SetSquash(transform, 1f - 0.06f * stretch, 1f + 0.14f * stretch);
+            }
+            else if (useLiftAnimation && liftHeight > 0f)
             {
                 // Create arc movement - lift piece up and then down
                 Vector3 basePos = Vector3.Lerp(startPos, endPos, curveValue);
@@ -535,6 +560,7 @@ public abstract class ChessPiece : MonoBehaviour
         // Ensure final position is exact
         transform.localPosition = endPos;
         isMoving = false;
+        if (hop) PieceEffects.Land(this);
         
         Debug.Log($"✅ Animation Complete: {pieceColor} {pieceType} reached {targetPosition}");
         

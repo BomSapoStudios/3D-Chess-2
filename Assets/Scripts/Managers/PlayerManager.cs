@@ -338,6 +338,9 @@ public class PlayerManager : MonoBehaviour
             if (kingToRemove != null) break;
         }
 
+        // The king dissolves into orbs that turn its pieces, one by one
+        PieceEffects.ConquestEffect effect = PieceEffects.BeginConquest(kingToRemove, fromColor, toColor);
+
         // Remove the king from the board
         if (kingToRemove != null)
         {
@@ -370,6 +373,7 @@ public class PlayerManager : MonoBehaviour
 
                         // Convert piece to new color
                         piece.ConvertToColor(toColor);
+                        effect.Add(piece);
                         transferCount++;
 
                         Debug.Log($"  Converted {piece.pieceType} at {pos} from {fromColor} to {toColor}");
@@ -379,6 +383,7 @@ public class PlayerManager : MonoBehaviour
         }
 
         Debug.Log($"🎨 CONQUEST: Transferred {transferCount} pieces from {fromColor} to {toColor}");
+        effect.Play();
 
         return transferCount;
     }
