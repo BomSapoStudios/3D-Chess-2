@@ -49,6 +49,8 @@ export interface GameConfig {
   timedMode: boolean;
   timePerPlayerSeconds: number;
   aiDifficulty: AIDifficulty;
+  /** Seats played by robots. The host's device runs their AI and moves for them. */
+  aiColors?: PlayerColor[];
 }
 
 export interface GameState {

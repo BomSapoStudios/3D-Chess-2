@@ -126,7 +126,7 @@ public class PawnPromotionManager : MonoBehaviour
         }
         
         // Online: the other player picks on their device; we apply it when the server says
-        if (OnlineSession.IsActive && promotingPlayerColor != OnlineSession.LocalColor)
+        if (OnlineSession.IsActive && !OnlineSession.IsLocal(promotingPlayerColor))
         {
             if (pendingRemotePromotion.HasValue)
             {
@@ -379,7 +379,7 @@ public class PawnPromotionManager : MonoBehaviour
     /// <summary>Online: apply the other player's promotion choice</summary>
     public void ApplyRemotePromotion(ChessPieceType type)
     {
-        if (isPromotionInProgress && promotingPawn != null && promotingPlayerColor != OnlineSession.LocalColor)
+        if (isPromotionInProgress && promotingPawn != null && !OnlineSession.IsLocal(promotingPlayerColor))
             OnPieceSelected(type);
         else
             pendingRemotePromotion = type;
@@ -388,7 +388,7 @@ public class PawnPromotionManager : MonoBehaviour
     private void OnPieceSelected(ChessPieceType selectedPieceType)
     {
         if (OnlineSession.ShouldSend(promotingPlayerColor))
-            OnlineClient.Instance.SendPromotion(promotionTargetPosition, selectedPieceType);
+            OnlineClient.Instance.SendPromotion(promotingPlayerColor, promotionTargetPosition, selectedPieceType);
 
         Debug.Log($"PawnPromotionManager.OnPieceSelected: Player selected {selectedPieceType} for promotion");
         Debug.Log($"PawnPromotionManager.OnPieceSelected: isPromotionInProgress={isPromotionInProgress}");

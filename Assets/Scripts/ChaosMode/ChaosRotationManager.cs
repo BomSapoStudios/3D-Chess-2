@@ -150,6 +150,7 @@ public class ChaosRotationManager : MonoBehaviour
     {
         if (!enableChaosMode || chaosAnimationInProgress)
             return;
+        if (OnlineSession.IsActive) return; // online, the server picks the spins (ApplyRemoteRotation)
         
         movesSinceLastChaos++;
         
@@ -167,6 +168,28 @@ public class ChaosRotationManager : MonoBehaviour
         }
     }
     
+    /// <summary>Online: play a spin the server chose (from → to for every moved cell)</summary>
+    public void ApplyRemoteRotation(Dictionary<BoardPosition, BoardPosition> map)
+    {
+        StartCoroutine(RemoteRotationRoutine(map));
+    }
+
+    private System.Collections.IEnumerator RemoteRotationRoutine(Dictionary<BoardPosition, BoardPosition> map)
+    {
+        while (chaosAnimationInProgress) yield return null;
+        chaosAnimationInProgress = true;
+        OnChaosRotationStarted?.Invoke(ChaosRotationType.LayerRotation);
+        if (ChessBoard.Instance != null) yield return StartCoroutine(ChessBoard.Instance.ApplyChaosRotation(map, animationDuration));
+        chaosAnimationInProgress = false;
+        if (GameStateManager.Instance != null) GameStateManager.Instance.ClearAnimationCache();
+        if (CheckDetectionManager.Instance != null)
+        {
+            CheckDetectionManager.Instance.InvalidateCache();
+            CheckDetectionManager.Instance.SafeUpdateVisualFeedback();
+        }
+        OnChaosRotationCompleted?.Invoke(ChaosRotationType.LayerRotation);
+    }
+
     /// <summary>
     /// Trigger a slice rotation chaos event
     /// </summary>

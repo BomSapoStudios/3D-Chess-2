@@ -140,5 +140,22 @@ const f1 = await m1c.wait(m => m.type === 'matchmaking:found');
 const f2 = await m2c.wait(m => m.type === 'matchmaking:found');
 check(f1.roomCode && f1.roomCode === f2.roomCode, `Find Match pairs players into one room (${f1.roomCode})`);
 
+// Robot seats: the host's device plays them
+const botRoom = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Black', 'Purple'], chaosMode: true, chaosInterval: 5 } }, alice.token)).body;
+check(botRoom.config.aiColors?.length === 2 && botRoom.config.chaosInterval === 5, `room with two robot seats (${botRoom.code})`);
+const h = await client(`${WS_BASE}/rooms/${botRoom.code}/connect?token=${alice.token}`);
+const hJoined = await h.wait(m => m.type === 'room:joined');
+check(hJoined.state.players.length === 3 && hJoined.state.phase === 'waiting', 'robots are seated, one human seat still open');
+const g = await client(`${WS_BASE}/rooms/${botRoom.code}/connect?token=${carol.token}`);
+const gJoined = await g.wait(m => m.type === 'room:joined');
+check(gJoined.yourColor === 'Green' && gJoined.state.phase === 'placement', 'the human guest gets the open seat and placement starts');
+const asRobot = await h.request({ type: 'game:placePiece', as: 'Black', pieceType: 'King', position: { x: 5, y: 4, z: 2 } });
+  const outside = await h.request({ type: 'game:placePiece', as: 'Black', pieceType: 'Queen', position: { x: 5, y: 0, z: 0 } });
+  check(!outside.ok, 'big-board placement zones match the game');
+check(asRobot.ok, `host places a piece for a robot${asRobot.ok ? '' : ` (${asRobot.error})`}`);
+const notHost = await g.request({ type: 'game:placePiece', as: 'Purple', pieceType: 'King', position: { x: 2, y: 1, z: 5 } });
+check(!notHost.ok, 'only the host can act for robots');
+h.close(); g.close();
+
 console.log(failures === 0 ? '\nAll checks passed' : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

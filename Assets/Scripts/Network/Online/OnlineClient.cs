@@ -186,6 +186,19 @@ public class OnlineClient : MonoBehaviour
         done(result, error);
     }
 
+    /// <summary>Players whose name contains the query (3+ letters)</summary>
+    public IEnumerator SearchPlayers(string query, Action<FriendInfo[], string> done)
+    {
+        FriendInfo[] results = null;
+        string error = null;
+        yield return Call("GET", "/friends/search?q=" + UnityWebRequest.EscapeURL(query.Trim()), null, Token, (status, text) =>
+        {
+            if (status == 200) results = JsonUtility.FromJson<SearchResponse>(text).results ?? new FriendInfo[0];
+            else error = ErrorText(status, text);
+        });
+        done(results, error);
+    }
+
     public IEnumerator SendFriendRequest(string name, Action<string, string> done)
     {
         string result = null, error = null;
@@ -211,10 +224,10 @@ public class OnlineClient : MonoBehaviour
         Simple("/friends/dismiss", "{\"roomCode\":\"" + roomCode + "\"}", done);
 
     /// <summary>Create a private game and invite a friend to it. Calls back with (roomCode, error).</summary>
-    public IEnumerator ChallengeFriend(string friendId, string boardSize, Action<string, string> done)
+    public IEnumerator ChallengeFriend(string friendId, string configJson, Action<string, string> done)
     {
         string code = null, error = null;
-        string body = "{\"friendId\":\"" + friendId + "\",\"config\":{\"boardSize\":\"" + boardSize + "\",\"playerCount\":2,\"chaosMode\":false,\"timedMode\":false}}";
+        string body = "{\"friendId\":\"" + friendId + "\",\"config\":" + configJson + "}";
         yield return Call("POST", "/friends/challenge", body, Token, (status, text) =>
         {
             if (status == 200) code = JsonUtility.FromJson<CreateRoomResponse>(text).code;
@@ -278,10 +291,11 @@ public class OnlineClient : MonoBehaviour
 
     // ───────────────────────── Rooms ─────────────────────────
 
-    public IEnumerator CreateRoom(string boardSize, Action<string, string> done)
+    /// <summary>Create a private room. configJson is the server's game config (see NeonMenu.OnlineConfigJson).</summary>
+    public IEnumerator CreateRoom(string configJson, Action<string, string> done)
     {
         string code = null, error = null;
-        string body = "{\"config\":{\"boardSize\":\"" + boardSize + "\",\"playerCount\":2,\"chaosMode\":false,\"timedMode\":false}}";
+        string body = "{\"config\":" + configJson + "}";
         yield return Call("POST", "/rooms", body, Token, (status, text) =>
         {
             if (status == 200) code = JsonUtility.FromJson<CreateRoomResponse>(text).code;
@@ -360,18 +374,22 @@ public class OnlineClient : MonoBehaviour
 
     // ───────────────────────── Game messages ─────────────────────────
 
-    public void SendPlacePiece(ChessPieceType type, BoardPosition position) =>
-        Send("{\"type\":\"game:placePiece\",\"pieceType\":\"" + type + "\",\"position\":" + Pos(position) + "}");
+    // Each takes the side acting: the host also sends for its robot seats ("as")
 
-    public void SendReady() => Send("{\"type\":\"game:ready\"}");
+    public void SendPlacePiece(PieceColor color, ChessPieceType type, BoardPosition position) =>
+        Send("{\"type\":\"game:placePiece\"," + As(color) + "\"pieceType\":\"" + type + "\",\"position\":" + Pos(position) + "}");
 
-    public void SendMove(BoardPosition from, BoardPosition to) =>
-        Send("{\"type\":\"game:move\",\"from\":" + Pos(from) + ",\"to\":" + Pos(to) + "}");
+    public void SendReady(PieceColor color) => Send("{\"type\":\"game:ready\"" + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
 
-    public void SendPromotion(BoardPosition position, ChessPieceType type) =>
-        Send("{\"type\":\"game:promotePawn\",\"position\":" + Pos(position) + ",\"pieceType\":\"" + type + "\"}");
+    public void SendMove(PieceColor color, BoardPosition from, BoardPosition to) =>
+        Send("{\"type\":\"game:move\"," + As(color) + "\"from\":" + Pos(from) + ",\"to\":" + Pos(to) + "}");
 
-    public void SendResign() => Send("{\"type\":\"game:resign\"}");
+    public void SendPromotion(PieceColor color, BoardPosition position, ChessPieceType type) =>
+        Send("{\"type\":\"game:promotePawn\"," + As(color) + "\"position\":" + Pos(position) + ",\"pieceType\":\"" + type + "\"}");
+
+    public void SendResign(PieceColor color) => Send("{\"type\":\"game:resign\"" + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
+
+    private string As(PieceColor color) => color == LocalColor ? "" : "\"as\":\"" + color + "\",";
 
     /// <summary>Send a request; the server's ack (ok/error) goes to the callback if given</summary>
     private void Send(string json, Action<ServerMessage> onAck = null)
@@ -423,6 +441,7 @@ public class OnlineClient : MonoBehaviour
     [Serializable] private class LinkCodeResponse { public string code; }
     [Serializable] private class FriendStatusResponse { public string status; }
     [Serializable] private class ErrorResponse { public string error; }
+    [Serializable] private class SearchResponse { public FriendInfo[] results; }
 }
 
 [Serializable]
@@ -437,7 +456,7 @@ public class FriendInfo
 {
     public string userId;
     public string name;
-    public string status;   // friends | incoming | outgoing
+    public string status;   // friends | incoming | outgoing (| none, in search results)
     public bool online;
 }
 
@@ -471,6 +490,22 @@ public class ServerMessage
     public NetPos to;
     public NetPos position;
     public NetState state;
+    public NetRotation rotation;
+    public string conqueredBy;
+}
+
+[Serializable]
+public class NetRotation
+{
+    public string type;
+    public NetStep[] positionMap;
+}
+
+[Serializable]
+public class NetStep
+{
+    public NetPos from;
+    public NetPos to;
 }
 
 [Serializable]
@@ -495,6 +530,12 @@ public class NetConfig
 {
     public string boardSize;
     public int playerCount;
+    public bool chaosMode;
+    public int chaosInterval;
+    public bool timedMode;
+    public int timePerPlayerSeconds;
+    public string aiDifficulty;
+    public string[] aiColors;
 }
 
 [Serializable]

@@ -753,6 +753,7 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public bool ValidateTurnOrder()
     {
+        if (OnlineSession.IsActive) return true; // online, the server decides who moves (White first)
         // If this is the very first move after placement (totalMovesMade == 0)
         if (totalMovesMade == 0 && isFirstTurnAfterPlacement)
         {

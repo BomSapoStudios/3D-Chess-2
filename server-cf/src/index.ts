@@ -21,6 +21,7 @@ export { Accounts } from './accounts.js';
 //   POST /link/code                     → { code } to type on another device (Bearer)
 //   POST /link/redeem  { code }         → become that account on this device
 //   GET  /friends                       → { friends, challenges }; marks you online (Bearer)
+//   GET  /friends/search?q=neon         → { results: [{ userId, name, status }] } names containing q
 //   POST /friends/request { name }      POST /friends/respond { friendId, accept }
 //   POST /friends/remove  { friendId }  POST /friends/block   { friendId }
 //   POST /friends/challenge { friendId, config? } → { code } private room for you two
@@ -133,6 +134,7 @@ export default {
     if (path.startsWith('/friends')) {
       if (!user) return needUser();
       if (request.method === 'GET' && path === '/friends') return account('friends');
+      if (request.method === 'GET' && path === '/friends/search') return account('search', { query: url.searchParams.get('q') ?? '' });
       if (request.method === 'POST') {
         if (path === '/friends/request') return account('friend-request', { name: body.name });
         if (path === '/friends/respond') return account('friend-respond', { friendId: body.friendId, accept: body.accept });

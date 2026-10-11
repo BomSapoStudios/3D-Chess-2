@@ -69,6 +69,13 @@ export class Room extends DurableObject<Env> {
       const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig> };
       this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: Date.now() };
       this.engine = new GameEngine(body.code, sanitizeConfig(body.config));
+      // Robot seats are filled now; the host's device plays them
+      for (const color of this.engine.config.aiColors ?? []) {
+        const robotId = `ai:${color}`;
+        this.engine.addPlayer(robotId, 'Robot', color, 'ai', this.engine.config.aiDifficulty);
+        this.engine.setPlayerConnected(color, true);
+        this.seats[robotId] = color;
+      }
       await this.persist();
       await this.ctx.storage.setAlarm(Date.now() + ABANDONED_ROOM_MS);
       return Response.json({ code: body.code, config: this.engine.config });
@@ -159,6 +166,13 @@ export class Room extends DurableObject<Env> {
 
     const engine = this.engine;
     if (!engine) return reply(false, 'Room not found');
+
+    // The host's device acts for robot seats: { ..., as: 'Black' }
+    const robots = engine.config.aiColors ?? [];
+    if (msg.as !== undefined) {
+      if (me.userId !== this.meta?.hostUserId || !robots.includes(msg.as as PlayerColor)) return reply(false, 'You can only act for robot seats in your own game');
+      me.color = msg.as as PlayerColor;
+    }
 
     switch (msg.type) {
       case 'ping':
@@ -391,5 +405,12 @@ export function sanitizeConfig(input: Partial<GameConfig> = {}): Partial<GameCon
   // Board sizes the player count needs (matches the game's setup screen)
   if (config.playerCount === 4 && config.boardSize === '4x4x4') config.boardSize = '6x6x6';
   if (config.playerCount === 6) config.boardSize = '8x8x8';
+  if (['easy', 'medium', 'hard'].includes(input.aiDifficulty as string)) config.aiDifficulty = input.aiDifficulty;
+  // Robot seats: any seats but White (the host), and at least one seat left for a human opponent
+  if (Array.isArray(input.aiColors)) {
+    const seats = PLAYER_COLORS_BY_COUNT[config.playerCount ?? 2];
+    const robots = seats.filter(c => c !== 'White' && input.aiColors!.includes(c));
+    if (robots.length < seats.length - 1) config.aiColors = robots;
+  }
   return config;
 }

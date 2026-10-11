@@ -73,6 +73,7 @@ export class Accounts extends DurableObject<Env> {
       case 'link-redeem': return this.redeem(String(b.code ?? ''));
       case 'friends': return this.friends(userId);
       case 'friend-request': return this.friendRequest(userId, String(b.name ?? ''));
+      case 'search': return this.search(userId, String(b.query ?? ''));
       case 'friend-respond': return this.respond(userId, String(b.friendId ?? ''), b.accept === true);
       case 'friend-remove': return this.removeFriend(userId, String(b.friendId ?? ''));
       case 'block': return this.block(userId, String(b.friendId ?? ''));
@@ -217,6 +218,21 @@ export class Accounts extends DurableObject<Env> {
     const now = Date.now();
     this.sql.exec('INSERT OR REPLACE INTO friends (account_id, friend_id, status, created_at) VALUES (?, ?, ?, ?)', a, b, statusA, now);
     this.sql.exec('INSERT OR REPLACE INTO friends (account_id, friend_id, status, created_at) VALUES (?, ?, ?, ?)', b, a, statusB, now);
+  }
+
+  /** Players whose name contains the query (names starting with it first), for adding friends */
+  private search(userId: string, query: string) {
+    this.account(userId);
+    const q = query.replace(/[^A-Za-z0-9]/g, '');
+    if (q.length < 3) return { results: [] };
+    const rows = this.sql.exec(`
+      SELECT a.id AS userId, a.name AS name, f.status AS status
+      FROM accounts a LEFT JOIN friends f ON f.account_id = ? AND f.friend_id = a.id
+      WHERE a.name LIKE ? AND a.id != ?
+        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.account_id = ? AND b.blocked_id = a.id) OR (b.account_id = a.id AND b.blocked_id = ?))
+      ORDER BY (a.name LIKE ?) DESC, a.name LIMIT 20`,
+      userId, `%${q}%`, userId, userId, userId, `${q}%`).toArray();
+    return { results: rows.map(r => ({ userId: r.userId, name: r.name, status: r.status ?? 'none' })) };
   }
 
   private friendRequest(userId: string, name: string) {

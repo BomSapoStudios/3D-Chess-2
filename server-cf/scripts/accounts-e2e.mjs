@@ -68,6 +68,22 @@ await post('/friends/block', { friendId: c.userId }, a.token);
 check((await post('/friends/request', { name: a.name }, c.token)).status === 404, 'blocked player can no longer find you');
 check(!(await get('/friends', a.token)).body.friends.some(f => f.userId === c.userId), 'blocked player is gone from your list');
 
+// Search by name (part of a name works; blocked players are hidden)
+const part = b.name.slice(0, 6);
+const found = (await get(`/friends/search?q=${part}`, a.token)).body.results;
+check(found.some(r => r.userId === b.userId), `search "${part}" finds ${b.name}`);
+check((await get('/friends/search?q=ab', a.token)).body.results.length === 0, 'very short searches return nothing');
+const hidden = (await get(`/friends/search?q=${c.name.slice(0, 8)}`, a.token)).body.results;
+check(!hidden.some(r => r.userId === c.userId), 'blocked players are hidden from search');
+
+// Friends survive a name change
+await post('/friends/request', { name: a.name }, b.token);
+await post('/friends/respond', { friendId: b.userId, accept: true }, a.token);
+const renamed = (await post('/names/reroll', {}, a.token)).body;
+a.token = renamed.token;
+const afterRename = (await get('/friends', b.token)).body.friends.find(f => f.userId === a.userId);
+check(afterRename?.status === 'friends' && afterRename.name === renamed.name, `friend kept after renaming, shown under the new name (${renamed.name})`);
+
 // Remove
 await post('/friends/remove', { friendId: b.userId }, a.token);
 check(!(await get('/friends', b.token)).body.friends.some(f => f.userId === a.userId), 'removing a friend removes it for both');

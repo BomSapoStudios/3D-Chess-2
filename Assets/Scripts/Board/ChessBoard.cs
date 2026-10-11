@@ -663,7 +663,7 @@ public class ChessBoard : MonoBehaviour
         // Online: tell the server about our own moves (it re-checks them)
         if (moveResult && OnlineSession.ShouldSend(piece.pieceColor))
         {
-            OnlineClient.Instance.SendMove(from, to);
+            OnlineClient.Instance.SendMove(piece.pieceColor, from, to);
         }
 
         // VALIDATION: Check board consistency after move

@@ -216,7 +216,7 @@ public class PlacementManager : MonoBehaviour
         {
             if (!OnlineSession.CanControl(playerColor)) return;  // only the server marks the other side ready
             if (previousState && !ready) return;                  // can't take back "ready" online
-            if (ready && !previousState && OnlineSession.ShouldSend(playerColor)) OnlineClient.Instance.SendReady();
+            if (ready && !previousState && OnlineSession.ShouldSend(playerColor)) OnlineClient.Instance.SendReady(playerColor);
         }
 
         // Determine if this is human manual or AI auto-ready
@@ -1430,7 +1430,7 @@ public class PlacementManager : MonoBehaviour
         // Online: tell the server (it re-checks the placement)
         if (OnlineSession.ShouldSend(piece.pieceColor))
         {
-            OnlineClient.Instance.SendPlacePiece(piece.pieceType, position);
+            OnlineClient.Instance.SendPlacePiece(piece.pieceColor, piece.pieceType, position);
         }
 
         // Check if placement phase should end (when BOTH players complete)

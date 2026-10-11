@@ -73,7 +73,7 @@ public class OnlineGameBridge : MonoBehaviour
     private void Apply(ServerMessage msg)
     {
         PieceColor? color = Enum.TryParse(msg.color, out PieceColor c) ? c : (PieceColor?)null;
-        bool fromOpponent = color.HasValue && color.Value != OnlineSession.LocalColor;
+        bool fromOpponent = color.HasValue && !OnlineSession.IsLocal(color.Value); // another device's side
 
         switch (msg.type)
         {
@@ -93,6 +93,31 @@ public class OnlineGameBridge : MonoBehaviour
             case "game:pawnPromoted":
                 if (fromOpponent && Enum.TryParse(msg.pieceType, out ChessPieceType promoted) && PawnPromotionManager.Instance != null)
                     Remote(() => PawnPromotionManager.Instance.ApplyRemotePromotion(promoted));
+                break;
+
+            case "game:phaseChanged":
+                // The server starts play once everyone is ready, even if a player left pieces on their bench
+                if (msg.phase == "playing" && GameStateManager.Instance != null && GameStateManager.Instance.CanPlacePieces())
+                    Remote(() => PlacementManager.Instance.CompletePlacementPhase());
+                break;
+
+            case "game:chaosRotation":
+                // The server decides every Chaos Mode spin so all devices turn the same slice
+                if (msg.rotation?.positionMap != null && ChaosRotationManager.Instance != null)
+                {
+                    var map = new Dictionary<BoardPosition, BoardPosition>();
+                    foreach (var step in msg.rotation.positionMap) map[step.from.ToBoard()] = step.to.ToBoard();
+                    ChaosRotationManager.Instance.ApplyRemoteRotation(map);
+                }
+                break;
+
+            case "game:playerEliminated":
+                // Checkmates are found on every device; this covers resignations, timeouts and walk-outs
+                if (color.HasValue && GameEndDetectionManager.Instance != null)
+                {
+                    PieceColor? by = Enum.TryParse(msg.conqueredBy, out PieceColor winner) ? winner : (PieceColor?)null;
+                    Remote(() => GameEndDetectionManager.Instance.ApplyRemoteElimination(color.Value, by));
+                }
                 break;
 
             case "game:moveRejected":

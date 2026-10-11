@@ -135,7 +135,9 @@ export class GameEngine {
   }
 
   getActiveColors(): PlayerColor[] {
-    return this.getActivePlayers().map(p => p.color);
+    // Turn order is always White, Black, Green, Purple, Yellow, Orange, whatever order players joined in
+    const order = PLAYER_COLORS_BY_COUNT[6];
+    return this.getActivePlayers().map(p => p.color).sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
 
   // ── Phase transitions ────────────────────────────────────────────────────────
@@ -215,10 +217,25 @@ export class GameEngine {
     return { success: true };
   }
 
+  /**
+   * Same zones as the game (PlacementManager.GetPlacementZoneForColor): your own face of the cube,
+   * and on bigger boards only part of it, so players can't start in each other's reach.
+   *  6³: White/Black use Y 3-5, Z 1-4; Green/Purple use Y 0-2, X 1-4.  8³: the middle 4x4 of each face.
+   */
   private isValidPlacementZone(color: PlayerColor, pos: BoardPosition): boolean {
     const { axis, direction } = PLAYER_ADVANCE[color];
-    const coord = pos[axis];
-    return direction === 1 ? coord === 0 : coord === this.board.size - 1;
+    const n = this.board.size;
+    if (pos[axis] !== (direction === 1 ? 0 : n - 1)) return false;
+    const within = (v: number, lo: number, hi: number) => v >= lo && v <= hi;
+    if (n === 6) {
+      if (axis === 'x') return within(pos.y, 3, 5) && within(pos.z, 1, 4);
+      if (axis === 'z') return within(pos.y, 0, 2) && within(pos.x, 1, 4);
+    } else if (n === 8) {
+      if (axis === 'x') return within(pos.y, 2, 5) && within(pos.z, 2, 5);
+      if (axis === 'z') return within(pos.x, 2, 5) && within(pos.y, 2, 5);
+      if (axis === 'y') return within(pos.x, 2, 5) && within(pos.z, 2, 5);
+    }
+    return true;
   }
 
   // ── Move execution ────────────────────────────────────────────────────────────

@@ -131,6 +131,8 @@ public class GameEndDetectionManager : MonoBehaviour
     private void OnTurnChanged(PieceColor previousPlayer, PieceColor newCurrentPlayer)
     {
         if (!enableGameEndDetection) return;
+        // Not a real move: the turn is being (re)set, e.g. when play starts. Nobody can have been mated by it.
+        if (previousPlayer == newCurrentPlayer) return;
 
         // Multiplayer: the player who just moved may have checkmated ANY opponent, not just the
         // next player. Credit the conquest to the mover. (Skipped when the "move" was just the
@@ -336,6 +338,20 @@ public class GameEndDetectionManager : MonoBehaviour
     /// </summary>
     /// <param name="checkmatedPlayer">The player who was checkmated</param>
     /// <param name="lastMover">The player who just moved (delivered checkmate). Optional - if not provided, will be determined from game state</param>
+    /// <summary>
+    /// Online: another device reports a player knocked out (resigned, ran out of time, left).
+    /// Checkmates are detected here too, so a player already out is left alone.
+    /// </summary>
+    public void ApplyRemoteElimination(PieceColor loser, PieceColor? conqueror)
+    {
+        if (PlayerManager.Instance == null || PlayerManager.Instance.IsPlayerEliminated(loser)) return;
+        if (PlayerManager.Instance.GetActivePlayerCount() <= 2) return; // two-player endings come as game:over
+        if (conqueror.HasValue) PlayerManager.Instance.TransferPiecesToPlayer(loser, conqueror.Value);
+        PlayerManager.Instance.EliminatePlayer(loser);
+        if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
+        if (TurnManager.Instance != null && TurnManager.Instance.GetCurrentPlayer() == loser) StartCoroutine(SkipEliminatedTurn());
+    }
+
     private System.Collections.IEnumerator SkipEliminatedTurn()
     {
         yield return null;
@@ -401,6 +417,11 @@ public class GameEndDetectionManager : MonoBehaviour
             Debug.Log($"🎨 CONQUEST: Using fallback detection logic: {conqueror}");
         }
 
+        if (conqueror == checkmatedPlayer)
+        {
+            Debug.LogWarning($"GameEndDetectionManager: ignoring conquest of {checkmatedPlayer} by itself");
+            return;
+        }
         Debug.Log($"🎨 CONQUEST: {conqueror} has checkmated {checkmatedPlayer}!");
 
         // Transfer all pieces from checkmated player to conqueror
@@ -696,7 +717,7 @@ public class GameEndDetectionManager : MonoBehaviour
     /// <param name="forfeitingPlayer">The player who wants to forfeit</param>
     public void HandleForfeit(PieceColor forfeitingPlayer)
     {
-        if (OnlineSession.ShouldSend(forfeitingPlayer)) OnlineClient.Instance.SendResign();
+        if (OnlineSession.ShouldSend(forfeitingPlayer)) OnlineClient.Instance.SendResign(forfeitingPlayer);
         if (!enableGameEndDetection)
         {
             Debug.LogWarning("GameEndDetectionManager: Forfeit ignored - game end detection disabled");

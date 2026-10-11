@@ -27,12 +27,17 @@ public class NeonMenu : MonoBehaviour
     private AIDifficulty difficulty = AIDifficulty.Medium;
     private readonly List<PlayerType> playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Computer };
     private bool chaosMode;
+    private int chaosInterval = 9;
     private bool timedPlay;
+    private bool setupOnline;          // the setup screen is making an online game
+    private bool quickPlay;
+    private TextMeshProUGUI setupTitle, setupGoLabel;
 
     // Setup controls that change with state
     private readonly List<(Image image, TextMeshProUGUI label, System.Func<bool> selected, System.Func<bool> enabled, Color color)> chips =
         new List<(Image, TextMeshProUGUI, System.Func<bool>, System.Func<bool>, Color)>();
     private RectTransform playerGrid;
+    private TextMeshProUGUI playerHint;
     private Image chaosSwitch, timedSwitch;
     private RectTransform chaosKnob, timedKnob;
     private TextMeshProUGUI chaosNote, timedNote;
@@ -262,11 +267,11 @@ public class NeonMenu : MonoBehaviour
         header.offsetMin = new Vector2(16, -64);
         header.offsetMax = new Vector2(-24, -12);
 
-        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowMenu);
+        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, () => { if (setupOnline) ShowOnline(); else ShowMenu(); });
         Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
         back.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
 
-        TextMeshProUGUI title = NewText("Title", header, "PICK YOUR CHAOS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
+        TextMeshProUGUI title = setupTitle = NewText("Title", header, "PICK YOUR CHAOS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
         NeonTheme.ApplyFont(title, display: true);
         title.rectTransform.anchorMin = new Vector2(0, 0);
         title.rectTransform.anchorMax = new Vector2(1, 1);
@@ -276,6 +281,7 @@ public class NeonMenu : MonoBehaviour
 
         Button go = NeonButton(header, "Let's go!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, StartFromSetup);
         Place((RectTransform)go.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
+        setupGoLabel = go.GetComponentInChildren<TextMeshProUGUI>();
 
         // Two cards
         RectTransform left = Card(root, "Left Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
@@ -297,7 +303,8 @@ public class NeonMenu : MonoBehaviour
             ("Feast 8³", () => SetBoard(BoardSize.Large8x8x8), () => boardSize == BoardSize.Large8x8x8, () => true),
         }, NeonTheme.Lime, 16);
 
-        SectionLabel(left, "Tap a player to swap You / Robot", NeonTheme.Lavender);
+        playerHint = NewText("Label", left, "Tap a player to swap You / Robot", 15, NeonTheme.Lavender, TextAlignmentOptions.Left);
+        playerHint.gameObject.AddComponent<LayoutElement>().preferredHeight = 20;
         playerGrid = NewRect("Players", left);
         var rows = playerGrid.gameObject.AddComponent<VerticalLayoutGroup>();
         rows.spacing = 6;
@@ -318,6 +325,12 @@ public class NeonMenu : MonoBehaviour
         }, NeonTheme.Yellow, 16);
 
         SwitchRow(right, "Chaos Mode", out chaosNote, out chaosSwitch, out chaosKnob, () => { chaosMode = !chaosMode; Refresh(); });
+        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            ("Every 5", () => chaosInterval = 5, () => chaosMode && chaosInterval == 5, () => chaosMode),
+            ("Every 9", () => chaosInterval = 9, () => chaosMode && chaosInterval == 9, () => chaosMode),
+            ("Every 15", () => chaosInterval = 15, () => chaosMode && chaosInterval == 15, () => chaosMode),
+        }, NeonTheme.Cyan, 15);
         SwitchRow(right, "Speed round", out timedNote, out timedSwitch, out timedKnob, () => { timedPlay = !timedPlay; Refresh(); });
 
         Refresh();
@@ -472,10 +485,12 @@ public class NeonMenu : MonoBehaviour
             NeonTheme.NeutralTint(button);
             button.onClick.AddListener(() =>
             {
+                if (setupOnline && index == 0) return; // online, White is always you (the host)
                 playerTypes[index] = playerTypes[index] == PlayerType.Human ? PlayerType.Computer : PlayerType.Human;
                 Refresh();
             });
-            TextMeshProUGUI label = NewText("Text", image.transform, $"{ColorNames[i]}: {(human ? "You" : "Robot")}", 14, c, TextAlignmentOptions.Center);
+            string who = !human ? "Robot" : setupOnline ? (index == 0 ? "You" : "Player") : "You";
+            TextMeshProUGUI label = NewText("Text", image.transform, $"{ColorNames[i]}: {who}", 14, c, TextAlignmentOptions.Center);
             label.enableAutoSizing = true;
             label.fontSizeMin = 10;
             label.fontSizeMax = 14;
@@ -491,7 +506,7 @@ public class NeonMenu : MonoBehaviour
 
         RefreshCustomize();
         SetSwitch(chaosSwitch, chaosKnob, chaosMode);
-        chaosNote.text = chaosMode ? "Cube spins every 9 turns" : "Off";
+        chaosNote.text = chaosMode ? $"Cube spins every {chaosInterval} turns" : "Off";
         SetSwitch(timedSwitch, timedKnob, timedPlay);
         timedNote.text = timedPlay ? "10 minutes each" : "No clock";
     }
@@ -678,7 +693,7 @@ public class NeonMenu : MonoBehaviour
         nameRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
         SectionLabel(left, "Play a friend", NeonTheme.Cyan);
         RectTransform createRow = Row(left);
-        NeonButton(createRow, "Create game", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 17, CreateOnlineGame);
+        NeonButton(createRow, "Create game", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 17, ShowOnlineSetup);
         RectTransform joinRow = Row(left);
         codeInput = InputField(joinRow, "CODE", "", 6);
         codeInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
@@ -866,7 +881,6 @@ public class NeonMenu : MonoBehaviour
         renaming = false;
     }
 
-    private void CreateOnlineGame() => StartCoroutine(CreateRoutine());
     private void JoinOnlineGame() => StartCoroutine(JoinRoutine(codeInput.text));
     private void FindOnlineMatch() => StartCoroutine(MatchRoutine());
 
@@ -882,7 +896,7 @@ public class NeonMenu : MonoBehaviour
         done(ok);
     }
 
-    private IEnumerator CreateRoutine()
+    private IEnumerator CreateRoutine(string configJson)
     {
         if (onlineBusy) yield break;
         onlineBusy = true;
@@ -892,7 +906,7 @@ public class NeonMenu : MonoBehaviour
         if (!signedIn) { onlineBusy = false; yield break; }
 
         string code = null;
-        yield return OnlineClient.Instance.CreateRoom("4x4x4", (c, error) =>
+        yield return OnlineClient.Instance.CreateRoom(configJson, (c, error) =>
         {
             code = c;
             if (c == null) SetOnlineStatus(error);
@@ -901,7 +915,7 @@ public class NeonMenu : MonoBehaviour
 
         ListenForStart();
         OnlineClient.Instance.JoinRoom(code);
-        SetOnlineStatus($"Your game code is {code}. Send it to a friend; the game starts when they join.");
+        SetOnlineStatus($"Your game code is {code}. Send it to your friends; the game starts when every seat is filled.");
     }
 
     private IEnumerator JoinRoutine(string code)
@@ -973,19 +987,31 @@ public class NeonMenu : MonoBehaviour
         client.OnMessage -= OnOnlineMessage;
         client.OnClosed -= OnOnlineClosed;
 
-        OnlineSession.Begin(client.LocalColor);
+        NetConfig net = state.config ?? new NetConfig { boardSize = "4x4x4", playerCount = 2 };
+        var robots = new List<PieceColor>();
+        if (net.aiColors != null) foreach (string c in net.aiColors) if (System.Enum.TryParse(c, out PieceColor rc)) robots.Add(rc);
+        OnlineSession.Begin(client.LocalColor, client.IsHost, robots);
         OnlineGameBridge.Begin();
 
-        BoardSize size = state.config != null && state.config.boardSize == "8x8x8" ? BoardSize.Large8x8x8
-                       : state.config != null && state.config.boardSize == "6x6x6" ? BoardSize.Medium6x6x6
-                       : BoardSize.Small4x4x4;
-        var config = new GameConfiguration(2, 0, size, AIDifficulty.Medium);
-        config.playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Human };
-        config.enableChaosMode = false;
-        config.enableTimedPlay = false;
+        BoardSize size = net.boardSize == "8x8x8" ? BoardSize.Large8x8x8 : net.boardSize == "6x6x6" ? BoardSize.Medium6x6x6 : BoardSize.Small4x4x4;
+        int count = net.playerCount == 4 || net.playerCount == 6 ? net.playerCount : 2;
+        AIDifficulty level = net.aiDifficulty == "easy" ? AIDifficulty.Easy : net.aiDifficulty == "hard" ? AIDifficulty.Hard : AIDifficulty.Medium;
+        var config = new GameConfiguration(count, 0, size, level);
+        // Robot seats run on the host's device; everyone else sees them as remote players
+        config.playerTypes = new List<PlayerType>();
+        for (int i = 0; i < count; i++)
+        {
+            bool robotHere = client.IsHost && robots.Contains((PieceColor)i);
+            config.playerTypes.Add(robotHere ? PlayerType.Computer : PlayerType.Human);
+        }
+        config.aiPlayerCount = config.playerTypes.FindAll(t => t == PlayerType.Computer).Count;
+        config.enableChaosMode = net.chaosMode;
+        config.chaosTurnInterval = net.chaosInterval > 0 ? net.chaosInterval : 9;
+        config.enableTimedPlay = net.timedMode;
+        config.timePerPlayerMinutes = net.timePerPlayerSeconds > 0 ? net.timePerPlayerSeconds / 60 : 10;
         config.isOnlineGame = true;
         config.roomCode = client.RoomCode;
-        config.ApplyToLegacyFields();
+        if (count == 2) config.ApplyToLegacyFields();
         SceneController.Instance.LoadGameScene(config);
     }
 
@@ -999,6 +1025,8 @@ public class NeonMenu : MonoBehaviour
     private Button appleButton, cancelChallengeButton;
     private RectTransform friendsList;
     private FriendsResponse lastFriends;
+    private FriendInfo[] searchResults;   // shown above the friends list until closed
+    private string searchedFor;
     private string lastFriendsJson = "";
     private float nextFriendsPoll;
     private bool pollingFriends;
@@ -1029,14 +1057,14 @@ public class NeonMenu : MonoBehaviour
         RectTransform right = Card(root, "Friends Card", NeonTheme.Pink, new Vector2(0.46f, 0f), new Vector2(1f, 1f), new Vector2(8, 60), new Vector2(-24, -74));
 
         // Add a friend: names are generated, so this only ever matches real player names
-        SectionLabel(left, "Add a friend by their name", NeonTheme.Cyan);
+        SectionLabel(left, "Find a friend by name", NeonTheme.Cyan);
         RectTransform addRow = Row(left);
         addRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
-        addFriendInput = InputField(addRow, "e.g. NeonRook42", "", 24);
+        addFriendInput = InputField(addRow, "e.g. NeonRook", "", 24);
         addFriendInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
         addFriendInput.GetComponent<LayoutElement>().flexibleWidth = 1;
-        Button add = NeonButton(addRow, "Add", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 17, () => StartCoroutine(AddFriendRoutine()));
-        Fixed(add, 76);
+        Button add = NeonButton(addRow, "Search", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 16, () => StartCoroutine(SearchRoutine()));
+        Fixed(add, 86);
 
         SectionLabel(left, "Your account", NeonTheme.Cyan);
         accountNote = NewText("Account", left, "", 14, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
@@ -1176,6 +1204,19 @@ public class NeonMenu : MonoBehaviour
             ListNote("Loading…");
             return;
         }
+        if (searchResults != null)
+        {
+            RectTransform head = ListRow(searchResults.Length == 0 ? $"No players match \"{searchedFor}\"" : $"Players matching \"{searchedFor}\"", NeonTheme.Cyan, true);
+            RowButton(head, "Close", NeonTheme.Cyan, () => { searchResults = null; RebuildFriendsList(); });
+            foreach (var result in searchResults)
+            {
+                var r = result;
+                string note = r.status == "friends" ? " (friend)" : r.status == "outgoing" ? " (request sent)" : r.status == "incoming" ? " (added you)" : "";
+                RectTransform row = ListRow(r.name + note, NeonTheme.Lavender, true);
+                if (r.status == "none") RowButton(row, "Add", NeonTheme.Lime, () => StartCoroutine(AddFriendRoutine(r.name)));
+                else if (r.status == "incoming") RowButton(row, "Accept", NeonTheme.Lime, () => StartCoroutine(Act(OnlineClient.Instance.RespondToFriend(r.userId, true, ActDone))));
+            }
+        }
         if (lastFriends.challenges != null)
         {
             foreach (var challenge in lastFriends.challenges)
@@ -1277,18 +1318,35 @@ public class NeonMenu : MonoBehaviour
         nextFriendsPoll = 0f;
     }
 
-    private IEnumerator AddFriendRoutine()
+    private IEnumerator SearchRoutine()
     {
-        string name = addFriendInput.text.Trim();
-        if (name.Length == 0) { friendsStatus.text = "Type your friend's player name, like NeonRook42"; yield break; }
+        string query = addFriendInput.text.Trim();
+        if (query.Length < 3) { friendsStatus.text = "Type at least 3 letters of your friend's name"; yield break; }
+        bool signedIn = false;
+        yield return SignIn(ok => signedIn = ok);
+        if (!signedIn) yield break;
+        yield return OnlineClient.Instance.SearchPlayers(query, (results, error) =>
+        {
+            if (error != null) { friendsStatus.text = error; return; }
+            searchResults = results;
+            searchedFor = query;
+            friendsStatus.text = "";
+            RebuildFriendsList();
+        });
+    }
+
+    private IEnumerator AddFriendRoutine(string name)
+    {
         bool signedIn = false;
         yield return SignIn(ok => signedIn = ok);
         if (!signedIn) yield break;
         yield return OnlineClient.Instance.SendFriendRequest(name, (status, error) =>
         {
             if (error != null) { friendsStatus.text = error; return; }
-            addFriendInput.text = "";
-            friendsStatus.text = status == "friends" ? $"You and {name} are now friends!" : $"Friend request sent to {name}";
+            friendsStatus.text = status == "friends" ? $"You and {name} are now friends!" : $"Friend request sent to {name}. They'll show up here once they accept.";
+            if (searchResults != null)
+                foreach (var r in searchResults) if (r.name == name) r.status = status;
+            RebuildFriendsList();
         });
         nextFriendsPoll = 0f;
     }
@@ -1299,7 +1357,7 @@ public class NeonMenu : MonoBehaviour
         onlineBusy = true;
         friendsStatus.text = $"Challenging {friend.name}…";
         string code = null;
-        yield return OnlineClient.Instance.ChallengeFriend(friend.userId, "4x4x4", (c, error) =>
+        yield return OnlineClient.Instance.ChallengeFriend(friend.userId, OnlineConfigJson(), (c, error) =>
         {
             code = c;
             if (c == null) friendsStatus.text = error;
@@ -1412,7 +1470,21 @@ public class NeonMenu : MonoBehaviour
         Refresh();
     }
 
-    private void ShowSetup()
+    private void ShowSetup() => ShowSetupFor(false);
+
+    private void ShowOnlineSetup() => ShowSetupFor(true);
+
+    private void ShowSetupFor(bool online)
+    {
+        setupOnline = online;
+        LoadSetup();
+        setupTitle.text = online ? "ONLINE GAME" : "PICK YOUR CHAOS";
+        setupGoLabel.text = online ? "Create!" : "Let's go!";
+        playerHint.text = online ? "Tap a seat to swap Player / Robot" : "Tap a player to swap You / Robot";
+        ShowSetupScreen();
+    }
+
+    private void ShowSetupScreen()
     {
         menuScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -1447,11 +1519,88 @@ public class NeonMenu : MonoBehaviour
         playerTypes.Add(PlayerType.Computer);
         chaosMode = false;
         timedPlay = false;
+        setupOnline = false;
+        quickPlay = true;   // don't overwrite the player's saved setup
         StartFromSetup();
+        quickPlay = false;
+    }
+
+    // ── Remembered setup (separately for local and online games) ──
+
+    [System.Serializable]
+    private class SetupPrefs
+    {
+        public int players = 2;
+        public int board;
+        public int difficulty = (int)AIDifficulty.Medium;
+        public int[] types;
+        public bool chaos;
+        public int chaosInterval = 9;
+        public bool timed;
+    }
+
+    private string SetupKey => setupOnline ? "SetupPrefs.Online" : "SetupPrefs.Local";
+
+    private void LoadSetup()
+    {
+        SetupPrefs p = null;
+        try { p = JsonUtility.FromJson<SetupPrefs>(PlayerPrefs.GetString(SetupKey, "")); } catch { /* none saved */ }
+        if (p == null) p = new SetupPrefs { types = setupOnline ? new[] { 0, 0 } : new[] { 0, 1 } };
+        playerCount = p.players == 4 || p.players == 6 ? p.players : 2;
+        boardSize = (BoardSize)p.board;
+        difficulty = (AIDifficulty)p.difficulty;
+        chaosMode = p.chaos;
+        chaosInterval = p.chaosInterval == 5 || p.chaosInterval == 15 ? p.chaosInterval : 9;
+        timedPlay = p.timed;
+        playerTypes.Clear();
+        for (int i = 0; i < playerCount; i++)
+            playerTypes.Add(p.types != null && i < p.types.Length ? (PlayerType)p.types[i] : (setupOnline ? PlayerType.Human : PlayerType.Computer));
+        if (setupOnline) playerTypes[0] = PlayerType.Human;
+        SetPlayers(playerCount); // re-applies board rules for the player count
+    }
+
+    private void SaveSetup()
+    {
+        var p = new SetupPrefs
+        {
+            players = playerCount, board = (int)boardSize, difficulty = (int)difficulty,
+            types = playerTypes.ConvertAll(t => (int)t).ToArray(), chaos = chaosMode, chaosInterval = chaosInterval, timed = timedPlay,
+        };
+        PlayerPrefs.SetString(SetupKey, JsonUtility.ToJson(p));
+        Debug.Log($"NeonMenu: saved setup {SetupKey} = {JsonUtility.ToJson(p)}");
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>The saved online setup as the server's game config (used by Create and Challenge)</summary>
+    private string OnlineConfigJson()
+    {
+        bool wasOnline = setupOnline;
+        setupOnline = true;
+        LoadSetup();
+        setupOnline = wasOnline;
+        var robots = new List<string>();
+        for (int i = 1; i < playerCount; i++) if (playerTypes[i] == PlayerType.Computer) robots.Add("\"" + ColorNames[i] + "\"");
+        string size = boardSize == BoardSize.Large8x8x8 ? "8x8x8" : boardSize == BoardSize.Medium6x6x6 ? "6x6x6" : "4x4x4";
+        return "{\"boardSize\":\"" + size + "\",\"playerCount\":" + playerCount
+            + ",\"chaosMode\":" + (chaosMode ? "true" : "false") + ",\"chaosInterval\":" + chaosInterval
+            + ",\"timedMode\":" + (timedPlay ? "true" : "false") + ",\"timePerPlayerSeconds\":600"
+            + ",\"aiDifficulty\":\"" + difficulty.ToString().ToLowerInvariant() + "\""
+            + ",\"aiColors\":[" + string.Join(",", robots) + "]}";
     }
 
     private void StartFromSetup()
     {
+        if (setupOnline)
+        {
+            int humans = 0;
+            foreach (PlayerType t in playerTypes) if (t == PlayerType.Human) humans++;
+            if (humans < 2) { ShowToast("Leave at least one seat for another player"); return; }
+            SaveSetup();
+            ShowOnline();
+            StartCoroutine(CreateRoutine(OnlineConfigJson()));
+            return;
+        }
+        if (!quickPlay) SaveSetup();
         var config = new GameConfiguration();
         config.playerCount = playerCount;
         config.boardSize = boardSize;
@@ -1461,7 +1610,7 @@ public class NeonMenu : MonoBehaviour
         foreach (PlayerType t in playerTypes) if (t == PlayerType.Computer) robots++;
         config.aiPlayerCount = robots;
         config.enableChaosMode = chaosMode;
-        config.chaosTurnInterval = 9;
+        config.chaosTurnInterval = chaosInterval;
         config.enableTimedPlay = timedPlay;
         config.timePerPlayerMinutes = 10;
         if (playerCount == 2) config.ApplyToLegacyFields();
