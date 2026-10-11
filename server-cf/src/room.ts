@@ -4,7 +4,7 @@ import {
   PLAYER_COLORS_BY_COUNT,
   type BoardPosition, type EndReason, type GameConfig, type PieceType, type PlayerColor,
 } from './types/game.js';
-import type { Env } from './index.js';
+import { accounts, type Env } from './index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Room — one Durable Object per game, addressed by its 6-character code.
@@ -112,7 +112,15 @@ export class Room extends DurableObject<Env> {
     if (url.pathname === '/info') {
       if (!this.meta || !this.engine) return Response.json({ error: 'Room not found' }, { status: 404 });
       const state = this.engine.getState();
+      const asker = url.searchParams.get('userId');
+      const yourColor = asker ? this.seats[asker] ?? null : null;
       return Response.json({
+        yourColor,
+        isHost: asker != null && asker === this.meta.hostUserId,
+        yourTurn: yourColor != null && state.phase === 'playing' && state.currentTurn === yourColor,
+        pace: state.config.pace ?? 'live',
+        moveDeadline: this.slowDeadline() ?? this.clockDeadline(),
+        lobbyClosesAt: state.phase === 'waiting' ? this.meta.expiresAt ?? null : null,
         code: this.meta.code,
         isPublic: this.meta.isPublic,
         phase: state.phase,
@@ -152,6 +160,8 @@ export class Room extends DurableObject<Env> {
       }
       engine.addPlayer(userId, name, color);
       this.seats[userId] = color;
+      // Remember the game on the player's account, so they can find it after an app restart
+      this.ctx.waitUntil(accounts(this.env, 'game-add', { roomCode: this.meta!.code, userIds: [userId] }).catch(() => undefined));
     }
 
     // Only one live socket per player: a reconnect replaces the old one
@@ -310,6 +320,7 @@ export class Room extends DurableObject<Env> {
       this.gameOver = result.gameOver;
       this.turnStartedAt = null;
       if (this.meta) this.meta.gameOverAt = Date.now();
+      this.forgetRoom();
     } else {
       this.startTurnClock();
     }
@@ -433,6 +444,7 @@ export class Room extends DurableObject<Env> {
       const finishedAndEmpty = this.gameOver && meta.emptySince != null && now - meta.emptySince >= this.t(FINISHED_EMPTY_MS);
       const idle = now - (meta.lastActivityAt ?? meta.createdAt) >= this.t(IDLE_CAP_MS);
       if (finishedAndEmpty || idle) {
+        this.forgetRoom();
         await this.ctx.storage.deleteAll();
         this.meta = null;
         this.engine = null;
@@ -449,12 +461,20 @@ export class Room extends DurableObject<Env> {
     this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
     this.turnStartedAt = null;
     this.meta!.gameOverAt = Date.now();
+    this.forgetRoom();
     await this.persist();
     await this.logEvent({ type: 'game:over', ...this.gameOver });
   }
 
+  /** Take this room off its players' active games lists */
+  private forgetRoom(): void {
+    if (!this.meta) return;
+    this.ctx.waitUntil(accounts(this.env, 'game-remove', { roomCode: this.meta.code }).catch(() => undefined));
+  }
+
   /** Close a lobby that never started: tell anyone still in it, then forget the room */
   private async closeRoom(reason: 'expired' | 'host_left' | 'finished'): Promise<void> {
+    this.forgetRoom();
     this.broadcast({ type: 'room:closed', reason });
     const why = reason === 'expired' ? 'Room closed: nobody joined' : reason === 'host_left' ? 'Room closed: the host left' : 'Room closed: game over';
     for (const ws of this.ctx.getWebSockets()) {

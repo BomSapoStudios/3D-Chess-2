@@ -54,6 +54,11 @@ public class OnlineGameBridge : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+        if (OnlineSession.Replaying)
+        {
+            CatchUp();
+            return;
+        }
         // Messages can arrive before the game scene has finished building; replay them once it has
         while (backlog.Count > 0 && GameReady())
         {
@@ -61,9 +66,59 @@ public class OnlineGameBridge : MonoBehaviour
         }
     }
 
+    // ───────────────────────── Resuming a game after the app restarted ─────────────────────────
+
+    private float nextReplayAt, replayStartedAt = -1f;
+    private int appliedSeq;
+
+    /// <summary>
+    /// Rebuild a resumed game from the server's history, one event at a time, waiting for
+    /// each change to settle (setup ending, a Chaos spin) before the next. Then hand back control.
+    /// </summary>
+    private void CatchUp()
+    {
+        if (replayStartedAt < 0f)
+        {
+            replayStartedAt = Time.unscaledTime;
+            Show("Picking up where you left off…", 60f);
+        }
+        var client = OnlineClient.Instance;
+        bool timedOut = Time.unscaledTime - replayStartedAt > 90f;
+        if (backlog.Count == 0)
+        {
+            if (client == null || appliedSeq >= client.CatchUpTo || timedOut) FinishCatchUp();
+            return;
+        }
+        if (!GameReady() || Time.unscaledTime < nextReplayAt || Busy()) return;
+        ServerMessage msg = backlog.Dequeue();
+        Apply(msg);
+        if (msg.seq > appliedSeq) appliedSeq = msg.seq;
+        nextReplayAt = Time.unscaledTime + 0.03f;
+    }
+
+    private static bool Busy()
+    {
+        if (ChaosRotationManager.Instance != null && ChaosRotationManager.Instance.IsChaosAnimationInProgress()) return true;
+        foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
+            if (piece.IsMoving) return true;
+        return false;
+    }
+
+    private void FinishCatchUp()
+    {
+        OnlineSession.Replaying = false;
+        Show("You're back in the game", 3f);
+        // Robots played on this device carry on (setup or their turn)
+        if (PlacementManager.Instance != null) PlacementManager.Instance.ResumeAIPlacement();
+        if (TurnManager.Instance != null) TurnManager.Instance.ResumeAIIfNeeded();
+        // Anything that arrived live while catching up
+        while (backlog.Count > 0 && GameReady()) Apply(backlog.Dequeue());
+    }
+
     private static bool GameReady() =>
         ChessBoard.Instance != null && PlacementManager.Instance != null && TurnManager.Instance != null &&
-        GameStateManager.Instance != null && PieceTray.GetTrayForColor(PieceColor.Black) != null;
+        GameStateManager.Instance != null && PieceTray.GetTrayForColor(PieceColor.Black) != null &&
+        PlacementManager.Instance.PiecesReady; // trays filled, so placements can be taken from them
 
     private void Receive(ServerMessage msg)
     {
@@ -72,7 +127,7 @@ public class OnlineGameBridge : MonoBehaviour
             moveDeadline = msg.state.moveDeadline;
             currentTurn = msg.state.currentTurn;
         }
-        if (GameReady() && backlog.Count == 0) Apply(msg);
+        if (GameReady() && backlog.Count == 0 && !OnlineSession.Replaying) Apply(msg);
         else backlog.Enqueue(msg);
     }
 

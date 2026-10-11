@@ -52,7 +52,7 @@ export interface Env {
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */
-async function accounts(env: Env, op: string, body: Record<string, unknown>): Promise<{ status: number; data: Record<string, unknown> }> {
+export async function accounts(env: Env, op: string, body: Record<string, unknown>): Promise<{ status: number; data: Record<string, unknown> }> {
   const stub = env.ACCOUNTS.get(env.ACCOUNTS.idFromName('global'));
   const res = await stub.fetch(`https://accounts/${op}`, { method: 'POST', body: JSON.stringify(body) });
   return { status: res.status, data: await res.json() as Record<string, unknown> };
@@ -153,6 +153,23 @@ export default {
           return json(room);
         }
       }
+    }
+
+    // Your games in progress (or waiting for players), newest first, with whose turn it is
+    if (path === '/games' && request.method === 'GET') {
+      if (!user) return needUser();
+      const { data } = await accounts(env, 'games', { userId: user.userId });
+      const games = [];
+      for (const code of (data.codes as string[]) ?? []) {
+        const res = await env.ROOM.get(env.ROOM.idFromName(code)).fetch(`https://room/info?userId=${encodeURIComponent(user.userId)}`);
+        const info = res.ok ? await res.json() as Record<string, unknown> : null;
+        if (!info || info.phase === 'gameover' || !info.yourColor) {
+          await accounts(env, 'game-remove', { roomCode: code, userId: user.userId }); // gone or finished
+          continue;
+        }
+        games.push(info);
+      }
+      return json({ games });
     }
 
     if (path === '/rooms' && request.method === 'POST') {

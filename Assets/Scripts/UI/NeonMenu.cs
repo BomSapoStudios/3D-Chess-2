@@ -77,6 +77,76 @@ public class NeonMenu : MonoBehaviour
         yield return null;
         yield return null;
         HideOldMenu();
+
+        // Games still going (say the app was closed mid-game): show them on the Online Game button
+        yield return RefreshGames();
+    }
+
+    // ───────────────────────── Your games (resume after a restart) ─────────────────────────
+
+    private TextMeshProUGUI onlineMenuLabel;
+    private RectTransform gamesList;
+    private GameObject gamesSection;
+    private GameInfo[] myGames = new GameInfo[0];
+
+    /// <summary>Ask the server for this player's games in progress (only if they've signed in before)</summary>
+    private IEnumerator RefreshGames()
+    {
+        var client = OnlineClient.GetOrCreate();
+        if (!client.HasToken) yield break;
+        GameInfo[] games = null;
+        yield return client.GetGames((g, error) => games = g);
+        myGames = games ?? new GameInfo[0];
+        int yourMove = 0;
+        foreach (GameInfo g in myGames) if (g.yourTurn) yourMove++;
+        if (onlineMenuLabel != null)
+            onlineMenuLabel.text = myGames.Length == 0 ? "Online Game" : yourMove > 0 ? $"Online Game ({yourMove}!)" : $"Online Game ({myGames.Length})";
+        RebuildGamesList();
+    }
+
+    private void RebuildGamesList()
+    {
+        if (gamesList == null) return;
+        foreach (Transform child in gamesList) Destroy(child.gameObject);
+        gamesSection.SetActive(myGames.Length > 0);
+        // Your move first, then the rest; two fit on the card
+        var ordered = new List<GameInfo>(myGames);
+        ordered.Sort((a, b) => b.yourTurn.CompareTo(a.yourTurn));
+        for (int i = 0; i < ordered.Count && i < 2; i++)
+        {
+            GameInfo g = ordered[i];
+            RectTransform row = NewRect("Game", gamesList);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
+            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+            TextMeshProUGUI label = NewText("Label", row, GameLabel(g), 14, g.yourTurn ? NeonTheme.Lime : NeonTheme.Lavender, TextAlignmentOptions.Left);
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 10;
+            label.fontSizeMax = 14;
+            label.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+            string code = g.code;
+            Button resume = NeonButton(row, "Resume", new Vector2(0, 36), g.yourTurn ? NeonTheme.Lime : NeonTheme.Cyan, NeonTheme.Ground, 0f, 14, () => ResumeGame(code));
+            Fixed(resume, 86);
+        }
+    }
+
+    private static string GameLabel(GameInfo g)
+    {
+        var others = new List<string>();
+        if (g.players != null) foreach (GamePlayer p in g.players) if (p.color != g.yourColor) others.Add(p.name);
+        string vs = others.Count == 0 ? "Waiting for players" : "vs " + string.Join(", ", others);
+        string status = g.phase == "waiting" ? "lobby" : g.phase == "placement" ? "setting up" : g.yourTurn ? "your move" : "their move";
+        return $"{vs} · {status}";
+    }
+
+    private void ResumeGame(string code)
+    {
+        ShowOnline();
+        StartCoroutine(JoinRoutine(code));
     }
 
     private void HideOldMenu()
@@ -201,7 +271,7 @@ public class NeonMenu : MonoBehaviour
         rowLayout.childControlHeight = false;
         rowLayout.childForceExpandWidth = false;
         NeonButton(row, "Local Game", new Vector2(178, 52), NeonTheme.Lime, NeonTheme.Pink, 1f, 18, ShowSetup);
-        NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline);
+        onlineMenuLabel = NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline).GetComponentInChildren<TextMeshProUGUI>();
 
         NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
 
@@ -718,6 +788,24 @@ public class NeonMenu : MonoBehaviour
         codeInput.onValidateInput += (text, index, ch) => char.ToUpperInvariant(ch);
         NeonButton(joinRow, "Join", new Vector2(0, 44), NeonTheme.Yellow, NeonTheme.Cyan, 0f, 17, JoinOnlineGame);
 
+        // Your games in progress, so you can get back in after the app restarts
+        gamesSection = NewRect("Your Games", right).gameObject;
+        var gamesLayout = gamesSection.AddComponent<VerticalLayoutGroup>();
+        gamesLayout.spacing = 4;
+        gamesLayout.childControlWidth = true;
+        gamesLayout.childControlHeight = true;
+        gamesLayout.childForceExpandWidth = true;
+        gamesLayout.childForceExpandHeight = false;
+        SectionLabel((RectTransform)gamesSection.transform, "Your games", NeonTheme.Lime);
+        gamesList = NewRect("List", gamesSection.transform);
+        var listLayout2 = gamesList.gameObject.AddComponent<VerticalLayoutGroup>();
+        listLayout2.spacing = 4;
+        listLayout2.childControlWidth = true;
+        listLayout2.childControlHeight = true;
+        listLayout2.childForceExpandWidth = true;
+        listLayout2.childForceExpandHeight = false;
+        gamesSection.SetActive(false);
+
         SectionLabel(right, "Play anyone", NeonTheme.PinkSoft);
         TextMeshProUGUI blurb = NewText("Blurb", right, "Get paired with the next player looking for a 4x4x4 game.", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         blurb.fontStyle = FontStyles.Normal;
@@ -890,6 +978,7 @@ public class NeonMenu : MonoBehaviour
     {
         yield return SignIn(_ => { });
         ShowName();
+        yield return RefreshGames();
     }
 
     private void LeaveOnlineScreen()
@@ -1020,7 +1109,8 @@ public class NeonMenu : MonoBehaviour
     {
         if (onlineStarting) return;
         // Both seats filled: the room moves to piece placement and the game begins
-        if ((msg.type == "room:joined" || msg.type == "room:playerJoined") && msg.state != null && msg.state.phase == "placement")
+        if ((msg.type == "room:joined" || msg.type == "room:playerJoined") && msg.state != null &&
+            (msg.state.phase == "placement" || (msg.type == "room:joined" && msg.state.phase == "playing")))
         {
             StartOnlineGame(msg.state);
         }
@@ -1060,6 +1150,8 @@ public class NeonMenu : MonoBehaviour
         var robots = new List<PieceColor>();
         if (net.aiColors != null) foreach (string c in net.aiColors) if (System.Enum.TryParse(c, out PieceColor rc)) robots.Add(rc);
         OnlineSession.Begin(client.LocalColor, client.IsHost, robots);
+        // Rejoining a game already under way: rebuild it from the server's history first
+        OnlineSession.Replaying = state.seq > 0;
         OnlineGameBridge.Begin();
 
         BoardSize size = net.boardSize == "8x8x8" ? BoardSize.Large8x8x8 : net.boardSize == "6x6x6" ? BoardSize.Medium6x6x6 : BoardSize.Small4x4x4;

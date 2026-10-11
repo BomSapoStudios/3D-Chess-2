@@ -2152,6 +2152,7 @@ public class PlacementManager : MonoBehaviour
     /// </summary>
     private void TriggerAIPlacementIfNeeded()
     {
+        if (OnlineSession.Replaying) return; // rebuilding a resumed game: see ResumeAIPlacement
         // Only trigger AI if alternating turns is enabled or if we're in a specific AI mode
         if (!alternatingTurns && !ShouldUseAIPlacement())
         {
@@ -2178,8 +2179,21 @@ public class PlacementManager : MonoBehaviour
     /// <summary>
     /// Trigger AI placement for all AI players simultaneously (asynchronous mode, supports 2-6 players)
     /// </summary>
+    /// <summary>After a resumed online game is rebuilt in setup: robots finish placing their pieces</summary>
+    public void ResumeAIPlacement()
+    {
+        if (GameStateManager.Instance == null || !GameStateManager.Instance.CanPlacePieces()) return;
+        if (AIPlayer.Instance == null || TurnManager.Instance == null || PlayerManager.Instance == null) return;
+        foreach (PieceColor color in PlayerManager.Instance.GetActivePlayers())
+        {
+            if (TurnManager.Instance.IsPlayerAI(color) && !IsPlayerPlacementCompleted(color))
+                AIPlayer.Instance.RequestPlacement(color);
+        }
+    }
+
     private void TriggerAIPlacementForBothPlayers()
     {
+        if (OnlineSession.Replaying) return; // rebuilding a resumed game: see ResumeAIPlacement
         Debug.Log("🚀 ENTRY: PlacementManager.TriggerAIPlacementForBothPlayers - Starting AI placement process for all players");
 
         if (AIPlayer.Instance == null)
@@ -2253,6 +2267,9 @@ public class PlacementManager : MonoBehaviour
     /// <summary>
     /// TIMING FIX: Called by GameManager when pieces are created in trays and ready for AI placement
     /// </summary>
+    /// <summary>Every player's pieces have been created in the trays</summary>
+    public bool PiecesReady => piecesReadyForAI;
+
     public void NotifyPiecesReady()
     {
         Debug.Log("🎯 PlacementManager.NotifyPiecesReady: ENTRY - Pieces are now ready for AI placement!");

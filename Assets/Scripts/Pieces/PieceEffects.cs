@@ -130,8 +130,12 @@ public class PieceEffects : MonoBehaviour
 
     // ───────────────────────── Landing ring ─────────────────────────
 
+    /// <summary>Effects are skipped while a resumed game is rebuilt from its history</summary>
+    private static bool Enabled => !OnlineSession.Replaying;
+
     public static void LandingRing(Vector3 worldPosition, Color color)
     {
+        if (!Enabled) return;
         Runner.StartCoroutine(Runner.RingRoutine(worldPosition, color));
     }
 
@@ -177,7 +181,7 @@ public class PieceEffects : MonoBehaviour
     /// </summary>
     public static void Shatter(ChessPiece victim, ChessPiece attacker)
     {
-        if (victim == null) return;
+        if (victim == null || !Enabled) return;
         GameObject copy = VisualCopy(victim);
         Runner.StartCoroutine(Runner.ShatterRoutine(copy, attacker, GlowColor(victim.pieceColor)));
     }
@@ -279,7 +283,8 @@ public class PieceEffects : MonoBehaviour
     {
         var effect = new ConquestEffect
         {
-            kingCopy = king != null ? VisualCopy(king) : null,
+            enabled = Enabled,
+            kingCopy = king != null && Enabled ? VisualCopy(king) : null,
             loserColor = GlowColor(loser),
             winnerColor = GlowColor(winner),
             loser = loser,
@@ -293,11 +298,12 @@ public class PieceEffects : MonoBehaviour
         public Color loserColor, winnerColor;
         public PieceColor loser;
         public readonly List<ChessPiece> pieces = new List<ChessPiece>();
+        public bool enabled = true;
 
         /// <summary>Hold a converted piece in its old colour until its orb reaches it</summary>
         public void Add(ChessPiece piece)
         {
-            if (piece == null) return;
+            if (piece == null || !enabled) return;
             pieces.Add(piece);
             PieceColor now = piece.pieceColor;
             piece.pieceColor = loser;
@@ -305,7 +311,10 @@ public class PieceEffects : MonoBehaviour
             piece.pieceColor = now;
         }
 
-        public void Play() => Runner.StartCoroutine(Runner.ConquestRoutine(this));
+        public void Play()
+        {
+            if (enabled) Runner.StartCoroutine(Runner.ConquestRoutine(this));
+        }
     }
 
     private IEnumerator ConquestRoutine(ConquestEffect e)
@@ -411,7 +420,7 @@ public class PieceEffects : MonoBehaviour
     /// </summary>
     public static void Promote(ChessPiece pawn, ChessPiece promoted)
     {
-        if (promoted == null) return;
+        if (promoted == null || !Enabled) return;
         GameObject copy = pawn != null ? VisualCopy(pawn) : null;
         if (copy != null) copy.transform.SetPositionAndRotation(promoted.transform.position, copy.transform.rotation);
         Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, GlowColor(promoted.pieceColor)));
@@ -519,7 +528,7 @@ public class PieceEffects : MonoBehaviour
     /// <summary>A landing squash that springs back</summary>
     public static void Land(ChessPiece piece)
     {
-        if (piece == null) return;
+        if (piece == null || !Enabled) return;
         Runner.StartCoroutine(Runner.LandRoutine(piece.transform));
         LandingRing(piece.transform.position, GlowColor(piece.pieceColor));
     }

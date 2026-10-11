@@ -17,6 +17,13 @@ public static class OnlineSession
     /// <summary>True while applying a move/placement received from the server</summary>
     public static bool ApplyingRemote { get; set; }
 
+    /// <summary>
+    /// True while a resumed game is being rebuilt from the server's history. Every side is
+    /// treated as remote (nothing is sent, nobody can touch pieces, robots wait), moves are
+    /// instant and effects are skipped.
+    /// </summary>
+    public static bool Replaying { get; set; }
+
     public static void Begin(PieceColor localColor, bool isHost = false, IEnumerable<PieceColor> robotColors = null)
     {
         IsActive = true;
@@ -31,13 +38,14 @@ public static class OnlineSession
     {
         IsActive = false;
         ApplyingRemote = false;
+        Replaying = false;
         robots.Clear();
     }
 
     public static bool IsRobot(PieceColor color) => robots.Contains(color);
 
     /// <summary>Played on this device: our own side, plus robot seats when we're the host</summary>
-    public static bool IsLocal(PieceColor color) => color == LocalColor || (IsHost && robots.Contains(color));
+    public static bool IsLocal(PieceColor color) => !Replaying && (color == LocalColor || (IsHost && robots.Contains(color)));
 
     /// <summary>Online: only sides played on this device may change locally</summary>
     public static bool CanControl(PieceColor color) => !IsActive || ApplyingRemote || IsLocal(color);

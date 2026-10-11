@@ -37,6 +37,12 @@ public class OnlineClient : MonoBehaviour
     public string RoomCode { get; private set; }
     /// <summary>Number of the last game event received from this room, for catching up after a drop</summary>
     public int LastSeq { get; private set; }
+
+    /// <summary>When rejoining, the room's event count at that moment: the history to catch up on</summary>
+    public int CatchUpTo { get; private set; }
+
+    /// <summary>Signed in before on this device (so it's safe to ask the server about this player)</summary>
+    public bool HasToken => !string.IsNullOrEmpty(Token);
     public PieceColor LocalColor { get; private set; }
     public bool IsHost { get; private set; }
     public string PlayerName => PlayerPrefs.GetString("OnlineName", "");
@@ -186,6 +192,19 @@ public class OnlineClient : MonoBehaviour
             else error = ErrorText(status, text);
         });
         done(result, error);
+    }
+
+    /// <summary>This player's games in progress or waiting for players, newest first</summary>
+    public IEnumerator GetGames(Action<GameInfo[], string> done)
+    {
+        GameInfo[] result = null;
+        string error = null;
+        yield return Call("GET", "/games", null, Token, (status, text) =>
+        {
+            if (status == 200) result = JsonUtility.FromJson<GamesResponse>(text).games;
+            else error = ErrorText(status, text);
+        });
+        done(result ?? new GameInfo[0], error);
     }
 
     /// <summary>Players whose name contains the query (3+ letters)</summary>
@@ -443,7 +462,10 @@ public class OnlineClient : MonoBehaviour
             if (Enum.TryParse(msg.yourColor, out PieceColor color)) LocalColor = color;
             // Back after a drop (or hours away in a Take your time game): fetch what we missed
             if (msg.state != null && msg.state.seq > LastSeq)
+            {
+                CatchUpTo = msg.state.seq;
                 Send("{\"type\":\"room:replay\",\"since\":" + LastSeq + "}");
+            }
         }
         OnMessage?.Invoke(msg);
     }
@@ -467,6 +489,37 @@ public class FriendsResponse
 {
     public FriendInfo[] friends;
     public ChallengeInfo[] challenges;
+}
+
+[Serializable]
+public class GamesResponse
+{
+    public GameInfo[] games;
+}
+
+/// <summary>One of your games, from GET /games</summary>
+[Serializable]
+public class GameInfo
+{
+    public string code;
+    public string phase;        // waiting | placement | playing
+    public string yourColor;
+    public bool yourTurn;
+    public bool isHost;
+    public string pace;         // live | slow
+    public long moveDeadline;
+    public string currentTurn;
+    public int openSeats;
+    public NetConfig config;
+    public GamePlayer[] players;
+}
+
+[Serializable]
+public class GamePlayer
+{
+    public string name;
+    public string color;
+    public bool connected;
 }
 
 [Serializable]

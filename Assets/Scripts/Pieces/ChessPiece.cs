@@ -409,7 +409,7 @@ public abstract class ChessPiece : MonoBehaviour
         }
         
         // Determine animation context and start appropriate movement animation
-        AnimationContext context = DetermineAnimationContext();
+        AnimationContext context = OnlineSession.Replaying ? AnimationContext.Instant : DetermineAnimationContext();
         StartCoroutine(MoveCoroutine(newPosition, context));
         return true;
     }

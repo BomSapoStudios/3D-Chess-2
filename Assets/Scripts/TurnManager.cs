@@ -814,8 +814,16 @@ public class TurnManager : MonoBehaviour
     /// <summary>
     /// Trigger an AI move for the current player (if they are AI)
     /// </summary>
+    /// <summary>After a resumed online game is rebuilt: let a robot whose turn it is move</summary>
+    public void ResumeAIIfNeeded()
+    {
+        if (GameStateManager.Instance != null && GameStateManager.Instance.CanMovePiecesImmediate() && IsCurrentPlayerAI())
+            TriggerAIMove();
+    }
+
     private void TriggerAIMove()
     {
+        if (OnlineSession.Replaying) return; // rebuilding a resumed game: robots wait until it's caught up
         Debug.Log($"🔍 TurnManager.TriggerAIMove: CALLED for currentPlayer={currentPlayer}");
 
         // CRITICAL VALIDATION: Ensure proper turn order before any AI moves

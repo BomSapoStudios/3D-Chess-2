@@ -158,6 +158,20 @@ check(liveRoom.config.pace === 'live', 'rooms are Live by default');
   q.close();
 }
 
+// Your games: a game in progress is listed for both players, and drops off when it ends
+{
+  const { room, a, b } = await startGame({ pace: 'slow' });
+  const mine = (await get('/games', alice.token)).body.games;
+  const listed = mine.find(g => g.code === room.code);
+  check(listed?.yourColor === 'White' && listed.yourTurn === true && listed.phase === 'playing', 'your games lists a game in progress, with whose turn it is');
+  check((await get('/games', bob.token)).body.games.some(g => g.code === room.code && g.yourColor === 'Black' && !g.yourTurn), 'the opponent sees it too');
+  await a.request({ type: 'game:resign' });
+  await b.wait(m => m.type === 'game:over');
+  await sleep(300);
+  check(!(await get('/games', alice.token)).body.games.some(g => g.code === room.code), 'a finished game drops off the list');
+  a.close(); b.close();
+}
+
 // Friend requests expire (REQUEST_TIME_SCALE shrinks 30 days to about 2.6 s); an expired request can be sent again
 {
   await post('/friends/request', { name: alice.name }, bob.token);

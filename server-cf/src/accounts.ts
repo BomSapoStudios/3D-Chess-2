@@ -48,6 +48,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS link_codes (code TEXT PRIMARY KEY, account_id TEXT, expires INTEGER);
       CREATE TABLE IF NOT EXISTS friends (account_id TEXT, friend_id TEXT, status TEXT, created_at INTEGER, PRIMARY KEY (account_id, friend_id));
       CREATE TABLE IF NOT EXISTS blocks (account_id TEXT, blocked_id TEXT, PRIMARY KEY (account_id, blocked_id));
+      CREATE TABLE IF NOT EXISTS active_games (account_id TEXT, room_code TEXT, joined_at INTEGER, PRIMARY KEY (account_id, room_code));
       CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
@@ -85,6 +86,9 @@ export class Accounts extends DurableObject<Env> {
       case 'can-challenge': return this.canChallenge(userId, String(b.friendId ?? ''));
       case 'challenge': return this.challenge(userId, String(b.friendId ?? ''), String(b.roomCode ?? ''));
       case 'challenge-dismiss': return this.dismiss(userId, String(b.roomCode ?? ''));
+      case 'game-add': return this.gameAdd(String(b.roomCode ?? ''), Array.isArray(b.userIds) ? b.userIds.map(String) : []);
+      case 'game-remove': return this.gameRemove(String(b.roomCode ?? ''), typeof b.userId === 'string' ? b.userId : null);
+      case 'games': return this.games(userId);
       default: throw new HttpError(404, 'Unknown operation');
     }
   }
@@ -189,6 +193,30 @@ export class Accounts extends DurableObject<Env> {
     if (!row) throw new HttpError(404, 'That code is wrong or has expired');
     this.sql.exec('DELETE FROM link_codes WHERE code = ?', code.toUpperCase());
     return this.refresh(row.account_id as string, '');
+  }
+
+  // ── Active games (so a player can find their games again after the app restarts) ──
+
+  private gameAdd(roomCode: string, userIds: string[]) {
+    for (const id of userIds) {
+      this.sql.exec('INSERT OR IGNORE INTO active_games (account_id, room_code, joined_at) VALUES (?, ?, ?)', id, roomCode, Date.now());
+    }
+    return { ok: true };
+  }
+
+  /** A finished or closed room, for everyone in it; or one player's stale entry */
+  private gameRemove(roomCode: string, userId: string | null) {
+    if (userId) this.sql.exec('DELETE FROM active_games WHERE room_code = ? AND account_id = ?', roomCode, userId);
+    else this.sql.exec('DELETE FROM active_games WHERE room_code = ?', roomCode);
+    return { ok: true };
+  }
+
+  private games(userId: string) {
+    // Rooms never outlive a week of silence, so older entries are leftovers
+    this.sql.exec('DELETE FROM active_games WHERE joined_at < ?', Date.now() - 30 * DAY);
+    const codes = this.sql.exec('SELECT room_code FROM active_games WHERE account_id = ? ORDER BY joined_at DESC LIMIT 10', userId)
+      .toArray().map(r => r.room_code as string);
+    return { codes };
   }
 
   // ── Friends ──────────────────────────────────────────────────────────────────
