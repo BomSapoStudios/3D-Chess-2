@@ -375,6 +375,9 @@ export class GameEngine {
       }
 
       if (endResult.type === 'stalemate') {
+        // With 3+ players a stuck player just sits out their turns (like the game); only a
+        // two-player stalemate is a draw
+        if (this.getActiveColors().length > 2) continue;
         this.phase = 'gameover';
         gameOver = { winner: null, reason: 'stalemate' };
         break;
@@ -394,8 +397,22 @@ export class GameEngine {
     }
 
     if (!gameOver) {
-      // Advance turn to next active player
+      // Advance turn to the next active player who can move. With 3+ players, anyone with
+      // no legal moves (and not in check) is skipped; if nobody at all can move, it's a draw.
       this.advanceTurn(movedColor);
+      if (this.getActiveColors().length > 2) {
+        let tries = this.getActiveColors().length;
+        while (this.currentTurn && !CheckDetection.hasAnyLegalMove(this.currentTurn, this.board) && tries-- > 0) {
+          this.advanceTurn(this.currentTurn);
+        }
+        if (tries < 0) {
+          this.phase = 'gameover';
+          gameOver = { winner: null, reason: 'stalemate' };
+        }
+      }
+    }
+
+    if (!gameOver) {
 
       // Chaos mode check
       if (this.config.chaosMode) {

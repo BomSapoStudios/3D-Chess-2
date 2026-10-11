@@ -293,3 +293,60 @@ describe('GameEngine', () => {
     expect(engine.getState().phase).toBe('gameover');
   });
 });
+
+describe('Stalemate', () => {
+  // Black king in the corner, not in check, with every escape square covered
+  // (found by searching every queen + rook placement on 4x4x4)
+  function stalematedBoard(): ChessBoard {
+    const board = new ChessBoard('4x4x4');
+    board.placePiece({ x: 3, y: 3, z: 3 }, 'King', 'Black');
+    board.placePiece({ x: 0, y: 0, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 0, y: 2, z: 3 }, 'Rook', 'White');
+    board.placePiece({ x: 2, y: 3, z: 1 }, 'Queen', 'White');
+    return board;
+  }
+
+  function engineWith(colors: ('White' | 'Black' | 'Green' | 'Purple')[], board: ChessBoard) {
+    const engine = new GameEngine('STALE1', { boardSize: '4x4x4', playerCount: colors.length });
+    colors.forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string; currentTurn: string };
+    e.board = board;
+    e.phase = 'playing';
+    e.currentTurn = 'White';
+    return engine;
+  }
+
+  test('the position is a stalemate, not a checkmate', () => {
+    const board = stalematedBoard();
+    expect(CheckDetection.isStalemate('Black', board)).toBe(true);
+    expect(CheckDetection.isCheckmate('Black', board)).toBe(false);
+  });
+
+  test('two players: stalemating the opponent ends the game in a draw', () => {
+    const board = stalematedBoard();
+    board.removePiece({ x: 2, y: 3, z: 1 });
+    board.placePiece({ x: 2, y: 1, z: 1 }, 'Queen', 'White');
+    expect(CheckDetection.isStalemate('Black', board)).toBe(false);
+    const engine = engineWith(['White', 'Black'], board);
+    const result = engine.executeMove('White', { x: 2, y: 1, z: 1 }, { x: 2, y: 3, z: 1 });
+    expect(result.success).toBe(true);
+    expect(result.gameOver).toEqual({ winner: null, reason: 'stalemate' });
+  });
+
+  test('four players: a stuck player sits out their turn and the game goes on', () => {
+    const board = stalematedBoard();
+    board.removePiece({ x: 2, y: 3, z: 1 });
+    board.placePiece({ x: 2, y: 1, z: 1 }, 'Queen', 'White');
+    board.placePiece({ x: 0, y: 3, z: 0 }, 'King', 'Green');
+    board.placePiece({ x: 1, y: 0, z: 0 }, 'Knight', 'Green');
+    board.placePiece({ x: 3, y: 0, z: 0 }, 'King', 'Purple');
+    const engine = engineWith(['White', 'Black', 'Green', 'Purple'], board);
+    const result = engine.executeMove('White', { x: 2, y: 1, z: 1 }, { x: 2, y: 3, z: 1 });
+    expect(result.success).toBe(true);
+    expect(result.gameOver).toBeUndefined();
+    expect(engine.getState().phase).toBe('playing');
+    expect(result.eliminatedPlayer).toBeUndefined();
+    expect(CheckDetection.hasAnyLegalMove('Green', board)).toBe(true);
+    expect(engine.getState().currentTurn).toBe('Green'); // Black is skipped
+  });
+});

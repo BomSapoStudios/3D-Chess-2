@@ -133,6 +133,8 @@ public class GameEndDetectionManager : MonoBehaviour
         if (!enableGameEndDetection) return;
         // Not a real move: the turn is being (re)set, e.g. when play starts. Nobody can have been mated by it.
         if (previousPlayer == newCurrentPlayer) return;
+        // The board just changed: work from fresh check states, or a mate could be mistaken for a stalemate
+        if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
 
         // Multiplayer: the player who just moved may have checkmated ANY opponent, not just the
         // next player. Credit the conquest to the mover. (Skipped when the "move" was just the
@@ -510,6 +512,13 @@ public class GameEndDetectionManager : MonoBehaviour
             ? PlayerManager.Instance.GetActivePlayerCount()
             : 2;
 
+        // Multiplayer, but nobody else can move either: skipping would go round forever, so it's a draw
+        if (activePlayerCount > 2 && PlayerManager.Instance != null &&
+            !PlayerManager.Instance.GetActivePlayers().Any(p => p != stalematedPlayer && !PlayerManager.Instance.IsPlayerEliminated(p) && HasLegalMoves(p)))
+        {
+            activePlayerCount = 2; // end it below like a two-player stalemate
+        }
+
         if (activePlayerCount > 2)
         {
             // MULTIPLAYER: Player has no legal moves - skip their turn and continue game
@@ -534,7 +543,9 @@ public class GameEndDetectionManager : MonoBehaviour
         else
         {
             // 2-PLAYER: Traditional stalemate = draw, end game
-            string reason = $"Stalemate! Game ends in a draw - {stalematedPlayer} has no legal moves but is not in check";
+            string reason = IsMultiplayerInProgress()
+                ? "Stalemate! Game ends in a draw - nobody has a legal move"
+                : $"Stalemate! Game ends in a draw - {stalematedPlayer} has no legal moves but is not in check";
 
             Debug.Log($"🏁 GameEndDetectionManager: STALEMATE DETECTED - {reason}");
 
