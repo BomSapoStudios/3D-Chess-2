@@ -180,7 +180,7 @@ public class ConfirmationDialog : MonoBehaviour
     public void ShowForfeitDialog(PieceColor playerColor, System.Action onConfirm)
     {
         string title = "Confirm Forfeit";
-        string message = $"Are you sure you want to forfeit as {playerColor}?\\n\\nThis will end the game immediately and you will lose.\\n\\nPress ENTER to confirm or ESCAPE to cancel.";
+        string message = $"Forfeit as {playerColor}? The game ends now and you lose.";
         
         ShowDialog(title, message, onConfirm);
     }
@@ -193,7 +193,7 @@ public class ConfirmationDialog : MonoBehaviour
     public void ShowDrawOfferDialog(PieceColor playerColor, System.Action onConfirm)
     {
         string title = "Offer Draw";
-        string message = $"Offer a draw as {playerColor}?\\n\\nThis will send a draw offer to your opponent.\\nThey can choose to accept or decline.\\n\\nPress ENTER to confirm or ESCAPE to cancel.";
+        string message = $"Offer a draw as {playerColor}? Your opponent can accept or decline.";
         
         ShowDialog(title, message, onConfirm);
     }
@@ -252,51 +252,31 @@ public class ConfirmationDialog : MonoBehaviour
     
     private void OnGUI()
     {
-        if (!isDialogActive || !stylesInitialized) return;
-        
-        // Draw overlay
-        GUI.Box(overlayRect, "", overlayStyle);
-        
-        // Begin dialog area
-        GUILayout.BeginArea(dialogRect, dialogBoxStyle);
-        
-        GUILayout.BeginVertical();
-        
-        // Title
-        GUILayout.Label(dialogTitle, titleStyle);
-        GUILayout.Space(20);
-        
-        // Message
-        GUILayout.Label(dialogMessage.Replace("\\n", "\\n"), messageStyle);
-        GUILayout.FlexibleSpace();
-        
-        // Buttons
-        GUILayout.BeginHorizontal();
-        
-        GUILayout.FlexibleSpace();
-        
-        // Confirm button
-        if (GUILayout.Button("CONFIRM (Enter)", buttonStyle, GUILayout.Width(150), GUILayout.Height(40)))
-        {
-            OnConfirmClicked();
-        }
-        
-        GUILayout.Space(20);
-        
-        // Cancel button
-        if (GUILayout.Button("CANCEL (Esc)", buttonStyle, GUILayout.Width(150), GUILayout.Height(40)))
-        {
-            OnCancelClicked();
-        }
-        
-        GUILayout.FlexibleSpace();
-        
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        GUILayout.EndVertical();
-        
-        GUILayout.EndArea();
+        if (!isDialogActive) return;
+
+        // Neon panel like the Game Menu, scaled for the screen and kept in the safe area
+        GUI.depth = -30;
+        Vector2 ui = TouchGUI.Begin();
+        TouchGUI.Block(new Rect(0, 0, ui.x, ui.y));
+        Color dim = new Color(0f, 0f, 0f, 0.6f);
+        Color old = GUI.color;
+        GUI.color = dim;
+        GUI.DrawTexture(new Rect(-ui.x, -ui.y, ui.x * 3f, ui.y * 3f), Texture2D.whiteTexture);
+        GUI.color = old;
+
+        float w = Mathf.Min(420f, ui.x - 40f), h = 210f;
+        Rect panel = new Rect((ui.x - w) / 2f, (ui.y - h) / 2f, w, h);
+        NeonTheme.GUIPanel(panel, NeonTheme.Cyan, 0.97f);
+
+        GUI.Label(new Rect(panel.x + 20, panel.y + 16, w - 40, 40), dialogTitle.ToUpperInvariant(),
+            NeonTheme.GUILabelStyle(NeonTheme.Lime, 26, true, TextAnchor.MiddleCenter, display: true));
+        GUIStyle message = NeonTheme.GUILabelStyle(NeonTheme.Lavender, 17, false, TextAnchor.MiddleCenter);
+        message.wordWrap = true;
+        GUI.Label(new Rect(panel.x + 24, panel.y + 60, w - 48, 70), dialogMessage.Replace("\\n", " "), message);
+
+        float bw = (w - 60f) / 2f;
+        if (TouchGUI.NeonButton(new Rect(panel.x + 20, panel.yMax - 64, bw, 46), "Confirm", NeonTheme.Pink, NeonTheme.Cyan, fontSize: 18)) OnConfirmClicked();
+        else if (TouchGUI.NeonButton(new Rect(panel.xMax - 20 - bw, panel.yMax - 64, bw, 46), "Cancel", NeonTheme.Cyan, NeonTheme.Pink, fontSize: 18)) OnCancelClicked();
+        TouchGUI.End();
     }
 }

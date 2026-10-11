@@ -295,6 +295,10 @@ public class PersistentCheckStatusUI : MonoBehaviour
             HandleNewGame();
         });
         
+        // Drawn in the neon style by OnGUI; this object only tracks when it's showing
+        newGameButtonImage.enabled = false;
+        newGameButtonText.enabled = false;
+
         // Initially hide the button
         newGameButton.SetActive(false);
         
@@ -336,6 +340,15 @@ public class PersistentCheckStatusUI : MonoBehaviour
     /// <summary>
     /// Handle new game button click - return to main menu for clean restart
     /// </summary>
+    /// <summary>The New Game button (shown at game over), in the same place and style as Turn Planner</summary>
+    private void OnGUI()
+    {
+        if (newGameButton == null || !newGameButton.activeSelf) return;
+        TouchGUI.Begin();
+        if (TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "New Game", NeonTheme.Pink, NeonTheme.Cyan, fontSize: 16)) HandleNewGame();
+        TouchGUI.End();
+    }
+
     private void HandleNewGame()
     {
         Debug.Log("PersistentCheckStatusUI: Handling new game request");
