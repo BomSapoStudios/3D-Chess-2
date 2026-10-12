@@ -516,8 +516,10 @@ public class CheckDetectionManager : MonoBehaviour
             return false;
         }
         
-        // Temporarily disable cache during simulation to prevent interference
+        // Temporarily disable cache during simulation to prevent interference, and keep the real
+        // cached answers (the simulated position must not overwrite them)
         bool originalCacheState = _cacheValid;
+        var savedCache = new Dictionary<PieceColor, bool>(_checkStateCache);
         _cacheValid = false;
         
         // CRITICAL FIX: Enable simulation mode to prevent corruption checks during move testing
@@ -545,6 +547,8 @@ public class CheckDetectionManager : MonoBehaviour
         ChessBoard.Instance.DisableSimulationMode();
         
         // Restore original cache state
+        _checkStateCache.Clear();
+        foreach (var kv in savedCache) _checkStateCache[kv.Key] = kv.Value;
         _cacheValid = originalCacheState;
         
         return kingInCheck;

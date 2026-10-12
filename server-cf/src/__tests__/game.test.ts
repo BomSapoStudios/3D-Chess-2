@@ -350,3 +350,23 @@ describe('Stalemate', () => {
     expect(engine.getState().currentTurn).toBe('Green'); // Black is skipped
   });
 });
+
+describe('Opening check (multiplayer)', () => {
+  test('a player placed into check moves first', () => {
+    const engine = new GameEngine('CHK001', { boardSize: '6x6x6', playerCount: 4 });
+    (['White', 'Black', 'Green', 'Purple'] as const).forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string };
+    const board = new ChessBoard('6x6x6');
+    board.placePiece({ x: 0, y: 5, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 5, y: 5, z: 5 }, 'King', 'Black');
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'King', 'Green');
+    board.placePiece({ x: 3, y: 0, z: 5 }, 'King', 'Purple');
+    board.placePiece({ x: 2, y: 0, z: 4 }, 'Rook', 'White'); // checks Green along z
+    e.board = board;
+    e.phase = 'placement';
+    for (const c of ['White', 'Black', 'Green', 'Purple'] as const) engine.completePlacement(c);
+    (engine as unknown as { spawnPawns: () => void }).spawnPawns = () => {};
+    expect(engine.startGame()).toBe(true);
+    expect(engine.getState().currentTurn).toBe('Green');
+  });
+});

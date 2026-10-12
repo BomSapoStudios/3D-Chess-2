@@ -30,6 +30,9 @@ public class TurnManager : MonoBehaviour
     private bool initialWhiteInCheck = false;
     private bool initialBlackInCheck = false;
     private bool bothPlayersStartInCheck = false;
+    // Players placed into check who haven't had their first turn yet: no king can be taken until they have
+    private readonly System.Collections.Generic.List<PieceColor> startedInCheck = new System.Collections.Generic.List<PieceColor>();
+    private System.Collections.Generic.Dictionary<PieceColor, bool> initialCheckStates = new System.Collections.Generic.Dictionary<PieceColor, bool>();
     
     [Header("Anti-Repetition System")]
     private System.Collections.Generic.List<string> gameHistory = new System.Collections.Generic.List<string>();
@@ -268,6 +271,7 @@ public class TurnManager : MonoBehaviour
         }
 
         // Track moves for opening protection
+        startedInCheck.Remove(previousPlayer);
         totalMovesMade++;
         if (isFirstTurnAfterPlacement && totalMovesMade >= 2)
         {
@@ -544,6 +548,9 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public bool ShouldBlockKingCapture()
     {
+        // Multiplayer: someone placed into check hasn't had their turn to get out of it yet
+        if (startedInCheck.Count > 0) return true;
+
         // Block king captures if both players started in check (to prevent instant checkmate)
         if (bothPlayersStartInCheck && isFirstTurnAfterPlacement)
         {
@@ -753,7 +760,8 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public bool ValidateTurnOrder()
     {
-        if (OnlineSession.IsActive) return true; // online, the server decides who moves (White first)
+        if (OnlineSession.IsActive) return true; // online, the server decides who moves
+        if (PlayerManager.Instance != null && PlayerManager.Instance.GetActivePlayerCount() > 2) return true; // set by DetermineOpeningTurnOrder
         // If this is the very first move after placement (totalMovesMade == 0)
         if (totalMovesMade == 0 && isFirstTurnAfterPlacement)
         {
@@ -930,6 +938,8 @@ public class TurnManager : MonoBehaviour
         initialWhiteInCheck = false;
         initialBlackInCheck = false;
         bothPlayersStartInCheck = false;
+        startedInCheck.Clear();
+        initialCheckStates = new System.Collections.Generic.Dictionary<PieceColor, bool>(playerCheckStates);
 
         // Extract White and Black check states for backwards compatibility
         if (playerCheckStates.ContainsKey(PieceColor.White))
@@ -1041,9 +1051,16 @@ public class TurnManager : MonoBehaviour
         }
         else
         {
-            // MULTI-PLAYER: Use first player in rotation order (typically White for 4/6-player games)
-            startingPlayer = activePlayers[0];
-            reason = $"multi-player game - first player in rotation ({activePlayers.Count} players total)";
+            // MULTI-PLAYER: White starts, unless someone was placed into check: then the first player
+            // in turn order who is in check moves first to resolve it. Until every player who started
+            // in check has had a turn, no king can be taken (ShouldBlockKingCapture).
+            var order = new System.Collections.Generic.List<PieceColor>(activePlayers);
+            order.Sort();
+            startedInCheck.Clear();
+            foreach (PieceColor c in order)
+                if (initialCheckStates.TryGetValue(c, out bool inCheck) && inCheck) startedInCheck.Add(c);
+            startingPlayer = startedInCheck.Count > 0 ? startedInCheck[0] : order[0];
+            reason = $"multi-player game - {(startedInCheck.Count > 0 ? "first player in check" : "first player in rotation")}";
             Debug.Log($"🔄 TurnManager: Multi-player mode - {activePlayers.Count} players, first is {startingPlayer}");
         }
 

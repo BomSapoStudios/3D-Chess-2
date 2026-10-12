@@ -45,6 +45,8 @@ export interface EngineSnapshot {
   chaosCountdown: number;
   turnsSinceChaos: number;
   drawOffer: { from: PlayerColor } | null;
+  /** Players who started in check and haven't moved yet (no king may be taken until they have) */
+  startedInCheck?: PlayerColor[];
 }
 
 export interface PlacePieceResult {
@@ -65,6 +67,7 @@ export class GameEngine {
   private moveHistory: MoveRecord[];
   private positionHistory: string[]; // for threefold repetition
   private pendingPromotion: { position: BoardPosition; color: PlayerColor } | null = null;
+  private startedInCheck: PlayerColor[] = [];
   private chaosCountdown: number;
   private turnsSinceChaos: number;
   private drawOffer: { from: PlayerColor } | null = null;
@@ -169,7 +172,11 @@ export class GameEngine {
     if (!this.allPlacementsComplete()) return false;
     this.spawnPawns();
     this.phase = 'playing';
-    this.currentTurn = this.getActiveColors()[0]; // White starts
+    // White starts, unless someone was placed into check: then the first player in turn order
+    // who is in check moves first, so they get to resolve it (matches the Unity client)
+    const active = this.getActiveColors();
+    this.startedInCheck = active.filter(c => CheckDetection.getCheckInfo(c, this.board).isInCheck);
+    this.currentTurn = this.startedInCheck[0] ?? active[0];
     this.positionHistory.push(this.board.hash());
     return true;
   }
@@ -265,6 +272,13 @@ export class GameEngine {
     if (!legalMoves.some(m => m.x === to.x && m.y === to.y && m.z === to.z)) {
       return { success: false, error: 'Illegal move' };
     }
+
+    // Nobody can take a king before every player who started in check has had a turn to get out of it
+    const target = this.board.getPiece(to);
+    if (target?.type === 'King' && this.startedInCheck.length > 0) {
+      return { success: false, error: 'Kings cannot be taken until everyone who started in check has moved' };
+    }
+    this.startedInCheck = this.startedInCheck.filter(c => c !== color);
 
     // Execute the move
     const captured = this.board.movePiece(from, to);
@@ -578,6 +592,7 @@ export class GameEngine {
       chaosCountdown: this.chaosCountdown,
       turnsSinceChaos: this.turnsSinceChaos,
       drawOffer: this.drawOffer,
+      startedInCheck: [...this.startedInCheck],
     };
   }
 
@@ -595,6 +610,7 @@ export class GameEngine {
     engine.chaosCountdown = s.chaosCountdown;
     engine.turnsSinceChaos = s.turnsSinceChaos;
     engine.drawOffer = s.drawOffer;
+    engine.startedInCheck = [...(s.startedInCheck ?? [])];
     return engine;
   }
 
