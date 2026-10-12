@@ -1265,13 +1265,6 @@ public class PlacementManager : MonoBehaviour
     {
         Debug.Log($"PlacementManager: Placement target clicked at {targetPosition}");
         
-        // A shown square tapped with nothing picked up: place that player's next piece
-        // (most important first: King, Queen, Rook, Bishop, Knight, Pawn)
-        if (selectedTrayPiece == null && previewColor.HasValue)
-        {
-            ChessPiece next = NextBenchPiece(previewColor.Value);
-            if (next != null) SelectPieceForPlacement(next);
-        }
         if (selectedTrayPiece == null)
         {
             Debug.LogWarning("PlacementManager: No piece selected for placement");

@@ -257,6 +257,13 @@ public class InputManager : MonoBehaviour
                 // Handle piece clicks based on game state
                 if (GameStateManager.Instance.CanPlacePieces())
                 {
+                    // Local games: only the pieces of the player in view can be picked up. A tap on
+                    // anyone else's piece (often the end of turning the cube) is ignored.
+                    if (!OnlineSession.IsActive && PlacementUI.WorkingOn.HasValue && hitPiece.pieceColor != PlacementUI.WorkingOn.Value)
+                    {
+                        return;
+                    }
+
                     // During placement phase - allow both tray piece selection and board piece repositioning
                     Debug.Log($"InputManager: PLACEMENT PHASE - Handling piece click for {hitPiece.pieceColor} {hitPiece.pieceType}");
 
