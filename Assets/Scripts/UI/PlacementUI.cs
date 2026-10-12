@@ -153,12 +153,14 @@ public class PlacementUI : MonoBehaviour
             // MULTI-PLAYER SUPPORT: Always show individual ready buttons for all active players
             ShowMultiPlayerReadyButtons();
 
-            ShowAutoPlaceButtons();
+            int autoRows = ShowAutoPlaceButtons();
 
-            // Deselect button - only show if a piece is selected
+            // Deselect button - only show if a piece is selected (below any auto-place buttons)
             if (PlacementManager.Instance != null && HasSelectedTrayPiece())
             {
-                if (TouchGUI.NeonButton(deselectButtonRect, "Deselect Piece", NeonTheme.Cyan, NeonTheme.Pink, outlined: true))
+                Rect deselect = deselectButtonRect;
+                deselect.y = Mathf.Max(deselect.y, 140 + autoRows * (buttonHeight + 8f));
+                if (TouchGUI.NeonButton(deselect, "Deselect Piece", NeonTheme.Cyan, NeonTheme.Pink, outlined: true))
                 {
                     OnDeselectButtonClicked();
                 }
@@ -181,22 +183,32 @@ public class PlacementUI : MonoBehaviour
     /// <summary>
     /// One "Auto-place" button per human player who still has pieces in their tray
     /// </summary>
-    private void ShowAutoPlaceButtons()
+    private int ShowAutoPlaceButtons()
     {
-        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) return;
+        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) return 0;
 
+        // All in one spot on the left (under the first ready button), stacked if several players
+        // place by hand, so they never sit over the board
+        float x = float.MaxValue, width = 0f;
+        foreach (var entry in playerReadyButtonRects)
+        {
+            if (entry.Value.x < x) { x = entry.Value.x; width = entry.Value.width; }
+        }
+        int row = 0;
         foreach (var entry in playerReadyButtonRects)
         {
             PieceColor player = entry.Key;
             bool isHuman = TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(player);
             if (!isHuman || !OnlineSession.CanControl(player) || PlacementManager.Instance.IsPlayerPlacementCompleted(player)) continue;
 
-            Rect rect = new Rect(entry.Value.x, 140, entry.Value.width, buttonHeight);
+            Rect rect = new Rect(x, 140 + row * (buttonHeight + 8f), width, buttonHeight);
+            row++;
             if (TouchGUI.NeonButton(rect, $"Auto-place {player}", NeonTheme.Yellow, NeonTheme.Pink))
             {
                 PlacementManager.Instance.AutoPlaceRemaining(player);
             }
         }
+        return row;
     }
 
     
