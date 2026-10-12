@@ -283,13 +283,12 @@ public class AIPlayer : MonoBehaviour
         float thinkingStartTime = Time.time;
         AIMove bestMove = null;
         
-        // PERFORMANCE OPTIMIZED: Use adaptive search depth based on position complexity
-        int searchDepth = GetAdaptiveSearchDepth();
-        float timeLimit = 0.5f; // Hard limit to prevent 30-second delays
-
-        Debug.Log($"🔍 AIPlayer.ThinkAndMoveCoroutine: Calling FindBestMove for {playerColor} with depth={searchDepth}, timeLimit={timeLimit}");
-        bestMove = minimaxEngine.FindBestMove(playerColor, searchDepth, timeLimit);
-        Debug.Log($"🔍 AIPlayer.ThinkAndMoveCoroutine: FindBestMove returned - bestMove is null: {bestMove == null}");
+        // Think for as long as the difficulty allows, a little each frame
+        var search = new RobotSearch();
+        int searchDepth = 0;
+        yield return search.FindMoveRoutine(playerColor, RobotSearch.Settings.For(difficulty), m => bestMove = m);
+        searchDepth = search.DepthReached;
+        Debug.Log($"AIPlayer: {playerColor} ({difficulty}) chose {bestMove} after {search.Nodes} positions, {searchDepth} moves deep");
 
         if (bestMove != null)
         {
@@ -298,7 +297,7 @@ public class AIPlayer : MonoBehaviour
 
         if (enableDebugLogging && bestMove != null)
         {
-            Debug.Log($"MinimaxEngine evaluated {minimaxEngine.GetNodesEvaluated()} nodes (depth: {searchDepth})");
+            Debug.Log($"Search depth reached: {searchDepth}");
             if (showEvaluationScores)
                 Debug.Log($"Best move evaluation: {bestMove.evaluationScore:F2}");
         }

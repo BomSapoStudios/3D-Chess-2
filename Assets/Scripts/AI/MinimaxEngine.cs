@@ -45,6 +45,14 @@ public class MinimaxEngine
     /// </summary>
     public AIMove FindBestMove(PieceColor player, int depth, float timeLimit = DEFAULT_TIME_LIMIT)
     {
+        // The search now lives in RobotSearch (right point of view, real turn order, king safety)
+        var settings = new RobotSearch.Settings { maxDepth = Mathf.Max(1, depth), seconds = timeLimit, quiescence = true };
+        return new RobotSearch().FindMove(player, settings);
+    }
+
+    /// <summary>The old search, kept for reference; no longer used</summary>
+    private AIMove FindBestMoveLegacy(PieceColor player, int depth, float timeLimit = DEFAULT_TIME_LIMIT)
+    {
         #if UNITY_WEBGL && !UNITY_EDITOR
         // WebGL: Enforce depth limit to prevent browser freezing
         depth = Mathf.Min(depth, MAX_DEPTH_WEBGL);
@@ -283,8 +291,6 @@ public class MinimaxEngine
             : new Vector3Int(4, 4, 4); // Fallback to 4x4x4 for 2-player games
 
         // DIAGNOSTIC: Log board scanning details for debugging
-        Debug.Log($"🔍 MinimaxEngine.GetAllPossibleMoves: Scanning board for {player} pieces");
-        Debug.Log($"🔍 Board dimensions: {boardDimensions.x}x{boardDimensions.y}x{boardDimensions.z}");
 
         int piecesFound = 0;
 
@@ -306,11 +312,6 @@ public class MinimaxEngine
                         // Check validation will be done once at the top level, not for every minimax node
                         List<BoardPosition> validMoves = piece.GetValidMoves();
 
-                        // DIAGNOSTIC: Log details for Black pieces to help debug why they don't move
-                        if (player == PieceColor.Black)
-                        {
-                            Debug.Log($"🔍 Found {player} {piece.pieceType} at {position}, piece.CurrentPosition={piece.CurrentPosition}, validMoves count={validMoves.Count}");
-                        }
 
                         foreach (BoardPosition movePos in validMoves)
                         {
@@ -333,7 +334,6 @@ public class MinimaxEngine
         }
 
         // DIAGNOSTIC: Summary logging
-        Debug.Log($"🔍 MinimaxEngine.GetAllPossibleMoves: Found {piecesFound} {player} pieces, generated {moves.Count} total moves");
 
         // Update cache with memory limit
         #if UNITY_WEBGL && !UNITY_EDITOR

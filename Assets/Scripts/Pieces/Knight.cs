@@ -58,7 +58,6 @@ public class Knight : ChessPiece
             }
         }
         
-        Debug.Log($"Knight at {currentPosition}: Found {validMoves.Count} valid L-shaped moves");
         return validMoves;
     }
     

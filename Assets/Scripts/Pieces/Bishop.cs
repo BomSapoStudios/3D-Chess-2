@@ -41,7 +41,6 @@ public class Bishop : ChessPiece
             }
         }
         
-        Debug.Log($"Bishop at {currentPosition}: Found {validMoves.Count} valid diagonal moves");
         return validMoves;
     }
     

@@ -42,7 +42,6 @@ public class Rook : ChessPiece
             }
         }
         
-        Debug.Log($"Rook at {currentPosition}: Found {validMoves.Count} valid straight-line moves");
         return validMoves;
     }
     

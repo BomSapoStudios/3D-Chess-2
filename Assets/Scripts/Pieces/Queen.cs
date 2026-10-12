@@ -32,7 +32,6 @@ public class Queen : ChessPiece
             }
         }
         
-        Debug.Log($"Queen at {currentPosition}: Found {validMoves.Count} valid moves");
         return validMoves;
     }
     
