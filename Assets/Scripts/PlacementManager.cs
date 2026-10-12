@@ -64,6 +64,7 @@ public class PlacementManager : MonoBehaviour
     // Public property to check if a piece is selected
     public bool HasSelectedTrayPiece => selectedTrayPiece != null;
     public PieceColor? SelectedTrayColor => selectedTrayPiece != null ? selectedTrayPiece.pieceColor : (PieceColor?)null;
+    public ChessPieceType? SelectedTrayType => selectedTrayPiece != null ? selectedTrayPiece.pieceType : (ChessPieceType?)null;
     
     /// <summary>
     /// Get the placement zone for a piece color based on board size and player count

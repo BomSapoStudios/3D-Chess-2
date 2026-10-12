@@ -154,6 +154,7 @@ public class PlacementUI : MonoBehaviour
             ShowMultiPlayerReadyButtons();
 
             int autoRows = ShowAutoPlaceButtons();
+            ShowOnScreenBench(uiWidth, uiHeight);
 
             // Deselect button - only show if a piece is selected (below any auto-place buttons)
             if (PlacementManager.Instance != null && HasSelectedTrayPiece())
@@ -187,9 +188,84 @@ public class PlacementUI : MonoBehaviour
     /// </summary>
     private PieceColor? autoPlaceFor;
 
+    /// <summary>The player whose pieces the setup tools are showing (null when nobody places by hand)</summary>
+    public static PieceColor? WorkingOn { get; private set; }
+
+    private static readonly ChessPieceType[] BenchOrder =
+        { ChessPieceType.King, ChessPieceType.Queen, ChessPieceType.Rook, ChessPieceType.Bishop, ChessPieceType.Knight, ChessPieceType.Pawn };
+    private readonly Dictionary<string, Texture2D> benchIcons = new Dictionary<string, Texture2D>();
+
+    /// <summary>
+    /// The player's remaining pieces as a row of pictures above the View buttons: tap one,
+    /// then tap a glowing square. Works from any camera angle (the 3D benches of the top and
+    /// bottom players are hard to see together with the board).
+    /// </summary>
+    private void ShowOnScreenBench(float uiWidth, float uiHeight)
+    {
+        if (!WorkingOn.HasValue || PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) return;
+        PieceColor color = WorkingOn.Value;
+        PieceTray tray = PieceTray.GetTrayForColor(color);
+        if (tray == null) return;
+
+        // Pieces still on the bench, grouped by type
+        var byType = new Dictionary<ChessPieceType, List<ChessPiece>>();
+        foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>())
+        {
+            if (!byType.TryGetValue(p.pieceType, out var list)) byType[p.pieceType] = list = new List<ChessPiece>();
+            list.Add(p);
+        }
+        if (byType.Count == 0) return;
+
+        var types = new List<ChessPieceType>();
+        foreach (ChessPieceType t in BenchOrder) if (byType.ContainsKey(t)) types.Add(t);
+
+        const float size = 58f, gap = 8f;
+        float total = types.Count * size + (types.Count - 1) * gap;
+        float x = (uiWidth - total) / 2f;
+        float y = uiHeight - 52f - 12f - size - 10f; // just above the View buttons
+        Color tint = color == PieceColor.White ? NeonTheme.Cyan : PieceSets.Tint(PieceSets.Kind.NeonGlow, color);
+        PieceColor? selectedColor = PlacementManager.Instance.SelectedTrayColor;
+        ChessPieceType? selectedType = PlacementManager.Instance.SelectedTrayType;
+
+        GUI.Label(new Rect(x - 120f, y, 112f, size), $"{color}'s\nbench", NeonTheme.GUILabelStyle(tint, 14, true, TextAnchor.MiddleRight));
+        foreach (ChessPieceType t in types)
+        {
+            Rect r = new Rect(x, y, size, size);
+            bool chosen = selectedColor == color && selectedType == t;
+            if (TouchGUI.NeonButton(r, "", tint, NeonTheme.Ground, outlined: !chosen))
+            {
+                Haptics.Selection();
+                PlacementManager.Instance.OnTrayPieceClicked(byType[t][0]);
+            }
+            Texture2D icon = Icon(color, t);
+            if (icon != null)
+            {
+                Color old = GUI.color;
+                GUI.color = chosen ? Color.black : Color.white;
+                GUI.DrawTexture(new Rect(r.x + 7f, r.y + 5f, size - 14f, size - 14f), icon, ScaleMode.ScaleToFit, true);
+                GUI.color = old;
+            }
+            int count = byType[t].Count;
+            if (count > 1)
+                GUI.Label(new Rect(r.xMax - 26f, r.yMax - 20f, 24f, 18f), $"x{count}", NeonTheme.GUILabelStyle(chosen ? NeonTheme.Ground : NeonTheme.White, 12, true, TextAnchor.MiddleRight));
+            x += size + gap;
+        }
+    }
+
+    private Texture2D Icon(PieceColor color, ChessPieceType type)
+    {
+        string key = (color == PieceColor.White ? "Light_" : "Dark_") + type;
+        if (!benchIcons.TryGetValue(key, out Texture2D tex))
+        {
+            tex = Resources.Load<Texture2D>("PieceIcons/" + key);
+            benchIcons[key] = tex;
+        }
+        return tex;
+    }
+
     private int ShowAutoPlaceButtons()
     {
-        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) return 0;
+        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) { WorkingOn = null; return 0; }
 
         // Players who can still place by hand on this device, in seat order
         var placing = new List<PieceColor>();
@@ -202,7 +278,7 @@ public class PlacementUI : MonoBehaviour
             if (isHuman && OnlineSession.CanControl(player) && !PlacementManager.Instance.IsPlayerPlacementCompleted(player)) placing.Add(player);
         }
         placing.Sort();
-        if (placing.Count == 0) return 0;
+        if (placing.Count == 0) { WorkingOn = null; return 0; }
 
         // Follow what the player is working on
         PieceColor? tapped = PlacementManager.Instance.SelectedTrayColor;
@@ -212,6 +288,7 @@ public class PlacementUI : MonoBehaviour
         lastViewSeen = PlayerViewUI.LastViewed;
         if (!autoPlaceFor.HasValue || !placing.Contains(autoPlaceFor.Value)) autoPlaceFor = placing[0];
         PieceColor current = autoPlaceFor.Value;
+        WorkingOn = current;
 
         width = Mathf.Max(width, 200f); // 6 player ready buttons are narrow; this one needs room for its label
         bool many = placing.Count > 1;
