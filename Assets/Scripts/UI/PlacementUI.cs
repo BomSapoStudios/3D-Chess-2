@@ -659,11 +659,8 @@ public class PlacementUI : MonoBehaviour
     {
         Debug.Log($"PlacementUI: {playerColor} ready button clicked");
         
-        if (!CanStartGame())
-        {
-            Debug.LogWarning($"PlacementUI: Cannot set {playerColor} ready - not enough pieces placed");
-            return;
-        }
+        // Each player can say Ready once their own pieces are down, whatever the others are doing;
+        // the game starts when everyone is ready
         
         if (PlacementManager.Instance != null)
         {
