@@ -29,6 +29,7 @@ public class NeonMenu : MonoBehaviour
     private bool chaosMode;
     private int chaosInterval = 9;
     private bool timedPlay;
+    private int clockMinutes = 10;     // Speed round: minutes on each player's clock
     private bool slowPace;             // online "Take your time": up to a day per move
     private bool setupOnline;          // the setup screen is making an online game
     private bool quickPlay;
@@ -44,7 +45,8 @@ public class NeonMenu : MonoBehaviour
     private TextMeshProUGUI chaosNote, timedNote, paceNote;
     private Image paceSwitch;
     private RectTransform paceKnob;
-    private GameObject paceRow, timedRow;
+    private GameObject paceRow, timedRow, clockRow;
+    private bool ClockOn => timedPlay && !(setupOnline && slowPace);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Install()
@@ -407,6 +409,15 @@ public class NeonMenu : MonoBehaviour
             ("Every 15", () => chaosInterval = 15, () => chaosMode && chaosInterval == 15, () => chaosMode),
         }, NeonTheme.Cyan, 15);
         SwitchRow(right, "Speed round", out timedNote, out timedSwitch, out timedKnob, () => { timedPlay = !timedPlay; Refresh(); });
+        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            ("3m", () => clockMinutes = 3, () => ClockOn && clockMinutes == 3, () => ClockOn),
+            ("5m", () => clockMinutes = 5, () => ClockOn && clockMinutes == 5, () => ClockOn),
+            ("10m", () => clockMinutes = 10, () => ClockOn && clockMinutes == 10, () => ClockOn),
+            ("15m", () => clockMinutes = 15, () => ClockOn && clockMinutes == 15, () => ClockOn),
+            ("30m", () => clockMinutes = 30, () => ClockOn && clockMinutes == 30, () => ClockOn),
+        }, NeonTheme.Yellow, 14);
+        clockRow = right.GetChild(right.childCount - 1).gameObject;
         SwitchRow(right, "Take your time", out paceNote, out paceSwitch, out paceKnob, () => { slowPace = !slowPace; Refresh(); });
         timedRow = right.Find("Speed round").gameObject;
         paceRow = right.Find("Take your time").gameObject;
@@ -463,6 +474,7 @@ public class NeonMenu : MonoBehaviour
             {
                 if (!captured.enabled()) return;
                 captured.onClick();
+                Haptics.Selection();
                 Refresh();
             });
             TextMeshProUGUI label = NewText("Text", image.transform, item.text, fontSize, color, TextAlignmentOptions.Center);
@@ -497,7 +509,7 @@ public class NeonMenu : MonoBehaviour
         Place(track.rectTransform, new Vector2(1, 0.5f), new Vector2(62, 36), new Vector2(-34, 0));
         Button button = track.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => onToggle());
+        button.onClick.AddListener(() => { Haptics.Selection(); onToggle(); });
 
         Image knobImage = NewImage("Knob", track.transform, NeonTheme.Ground);
         knobImage.sprite = NeonTheme.Circle;
@@ -564,6 +576,7 @@ public class NeonMenu : MonoBehaviour
             button.onClick.AddListener(() =>
             {
                 if (setupOnline && index == 0) return; // online, White is always you (the host)
+                Haptics.Selection();
                 playerTypes[index] = playerTypes[index] == PlayerType.Human ? PlayerType.Computer : PlayerType.Human;
                 Refresh();
             });
@@ -586,11 +599,12 @@ public class NeonMenu : MonoBehaviour
         SetSwitch(chaosSwitch, chaosKnob, chaosMode);
         chaosNote.text = chaosMode ? $"Cube spins every {chaosInterval} turns" : "Off";
         SetSwitch(timedSwitch, timedKnob, timedPlay);
-        timedNote.text = timedPlay ? "10 minutes each" : "No clock";
+        timedNote.text = timedPlay ? $"{clockMinutes} minutes each" : "No clock";
         // Online only: Take your time games replace the speed clock with a day per move
         if (paceRow == null) return;
         paceRow.SetActive(setupOnline);
         timedRow.SetActive(!(setupOnline && slowPace));
+        clockRow.SetActive(ClockOn); // clock length chips only while the clock is on
         SetSwitch(paceSwitch, paceKnob, slowPace);
         paceNote.text = slowPace ? "Up to a day per move" : "Off: play live";
     }
@@ -1701,6 +1715,7 @@ public class NeonMenu : MonoBehaviour
         public int chaosInterval = 9;
         public bool timed;
         public bool slow;
+        public int clock = 10;
     }
 
     private string SetupKey => setupOnline ? "SetupPrefs.Online" : "SetupPrefs.Local";
@@ -1717,6 +1732,7 @@ public class NeonMenu : MonoBehaviour
         chaosInterval = p.chaosInterval == 5 || p.chaosInterval == 15 ? p.chaosInterval : 9;
         timedPlay = p.timed;
         slowPace = p.slow;
+        clockMinutes = p.clock == 3 || p.clock == 5 || p.clock == 15 || p.clock == 30 ? p.clock : 10;
         playerTypes.Clear();
         for (int i = 0; i < playerCount; i++)
             playerTypes.Add(p.types != null && i < p.types.Length ? (PlayerType)p.types[i] : (setupOnline ? PlayerType.Human : PlayerType.Computer));
@@ -1729,7 +1745,7 @@ public class NeonMenu : MonoBehaviour
         var p = new SetupPrefs
         {
             players = playerCount, board = (int)boardSize, difficulty = (int)difficulty,
-            types = playerTypes.ConvertAll(t => (int)t).ToArray(), chaos = chaosMode, chaosInterval = chaosInterval, timed = timedPlay, slow = slowPace,
+            types = playerTypes.ConvertAll(t => (int)t).ToArray(), chaos = chaosMode, chaosInterval = chaosInterval, timed = timedPlay, slow = slowPace, clock = clockMinutes,
         };
         PlayerPrefs.SetString(SetupKey, JsonUtility.ToJson(p));
         Debug.Log($"NeonMenu: saved setup {SetupKey} = {JsonUtility.ToJson(p)}");
@@ -1748,7 +1764,7 @@ public class NeonMenu : MonoBehaviour
         string size = boardSize == BoardSize.Large8x8x8 ? "8x8x8" : boardSize == BoardSize.Medium6x6x6 ? "6x6x6" : "4x4x4";
         return "{\"boardSize\":\"" + size + "\",\"playerCount\":" + playerCount
             + ",\"chaosMode\":" + (chaosMode ? "true" : "false") + ",\"chaosInterval\":" + chaosInterval
-            + ",\"timedMode\":" + (timedPlay && !slowPace ? "true" : "false") + ",\"timePerPlayerSeconds\":600"
+            + ",\"timedMode\":" + (timedPlay && !slowPace ? "true" : "false") + ",\"timePerPlayerSeconds\":" + clockMinutes * 60
             + ",\"pace\":\"" + (slowPace ? "slow" : "live") + "\""
             + ",\"aiDifficulty\":\"" + difficulty.ToString().ToLowerInvariant() + "\""
             + ",\"aiColors\":[" + string.Join(",", robots) + "]}";
@@ -1778,7 +1794,7 @@ public class NeonMenu : MonoBehaviour
         config.enableChaosMode = chaosMode;
         config.chaosTurnInterval = chaosInterval;
         config.enableTimedPlay = timedPlay;
-        config.timePerPlayerMinutes = 10;
+        config.timePerPlayerMinutes = clockMinutes;
         if (playerCount == 2) config.ApplyToLegacyFields();
 
         if (SceneController.Instance != null)
