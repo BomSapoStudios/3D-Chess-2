@@ -52,7 +52,6 @@ public static class JungleSky
             specks[sy * width + sx] = speckColors[rng.Next(speckColors.Length)];
         }
 
-        const float moonU = 0.62f, moonV = 0.2f, moonR = 0.045f;
 
         for (int y = 0; y < height; y++)
         {
@@ -74,18 +73,6 @@ public static class JungleSky
                     float ribbon = Fbm(u * 6f, v * 3f, seed + 9) - 0.55f;
                     float band = Mathf.Exp(-Mathf.Pow((above - 0.27f - 0.05f * Mathf.Sin(u * Mathf.PI * 2 * 3)) / 0.05f, 2));
                     if (ribbon > 0f) c += Color.Lerp(new Color(0.1f, 0.8f, 0.5f), new Color(0.6f, 0.2f, 0.9f), 0.5f + 0.5f * Mathf.Sin(u * Mathf.PI * 4)) * (ribbon * band * 0.9f);
-
-                    // Moon: pale cyan disc with soft craters, inside a wide glow
-                    float du = WrapDelta(u - moonU) * 2f, dv = v - moonV;
-                    float dist = Mathf.Sqrt(du * du + dv * dv);
-                    c += new Color(0.3f, 0.75f, 0.85f) * (0.35f * Mathf.Exp(-dist * dist / (moonR * moonR * 9f)));
-                    if (dist < moonR)
-                    {
-                        float crater = Fbm(du * 40f, dv * 40f, seed + 4);
-                        Color moon = Color.Lerp(new Color(0.75f, 0.98f, 1f), new Color(0.45f, 0.75f, 0.85f), crater * 0.8f);
-                        float edge = Mathf.Clamp01((moonR - dist) / 0.004f);
-                        c = Color.Lerp(c, moon, edge);
-                    }
 
                     // Tree crowns, far to near, each with a thin glowing rim along its top
                     for (int l = 0; l < layers.Length; l++)
@@ -252,6 +239,7 @@ public static class JungleScenery
         }
         StaticBatchingUtility.Combine(still.ToArray(), root.gameObject);
 
+        root.gameObject.AddComponent<JungleMoon>();
         root.gameObject.AddComponent<JungleFireflies>();
         root.gameObject.AddComponent<JungleMist>();
     }
@@ -269,6 +257,8 @@ public static class JungleScenery
         for (int i = 0; i < count; i++)
         {
             float angle = (i + (float)rng.NextDouble() * 0.6f) / count * Mathf.PI * 2f;
+            // Leave a clearing toward the moon
+            if (Mathf.Abs(Mathf.DeltaAngle(angle * Mathf.Rad2Deg, JungleMoon.Azimuth * Mathf.Rad2Deg)) < 22f) continue;
             float dist = 72f + (float)rng.NextDouble() * 45f; // well back from the board
             Vector3 basePos = new Vector3(Mathf.Cos(angle) * dist, WaterY, Mathf.Sin(angle) * dist);
             float height = 45f + (float)rng.NextDouble() * 30f;       // tops between y = 15 and 45
@@ -1137,5 +1127,152 @@ public class JungleMist : MonoBehaviour
         renderer.sharedMaterial = material;
         renderer.renderMode = ParticleSystemRenderMode.HorizontalBillboard;
         ps.Play();
+    }
+}
+
+/// <summary>
+/// A big full moon hanging over the jungle: a cratered disc in a wide pale halo, a shimmering
+/// path of moonlight on the pond beneath it, and the scene's light coming from its direction.
+/// The moon is drawn without fog so it shines through the mist.
+/// </summary>
+public class JungleMoon : MonoBehaviour
+{
+    // Low over the jungle ahead of the default White view (which looks toward +x), so it shows
+    // above the board; the trees leave a clearing in this direction
+    public static readonly Vector3 Direction = Quaternion.Euler(0f, -18f, 0f) * new Vector3(Mathf.Cos(13f * Mathf.Deg2Rad), Mathf.Sin(13f * Mathf.Deg2Rad), 0f);
+    public static float Azimuth => Mathf.Atan2(Direction.z, Direction.x);
+    private const float Distance = 600f;
+
+    private Transform disc, halo;
+    private Material pathMat;
+
+    private void Start()
+    {
+        // Sprites/Default: no fog, soft blending. Drawn after the sky (it writes no depth, so the sky would cover it)
+        Shader sprite = Shader.Find("Sprites/Default");
+        var discMat = new Material(sprite) { mainTexture = MoonTexture(), renderQueue = 2901 };
+        var haloMat = new Material(sprite) { mainTexture = GlowTexture(), color = new Color(0.75f, 0.95f, 1f, 0.55f), renderQueue = 2900 };
+        halo = Quad("Moon Halo", haloMat, 520f);
+        disc = Quad("Full Moon", discMat, 120f);
+
+        // Moonlight path on the water, stretching from under the moon toward the board
+        Vector3 flat = new Vector3(Direction.x, 0f, Direction.z).normalized;
+        pathMat = new Material(sprite) { mainTexture = PathTexture(), color = new Color(0.8f, 0.97f, 1f, 0.45f) };
+        var path = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(path.GetComponent<Collider>());
+        path.name = "Moon Path";
+        path.transform.SetParent(transform, false);
+        path.transform.position = new Vector3(0, JungleScenery.WaterY + 0.08f, 0) + flat * 95f;
+        path.transform.rotation = Quaternion.LookRotation(Vector3.down, flat);
+        path.transform.localScale = new Vector3(26f, 150f, 1f);
+        var pr = path.GetComponent<MeshRenderer>();
+        pr.sharedMaterial = pathMat;
+        pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // The moon is the light: pale blue-white, from its direction
+        foreach (Light light in FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            light.transform.rotation = Quaternion.LookRotation(-Direction);
+            light.color = new Color(0.78f, 0.92f, 1f);
+        }
+    }
+
+    private Transform Quad(string name, Material mat, float size)
+    {
+        var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(q.GetComponent<Collider>());
+        q.name = name;
+        q.transform.SetParent(transform, false);
+        q.transform.localScale = new Vector3(size, size, 1f);
+        var r = q.GetComponent<MeshRenderer>();
+        r.sharedMaterial = mat;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return q.transform;
+    }
+
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+#if DEVELOPMENT_BUILD
+        // Dev only: `defaults write BomSapo.Chess3D DebugMoonView -int 1` points the camera at the moon over the board
+        if (PlayerPrefs.GetInt("DebugMoonView", 0) == 1)
+        {
+            Vector3 eye = -new Vector3(Direction.x, 0f, Direction.z).normalized * 24f + Vector3.up * 4f;
+            cam.transform.position = eye;
+            cam.transform.rotation = Quaternion.LookRotation(Direction * 600f - eye);
+        }
+#endif
+        // Stays at the same spot in the sky wherever the camera goes, always facing it
+        Vector3 pos = cam.transform.position + Direction * Distance;
+        foreach (Transform t in new[] { halo, disc })
+        {
+            t.position = pos;
+            t.rotation = Quaternion.LookRotation(pos - cam.transform.position, Vector3.up);
+        }
+        // The moon path shimmers
+        if (pathMat != null) pathMat.color = new Color(0.8f, 0.97f, 1f, 0.4f + 0.08f * Mathf.Sin(Time.time * 1.7f) * Mathf.Sin(Time.time * 0.6f));
+    }
+
+    // Full moon: pale disc with soft grey maria and a slightly darker rim
+    private static Texture2D MoonTexture()
+    {
+        const int size = 256;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+            float d = Mathf.Sqrt(u * u + v * v);
+            if (d > 1f) { tex.SetPixel(x, y, new Color(1, 1, 1, 0)); continue; }
+            float maria = Mathf.PerlinNoise(u * 2.2f + 3.1f, v * 2.2f + 7.4f) * 0.7f + Mathf.PerlinNoise(u * 6f + 1f, v * 6f + 2f) * 0.3f;
+            float shade = 1f - Mathf.Clamp01((maria - 0.45f) * 1.6f) * 0.28f;
+            shade *= 1f - Mathf.Pow(d, 4f) * 0.18f;                         // limb darkening
+            Color c = new Color(0.93f, 0.97f, 1f) * shade;
+            c.a = Mathf.Clamp01((1f - d) * size * 0.25f);                    // smooth edge
+            tex.SetPixel(x, y, c);
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    // Soft round glow, brightest in the middle
+    private static Texture2D GlowTexture()
+    {
+        const int size = 128;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+            float d = Mathf.Sqrt(u * u + v * v);
+            float a = Mathf.Clamp01(1f - d);
+            tex.SetPixel(x, y, new Color(1, 1, 1, a * a * a));
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    // Broken horizontal glints, fading toward both ends, like moonlight on rippling water
+    private static Texture2D PathTexture()
+    {
+        const int w = 64, h = 256;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var rng = new System.Random(5);
+        for (int y = 0; y < h; y++)
+        {
+            float band = rng.NextDouble() < 0.55 ? 1f : 0.25f;
+            for (int x = 0; x < w; x++)
+            {
+                float u = (x + 0.5f) / w * 2f - 1f;
+                float across = Mathf.Clamp01(1f - Mathf.Abs(u) * (1.1f + 0.4f * Mathf.Sin(y * 0.3f)));
+                float along = Mathf.Sin((y + 0.5f) / h * Mathf.PI);
+                float glint = (y % 3 == 0) ? 0.4f : 1f;
+                tex.SetPixel(x, y, new Color(1, 1, 1, across * along * band * glint));
+            }
+        }
+        tex.Apply();
+        return tex;
     }
 }
