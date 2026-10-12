@@ -181,35 +181,54 @@ public class PlacementUI : MonoBehaviour
     }
 
     /// <summary>
-    /// One "Auto-place" button per human player who still has pieces in their tray
+    /// One "Auto-place" button, always in the same spot, for the player you're working on:
+    /// the colour of the tray piece you last tapped, else the side you last viewed from, else
+    /// the first player still placing. A small arrow beside it switches to the next player.
     /// </summary>
+    private PieceColor? autoPlaceFor;
+
     private int ShowAutoPlaceButtons()
     {
         if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) return 0;
 
-        // All in one spot on the left (under the first ready button), stacked if several players
-        // place by hand, so they never sit over the board
+        // Players who can still place by hand on this device, in seat order
+        var placing = new List<PieceColor>();
         float x = float.MaxValue, width = 0f;
         foreach (var entry in playerReadyButtonRects)
         {
             if (entry.Value.x < x) { x = entry.Value.x; width = entry.Value.width; }
-        }
-        int row = 0;
-        foreach (var entry in playerReadyButtonRects)
-        {
             PieceColor player = entry.Key;
             bool isHuman = TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(player);
-            if (!isHuman || !OnlineSession.CanControl(player) || PlacementManager.Instance.IsPlayerPlacementCompleted(player)) continue;
-
-            Rect rect = new Rect(x, 140 + row * (buttonHeight + 8f), width, buttonHeight);
-            row++;
-            if (TouchGUI.NeonButton(rect, $"Auto-place {player}", NeonTheme.Yellow, NeonTheme.Pink))
-            {
-                PlacementManager.Instance.AutoPlaceRemaining(player);
-            }
+            if (isHuman && OnlineSession.CanControl(player) && !PlacementManager.Instance.IsPlayerPlacementCompleted(player)) placing.Add(player);
         }
-        return row;
+        placing.Sort();
+        if (placing.Count == 0) return 0;
+
+        // Follow what the player is working on
+        PieceColor? tapped = PlacementManager.Instance.SelectedTrayColor;
+        if (tapped.HasValue && placing.Contains(tapped.Value)) autoPlaceFor = tapped;
+        else if (PlayerViewUI.LastViewed.HasValue && placing.Contains(PlayerViewUI.LastViewed.Value) && lastViewSeen != PlayerViewUI.LastViewed)
+            autoPlaceFor = PlayerViewUI.LastViewed;
+        lastViewSeen = PlayerViewUI.LastViewed;
+        if (!autoPlaceFor.HasValue || !placing.Contains(autoPlaceFor.Value)) autoPlaceFor = placing[0];
+        PieceColor current = autoPlaceFor.Value;
+
+        width = Mathf.Max(width, 200f); // 6 player ready buttons are narrow; this one needs room for its label
+        bool many = placing.Count > 1;
+        float arrow = many ? 44f : 0f;
+        Rect rect = new Rect(x, 140, width - (many ? arrow + 6f : 0f), buttonHeight);
+        if (TouchGUI.NeonButton(rect, $"Auto-place {current}", NeonTheme.Yellow, NeonTheme.Pink))
+        {
+            PlacementManager.Instance.AutoPlaceRemaining(current);
+        }
+        if (many && TouchGUI.NeonButton(new Rect(rect.xMax + 6f, 140, arrow, buttonHeight), ">", NeonTheme.Yellow, NeonTheme.Pink, outlined: true, fontSize: 18))
+        {
+            autoPlaceFor = placing[(placing.IndexOf(current) + 1) % placing.Count];
+        }
+        return 1;
     }
+
+    private PieceColor? lastViewSeen;
 
     
     /// <summary>

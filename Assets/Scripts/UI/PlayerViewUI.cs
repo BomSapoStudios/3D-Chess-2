@@ -37,6 +37,8 @@ public class PlayerViewUI : MonoBehaviour
 
     /// <summary>Set before a game starts to begin looking from this side (e.g. playing Black in Quick Play)</summary>
     public static PieceColor? StartView;
+    /// <summary>The side last picked with a View button (the setup tools follow it)</summary>
+    public static PieceColor? LastViewed;
     private float inGameSince = -1f;
 
     private void Update()
@@ -72,6 +74,7 @@ public class PlayerViewUI : MonoBehaviour
             if (TouchGUI.NeonButton(new Rect(x, y, w, h), color.ToString(), tint, NeonTheme.Ground, outlined: out_, fontSize: 14))
             {
                 ViewFrom(color);
+                LastViewed = color;
             }
             x += w + gap;
         }
