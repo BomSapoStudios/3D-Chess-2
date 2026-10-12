@@ -264,7 +264,7 @@ public class NeonMenu : MonoBehaviour
         TextMeshProUGUI tagline = NewText("Tagline", column, "Up, down, sideways. Go wild.", 18, NeonTheme.Cyan, TextAlignmentOptions.Left);
         tagline.rectTransform.sizeDelta = new Vector2(420, 26);
 
-        NeonButton(column, "Quick Play vs Computer!", new Vector2(370, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 21, StartQuickPlay);
+        NeonButton(column, "Quick Play vs Computer!", new Vector2(370, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 21, ShowSidePicker);
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -1701,14 +1701,71 @@ public class NeonMenu : MonoBehaviour
         toastPanel.gameObject.SetActive(false);
     }
 
-    private void StartQuickPlay()
+    // ── Quick Play: pick a side first ──
+
+    private GameObject sidePicker;
+
+    private void ShowSidePicker()
+    {
+        if (sidePicker == null) BuildSidePicker();
+        sidePicker.transform.SetAsLastSibling();
+        sidePicker.SetActive(true);
+    }
+
+    private void BuildSidePicker()
+    {
+        // Dim the menu; tapping outside the card closes the picker
+        Image dim = NewImage("Side Picker", transform, new Color(0f, 0f, 0f, 0.65f));
+        Stretch(dim.rectTransform);
+        Button closeArea = dim.gameObject.AddComponent<Button>();
+        closeArea.transition = Selectable.Transition.None;
+        closeArea.onClick.AddListener(() => sidePicker.SetActive(false));
+        sidePicker = dim.gameObject;
+
+        Image card = NewImage("Card", dim.transform, NeonTheme.Ground);
+        card.sprite = NeonTheme.Rounded;
+        card.type = Image.Type.Sliced;
+        Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(560, 230), Vector2.zero);
+        card.gameObject.AddComponent<Button>().transition = Selectable.Transition.None; // taps on the card don't close it
+        Image border = NewImage("Border", card.transform, NeonTheme.Pink);
+        border.sprite = NeonTheme.RoundedOutline;
+        border.type = Image.Type.Sliced;
+        border.raycastTarget = false;
+        Stretch(border.rectTransform);
+
+        TextMeshProUGUI title = NewText("Title", card.transform, "PLAY AS…", 30, NeonTheme.Lime, TextAlignmentOptions.Center);
+        NeonTheme.ApplyFont(title, display: true);
+        Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(520, 50), new Vector2(0, -42));
+        TextMeshProUGUI hint = NewText("Hint", card.transform, "White moves first", 15, NeonTheme.Lavender, TextAlignmentOptions.Center);
+        hint.fontStyle = FontStyles.Normal;
+        Place(hint.rectTransform, new Vector2(0.5f, 1f), new Vector2(520, 24), new Vector2(0, -78));
+
+        Button white = NeonButton(card.transform, "White", new Vector2(150, 64), NeonTheme.White, NeonTheme.Cyan, -1f, 22, () => PickSide(PieceColor.White));
+        Place((RectTransform)white.transform, new Vector2(0.5f, 0f), new Vector2(150, 64), new Vector2(-175, 62));
+        Button black = NeonButton(card.transform, "Black", new Vector2(150, 64), NeonTheme.Lavender, NeonTheme.Pink, 1f, 22, () => PickSide(PieceColor.Black));
+        Place((RectTransform)black.transform, new Vector2(0.5f, 0f), new Vector2(150, 64), new Vector2(0, 62));
+        Button surprise = NeonButton(card.transform, "Surprise me!", new Vector2(150, 64), NeonTheme.Yellow, NeonTheme.Pink, -1f, 19, () => PickSide(UnityEngine.Random.value < 0.5f ? PieceColor.White : PieceColor.Black));
+        Place((RectTransform)surprise.transform, new Vector2(0.5f, 0f), new Vector2(150, 64), new Vector2(175, 62));
+
+        sidePicker.SetActive(false);
+    }
+
+    private void PickSide(PieceColor side)
+    {
+        Haptics.Selection();
+        sidePicker.SetActive(false);
+        StartQuickPlay(side);
+    }
+
+    private void StartQuickPlay(PieceColor side)
     {
         playerCount = 2;
         boardSize = BoardSize.Small4x4x4;
         difficulty = AIDifficulty.Medium;
         playerTypes.Clear();
-        playerTypes.Add(PlayerType.Human);
-        playerTypes.Add(PlayerType.Computer);
+        playerTypes.Add(side == PieceColor.White ? PlayerType.Human : PlayerType.Computer);
+        playerTypes.Add(side == PieceColor.Black ? PlayerType.Human : PlayerType.Computer);
+        PlayerViewUI.StartView = side; // look from the player's own side
         chaosMode = false;
         timedPlay = false;
         setupOnline = false;

@@ -44,7 +44,8 @@ public class RobotSearch
 
     private const float WIN = 100000f;
     private const float KING_VALUE = 1000f;
-    private const int MAX_QUIESCENCE = 4;
+    private const int MAX_QUIESCENCE = 3;
+    private const int MAX_QUIESCENCE_MOVES = 6; // only the most promising captures (most valuable victim first)
 
     private PieceColor root;
     private List<PieceColor> order;           // active players in turn order
@@ -135,7 +136,9 @@ public class RobotSearch
 
     private bool OutOfTime()
     {
-        if ((Nodes & 255) == 0 && clock.Elapsed.TotalSeconds > budget) aborted = true;
+        // The first pass always finishes (otherwise a crowded opening board could leave no
+        // scored move at all); after that, stop when the time is up
+        if ((Nodes & 255) == 0 && DepthReached >= 1 && clock.Elapsed.TotalSeconds > budget) aborted = true;
         return aborted;
     }
 
@@ -251,7 +254,9 @@ public class RobotSearch
         else { if (standPat <= alpha) return standPat; if (standPat < beta) beta = standPat; }
 
         float best = standPat;
-        foreach (Move m in Moves(mover, true))
+        List<Move> captures = Moves(mover, true);
+        if (captures.Count > MAX_QUIESCENCE_MOVES) captures.RemoveRange(MAX_QUIESCENCE_MOVES, captures.Count - MAX_QUIESCENCE_MOVES);
+        foreach (Move m in captures)
         {
             float score;
             if (m.victim.pieceType == ChessPieceType.King)

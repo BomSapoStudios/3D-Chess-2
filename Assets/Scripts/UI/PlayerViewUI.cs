@@ -35,6 +35,22 @@ public class PlayerViewUI : MonoBehaviour
         return new List<PieceColor> { PieceColor.White, PieceColor.Black };
     }
 
+    /// <summary>Set before a game starts to begin looking from this side (e.g. playing Black in Quick Play)</summary>
+    public static PieceColor? StartView;
+    private float inGameSince = -1f;
+
+    private void Update()
+    {
+        if (!InGame()) { inGameSince = -1f; return; }
+        if (inGameSince < 0f) inGameSince = Time.time;
+        // Wait a moment for the camera to frame the board, then swing round
+        if (StartView.HasValue && Time.time - inGameSince > 0.8f)
+        {
+            if (StartView.Value != PieceColor.White) ViewFrom(StartView.Value);
+            StartView = null;
+        }
+    }
+
     private void OnGUI()
     {
         if (!InGame() || TurnPlannerUI.IsOpen) return;
