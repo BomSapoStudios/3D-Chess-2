@@ -596,6 +596,86 @@ public class PlacementManager : MonoBehaviour
     /// <summary>
     /// Deselect the currently selected tray piece
     /// </summary>
+    // ── Always-visible placement squares ──
+    // During setup, the squares the player in focus can use are shown even before a piece is
+    // picked up. Picking up a piece shows that piece's squares as before.
+
+    private PieceColor? previewColor;
+    private int previewSignature = -1;
+    private float nextPreviewCheck;
+
+    /// <summary>The player whose squares are shown with nothing picked up</summary>
+    private static PieceColor? FocusPlayer()
+    {
+        if (UI_WorkingOn.HasValue) return UI_WorkingOn;
+        if (OnlineSession.IsActive) return OnlineSession.LocalColor;
+        return null;
+    }
+
+    private static PieceColor? UI_WorkingOn => PlacementUI.WorkingOn;
+
+    private void LateUpdate()
+    {
+        bool placing = GameStateManager.Instance != null && GameStateManager.Instance.CanPlacePieces() && ChessBoard.Instance != null;
+        if (!placing || selectedTrayPiece != null || IsAutoPlacing)
+        {
+            if (previewColor.HasValue && selectedTrayPiece == null) ClearPlacementIndicators();
+            previewColor = null;
+            previewSignature = -1;
+            return;
+        }
+        PieceColor? color = FocusPlayer();
+        if (color.HasValue && (IsPlayerPlacementCompleted(color.Value) || !OnlineSession.CanControl(color.Value) || NextBenchPiece(color.Value) == null))
+            color = null;
+        if (!color.HasValue)
+        {
+            if (previewColor.HasValue) ClearPlacementIndicators();
+            previewColor = null;
+            previewSignature = -1;
+            return;
+        }
+
+        // Rebuild only when the player or the empty squares change (checked a few times a second)
+        if (color == previewColor && Time.unscaledTime < nextPreviewCheck && placementIndicators.Count > 0) return;
+        nextPreviewCheck = Time.unscaledTime + 0.15f;
+        List<BoardPosition> squares = ZoneSquares(color.Value);
+        int signature = (int)color.Value * 7919 + squares.Count;
+        foreach (BoardPosition p in squares) signature = signature * 31 + p.x * 100 + p.y * 10 + p.z;
+        if (color == previewColor && signature == previewSignature && placementIndicators.Count > 0) return;
+        previewColor = color;
+        previewSignature = signature;
+        ClearPlacementIndicators();
+        foreach (BoardPosition p in squares) CreatePlacementIndicator(p);
+    }
+
+    private static List<BoardPosition> ZoneSquares(PieceColor color)
+    {
+        var list = new List<BoardPosition>();
+        PlacementZone zone = GetPlacementZoneForColor(color);
+        for (int x = zone.xMin; x <= zone.xMax; x++)
+        for (int y = zone.yMin; y <= zone.yMax; y++)
+        for (int z = zone.zMin; z <= zone.zMax; z++)
+        {
+            var p = new BoardPosition(x, y, z);
+            if (ChessBoard.Instance.GetPieceAt(p) == null) list.Add(p); // the zone is already the colour's
+        }
+        return list;
+    }
+
+    private static readonly ChessPieceType[] PlacementOrder =
+        { ChessPieceType.King, ChessPieceType.Queen, ChessPieceType.Rook, ChessPieceType.Bishop, ChessPieceType.Knight, ChessPieceType.Pawn };
+
+    private static ChessPiece NextBenchPiece(PieceColor color)
+    {
+        PieceTray tray = PieceTray.GetTrayForColor(color);
+        if (tray == null) return null;
+        ChessPiece[] pieces = tray.GetComponentsInChildren<ChessPiece>();
+        foreach (ChessPieceType t in PlacementOrder)
+            foreach (ChessPiece p in pieces)
+                if (p.pieceType == t) return p;
+        return null;
+    }
+
     public void DeselectTrayPiece()
     {
         if (selectedTrayPiece != null)
@@ -1021,8 +1101,8 @@ public class PlacementManager : MonoBehaviour
         
         // Apply material - create indicator with player's color
         Renderer renderer = indicator.GetComponent<Renderer>();
-        Color playerColor = GetColorForPieceColor(selectedTrayPiece.pieceColor);
-        Debug.Log($"🎨 Creating indicator for {selectedTrayPiece.pieceColor} with Unity Color: {playerColor}");
+        PieceColor dotColor = selectedTrayPiece != null ? selectedTrayPiece.pieceColor : (previewColor ?? PieceColor.White);
+        Color playerColor = GetColorForPieceColor(dotColor);
         Material coloredMaterial = CreatePlacementMaterial(playerColor);
         Debug.Log($"🎨 Material created - color: {coloredMaterial.color}, hasProperty(_BaseColor): {coloredMaterial.HasProperty("_BaseColor")}");
         if (coloredMaterial.HasProperty("_BaseColor"))
@@ -1185,6 +1265,13 @@ public class PlacementManager : MonoBehaviour
     {
         Debug.Log($"PlacementManager: Placement target clicked at {targetPosition}");
         
+        // A shown square tapped with nothing picked up: place that player's next piece
+        // (most important first: King, Queen, Rook, Bishop, Knight, Pawn)
+        if (selectedTrayPiece == null && previewColor.HasValue)
+        {
+            ChessPiece next = NextBenchPiece(previewColor.Value);
+            if (next != null) SelectPieceForPlacement(next);
+        }
         if (selectedTrayPiece == null)
         {
             Debug.LogWarning("PlacementManager: No piece selected for placement");
