@@ -19,6 +19,7 @@ public class NeonMenu : MonoBehaviour
     private GameObject menuScreen;
     private GameObject setupScreen;
     private TextMeshProUGUI toastText;
+    private Image toastPanel;
     private Rect lastSafeArea;
 
     // Setup state
@@ -277,11 +278,23 @@ public class NeonMenu : MonoBehaviour
 
         NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
 
-        toastText = NewText("Toast", menuScreen.transform, "", 18, NeonTheme.Yellow, TextAlignmentOptions.Center);
-        toastText.rectTransform.anchorMin = new Vector2(0, 0);
-        toastText.rectTransform.anchorMax = new Vector2(1, 0);
-        toastText.rectTransform.sizeDelta = new Vector2(0, 30);
-        toastText.rectTransform.anchoredPosition = new Vector2(0, 16);
+        // Toasts sit above every screen (setup errors show while the setup screen is open)
+        toastPanel = NewImage("Toast", safeRoot, NeonTheme.Ground);
+        toastPanel.sprite = NeonTheme.Rounded;
+        toastPanel.type = Image.Type.Sliced;
+        toastPanel.raycastTarget = false;
+        Place(toastPanel.rectTransform, new Vector2(0.5f, 0), new Vector2(700, 46), new Vector2(0, 40));
+        Image toastBorder = NewImage("Border", toastPanel.transform, NeonTheme.Yellow);
+        toastBorder.sprite = NeonTheme.RoundedOutline;
+        toastBorder.type = Image.Type.Sliced;
+        toastBorder.raycastTarget = false;
+        Stretch(toastBorder.rectTransform);
+        toastText = NewText("Text", toastPanel.transform, "", 17, NeonTheme.Yellow, TextAlignmentOptions.Center);
+        toastText.enableWordWrapping = true;
+        Stretch(toastText.rectTransform, Vector2.zero);
+        toastText.rectTransform.offsetMin = new Vector2(14, 0);
+        toastText.rectTransform.offsetMax = new Vector2(-14, 0);
+        toastPanel.gameObject.SetActive(false);
     }
 
     private void BuildCube(RectTransform parent)
@@ -1682,8 +1695,10 @@ public class NeonMenu : MonoBehaviour
     private IEnumerator ToastRoutine(string message)
     {
         toastText.text = message;
-        yield return new WaitForSeconds(2.5f);
-        toastText.text = "";
+        toastPanel.gameObject.SetActive(true);
+        toastPanel.transform.SetAsLastSibling();
+        yield return new WaitForSeconds(3f);
+        toastPanel.gameObject.SetActive(false);
     }
 
     private void StartQuickPlay()
@@ -1776,7 +1791,12 @@ public class NeonMenu : MonoBehaviour
         {
             int humans = 0;
             foreach (PlayerType t in playerTypes) if (t == PlayerType.Human) humans++;
-            if (humans < 2) { ShowToast("Leave at least one seat for another player"); return; }
+            if (humans < 2)
+            {
+                // Online needs someone to play against: at least one other seat must be a player, not a robot
+                ShowToast("Online games need at least 2 players. Tap a Robot seat to make it a Player.");
+                return;
+            }
             SaveSetup();
             ShowOnline();
             StartCoroutine(CreateRoutine(OnlineConfigJson()));
