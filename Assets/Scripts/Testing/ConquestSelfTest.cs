@@ -128,6 +128,40 @@ public class ConquestSelfTest : MonoBehaviour
         Expect(PlayerManager.Instance.GetActivePlayerCount() == 4, $"4 players should remain, got {PlayerManager.Instance.GetActivePlayerCount()}");
         Expect(GameStateManager.Instance.currentState == GameState.Playing, "The game should still continue");
 
+        // ───── 3. Forfeits with 4 players left ─────
+        board.EnableSimulationMode();
+        ClearBoard();
+        var kings3 = new Dictionary<PieceColor, BoardPosition>
+        {
+            { PieceColor.White, P(3, 0, 3) }, { PieceColor.Black, P(3, 3, 3) },
+            { PieceColor.Yellow, P(5, 3, 3) }, { PieceColor.Orange, P(7, 7, 0) },
+        };
+        foreach (var k in kings3) Put<King>(k.Key, k.Value);
+        ChessPiece orangeBishop = Put<Bishop>(PieceColor.Orange, P(0, 0, 7));
+        ChessPiece yellowKnight = Put<Knight>(PieceColor.Yellow, P(6, 0, 6));
+        var updateCheckers = typeof(GameEndDetectionManager).GetMethod("UpdateFirstCheckers", BindingFlags.NonPublic | BindingFlags.Instance);
+        Put<Rook>(PieceColor.Black, P(7, 7, 5));      // Black checks Orange first
+        board.DisableSimulationMode();
+        CheckDetectionManager.Instance.InvalidateCache();
+        updateCheckers.Invoke(GameEndDetectionManager.Instance, new object[] { (PieceColor?)PieceColor.Black });
+        board.EnableSimulationMode();
+        Put<Rook>(PieceColor.White, P(2, 7, 0));      // then White checks Orange too
+        board.DisableSimulationMode();
+        CheckDetectionManager.Instance.InvalidateCache();
+        updateCheckers.Invoke(GameEndDetectionManager.Instance, new object[] { (PieceColor?)PieceColor.White });
+        SetTurn(PieceColor.White);
+
+        GameEndDetectionManager.Instance.HandleForfeit(PieceColor.Orange);
+        Expect(PlayerManager.Instance.IsPlayerEliminated(PieceColor.Orange), "Orange should be out after forfeiting");
+        Expect(orangeBishop != null && orangeBishop.pieceColor == PieceColor.Black, "Orange forfeited in check: Black (first to check) should take Orange's bishop");
+        Expect(board.GetPieceAt(P(7, 7, 0)) == null, "Orange's king should be gone");
+
+        GameEndDetectionManager.Instance.HandleForfeit(PieceColor.Yellow);
+        Expect(PlayerManager.Instance.IsPlayerEliminated(PieceColor.Yellow), "Yellow should be out after forfeiting");
+        Expect(board.GetPieceAt(P(6, 0, 6)) == null && board.GetPieceAt(P(5, 3, 3)) == null, "Yellow forfeited out of check: its pieces should leave the board");
+        Expect(PlayerManager.Instance.GetActivePlayerCount() == 2, $"2 players should remain, got {PlayerManager.Instance.GetActivePlayerCount()}");
+        Expect(GameStateManager.Instance.currentState == GameState.Playing, "The game should go on after forfeits");
+
         Debug.Log($"CONQUEST SELF-TEST: {passed} passed, {failures.Count} failed");
         foreach (string f in failures) Debug.Log("CONQUEST SELF-TEST FAIL: " + f);
     }

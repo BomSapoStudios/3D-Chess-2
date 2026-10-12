@@ -755,7 +755,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
     /// </summary>
     private void OnForfeitEvent(PieceColor forfeitingPlayer)
     {
-        PieceColor winner = (forfeitingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
+        PieceColor winner = GameEndDetectionManager.ForfeitWinner(forfeitingPlayer);
         gameEnded = true;
         gameEndMessage = $"🏆 {winner.ToString().ToUpper()} WINS! ({forfeitingPlayer} Forfeited)";
         

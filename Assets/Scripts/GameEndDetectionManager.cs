@@ -135,6 +135,7 @@ public class GameEndDetectionManager : MonoBehaviour
         if (previousPlayer == newCurrentPlayer) return;
         // The board just changed: work from fresh check states, or a mate could be mistaken for a stalemate
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
+        UpdateFirstCheckers(previousPlayer);
 
         // Multiplayer: the player who just moved may have checkmated ANY opponent, not just the
         // next player. Credit the conquest to the mover. (Skipped when the "move" was just the
@@ -349,6 +350,7 @@ public class GameEndDetectionManager : MonoBehaviour
         if (PlayerManager.Instance == null || PlayerManager.Instance.IsPlayerEliminated(loser)) return;
         if (PlayerManager.Instance.GetActivePlayerCount() <= 2) return; // two-player endings come as game:over
         if (conqueror.HasValue) PlayerManager.Instance.TransferPiecesToPlayer(loser, conqueror.Value);
+        else RemoveAllPieces(loser); // forfeited while not in check
         PlayerManager.Instance.EliminatePlayer(loser);
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
         if (TurnManager.Instance != null && TurnManager.Instance.GetCurrentPlayer() == loser) StartCoroutine(SkipEliminatedTurn());
@@ -726,9 +728,114 @@ public class GameEndDetectionManager : MonoBehaviour
     /// Handle a forfeit request from a player
     /// </summary>
     /// <param name="forfeitingPlayer">The player who wants to forfeit</param>
+    /// <summary>Who wins when this player forfeits a two-player game</summary>
+    public static PieceColor ForfeitWinner(PieceColor forfeitingPlayer)
+    {
+        if (PlayerManager.Instance != null)
+            foreach (PieceColor p in PlayerManager.Instance.GetActivePlayers())
+                if (p != forfeitingPlayer && !PlayerManager.Instance.IsPlayerEliminated(p)) return p;
+        return forfeitingPlayer == PieceColor.White ? PieceColor.Black : PieceColor.White;
+    }
+
+    // ── Who checked whom first (they win the pieces if the checked player forfeits) ──
+
+    private readonly Dictionary<PieceColor, PieceColor> firstChecker = new Dictionary<PieceColor, PieceColor>();
+
+    /// <summary>The other players attacking this player's King right now</summary>
+    private static List<PieceColor> CheckersOf(PieceColor player)
+    {
+        var result = new List<PieceColor>();
+        if (CheckDetectionManager.Instance == null) return result;
+        foreach (PieceColor c in CheckDetectionManager.Instance.GetAttackingPlayers(player))
+        {
+            if (c == player) continue;
+            if (PlayerManager.Instance != null && PlayerManager.Instance.IsPlayerEliminated(c)) continue;
+            result.Add(c);
+        }
+        result.Sort(); // turn order
+        return result;
+    }
+
+    /// <summary>
+    /// The first checker keeps the claim while still attacking; a check that starts on a move
+    /// belongs to the player who moved.
+    /// </summary>
+    private void UpdateFirstCheckers(PieceColor? mover)
+    {
+        if (PlayerManager.Instance == null) return;
+        foreach (PieceColor c in PlayerManager.Instance.GetActivePlayers())
+        {
+            List<PieceColor> checkers = CheckersOf(c);
+            if (checkers.Count == 0) { firstChecker.Remove(c); continue; }
+            if (firstChecker.TryGetValue(c, out PieceColor current) && checkers.Contains(current)) continue;
+            firstChecker[c] = mover.HasValue && checkers.Contains(mover.Value) ? mover.Value : checkers[0];
+        }
+    }
+
+    /// <summary>Take all of a player's pieces off the board (they forfeited while not in check)</summary>
+    private static void RemoveAllPieces(PieceColor player)
+    {
+        var board = ChessBoard.Instance;
+        if (board == null) return;
+        Vector3Int d = BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions() : new Vector3Int(4, 4, 4);
+        for (int x = 0; x < d.x; x++)
+        for (int y = 0; y < d.y; y++)
+        for (int z = 0; z < d.z; z++)
+        {
+            var pos = new BoardPosition(x, y, z);
+            ChessPiece p = board.GetPieceAt(pos);
+            if (p == null || p.pieceColor != player) continue;
+            PieceEffects.Shatter(p, null);
+            board.RemovePieceFromBoard(p, pos);
+        }
+        if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
+    }
+
+    /// <summary>
+    /// 4 or 6 player forfeit: the game goes on. In check, it counts as checkmate by whoever checked
+    /// them first, who takes their pieces; otherwise their pieces leave the board.
+    /// </summary>
+    private void HandleMultiplayerForfeit(PieceColor player)
+    {
+        ClearDrawOffer();
+        if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
+        List<PieceColor> checkers = CheckersOf(player);
+        PieceColor? checker = null;
+        if (checkers.Count > 0)
+            checker = firstChecker.TryGetValue(player, out PieceColor first) && checkers.Contains(first) ? first : checkers[0];
+
+        if (checker.HasValue)
+        {
+            HandleConquest(player, checker);
+        }
+        else
+        {
+            RemoveAllPieces(player);
+            PlayerManager.Instance.EliminatePlayer(player);
+            if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
+        }
+        firstChecker.Remove(player);
+        if (TurnManager.Instance != null && TurnManager.Instance.GetCurrentPlayer() == player) StartCoroutine(SkipEliminatedTurn());
+        if (PlayerManager.Instance.GetActivePlayerCount() == 1)
+        {
+            PieceColor winner = PlayerManager.Instance.GetActivePlayers()[0];
+            if (TimerManager.Instance != null) TimerManager.Instance.StopAllTimers();
+            OnGameEnd?.Invoke($"{winner} wins - everyone else is out");
+            if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
+        }
+    }
+
     public void HandleForfeit(PieceColor forfeitingPlayer)
     {
         if (OnlineSession.ShouldSend(forfeitingPlayer)) OnlineClient.Instance.SendResign(forfeitingPlayer);
+
+        // 4 or 6 players: the game goes on without them
+        if (enableGameEndDetection && IsMultiplayerInProgress() && GameStateManager.Instance != null && GameStateManager.Instance.CanMovePieces())
+        {
+            if (OnlineSession.IsActive) return; // the server decides; its game:playerEliminated applies it here
+            HandleMultiplayerForfeit(forfeitingPlayer);
+            return;
+        }
         if (!enableGameEndDetection)
         {
             Debug.LogWarning("GameEndDetectionManager: Forfeit ignored - game end detection disabled");
@@ -756,7 +863,7 @@ public class GameEndDetectionManager : MonoBehaviour
             Debug.Log($"GameEndDetectionManager: Processing AI player {forfeitingPlayer} forfeit");
         }
         
-        PieceColor winner = (forfeitingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
+        PieceColor winner = ForfeitWinner(forfeitingPlayer);
         string reason = $"Forfeit! {winner} wins by forfeit - {forfeitingPlayer} forfeited the game";
         
         Debug.Log($"🏁 GameEndDetectionManager: FORFEIT - {reason}");

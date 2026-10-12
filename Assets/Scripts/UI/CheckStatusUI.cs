@@ -507,8 +507,7 @@ public class CheckStatusUI : MonoBehaviour
     /// </summary>
     private void OnPlayerForfeit(PieceColor forfeitingPlayer)
     {
-        PieceColor winner = (forfeitingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
-        ShowForfeitMessage(forfeitingPlayer, winner);
+        ShowForfeitMessage(forfeitingPlayer, GameEndDetectionManager.ForfeitWinner(forfeitingPlayer));
     }
     
     /// <summary>

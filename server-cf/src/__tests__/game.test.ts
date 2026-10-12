@@ -370,3 +370,50 @@ describe('Opening check (multiplayer)', () => {
     expect(engine.getState().currentTurn).toBe('Green');
   });
 });
+
+describe('Forfeit (multiplayer)', () => {
+  function fourPlayer(board: ChessBoard, turn: 'White' | 'Black' | 'Green' | 'Purple' = 'White') {
+    const engine = new GameEngine('FORF01', { boardSize: '6x6x6', playerCount: 4 });
+    (['White', 'Black', 'Green', 'Purple'] as const).forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string; currentTurn: string };
+    e.board = board;
+    e.phase = 'playing';
+    e.currentTurn = turn;
+    return engine;
+  }
+  function kings(board: ChessBoard) {
+    board.placePiece({ x: 0, y: 5, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 5, y: 5, z: 5 }, 'King', 'Black');
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'King', 'Green');
+    board.placePiece({ x: 3, y: 0, z: 5 }, 'King', 'Purple');
+  }
+
+  test('not in check: their pieces leave the board, the game goes on and their turn passes', () => {
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 4, y: 2, z: 2 }, 'Queen', 'Green');
+    const engine = fourPlayer(board, 'Green');
+    const result = engine.resign('Green');
+    expect(result.gameOver).toBeUndefined();
+    expect(result.conqueredBy).toBeUndefined();
+    expect(board.getPiecesByColor('Green').length).toBe(0);
+    expect(engine.getState().phase).toBe('playing');
+    expect(engine.getState().currentTurn).toBe('Purple');
+  });
+
+  test('in check: the player who checked them first takes their pieces', () => {
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 4, y: 2, z: 2 }, 'Queen', 'Green');
+    board.placePiece({ x: 2, y: 0, z: 3 }, 'Rook', 'Purple'); // Purple checks Green first (along z)
+    const engine = fourPlayer(board, 'Black');
+    (engine as unknown as { updateFirstCheckers: (m: string | null) => void }).updateFirstCheckers('Purple');
+    board.placePiece({ x: 4, y: 0, z: 0 }, 'Rook', 'White');  // then White checks Green too (along x)
+    (engine as unknown as { updateFirstCheckers: (m: string | null) => void }).updateFirstCheckers('White');
+    const result = engine.resign('Green');
+    expect(result.conqueredBy).toBe('Purple');
+    expect(board.getPiece({ x: 4, y: 2, z: 2 })?.color).toBe('Purple');
+    expect(board.findKing('Green')).toBeNull();
+    expect(engine.getState().phase).toBe('playing');
+  });
+});

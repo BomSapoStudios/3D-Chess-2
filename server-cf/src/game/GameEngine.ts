@@ -47,6 +47,8 @@ export interface EngineSnapshot {
   drawOffer: { from: PlayerColor } | null;
   /** Players who started in check and haven't moved yet (no king may be taken until they have) */
   startedInCheck?: PlayerColor[];
+  /** For each player in check, who checked them first (they win the pieces if that player forfeits) */
+  firstChecker?: Partial<Record<PlayerColor, PlayerColor>>;
 }
 
 export interface PlacePieceResult {
@@ -68,6 +70,7 @@ export class GameEngine {
   private positionHistory: string[]; // for threefold repetition
   private pendingPromotion: { position: BoardPosition; color: PlayerColor } | null = null;
   private startedInCheck: PlayerColor[] = [];
+  private firstChecker: Partial<Record<PlayerColor, PlayerColor>> = {};
   private chaosCountdown: number;
   private turnsSinceChaos: number;
   private drawOffer: { from: PlayerColor } | null = null;
@@ -177,6 +180,7 @@ export class GameEngine {
     const active = this.getActiveColors();
     this.startedInCheck = active.filter(c => CheckDetection.getCheckInfo(c, this.board).isInCheck);
     this.currentTurn = this.startedInCheck[0] ?? active[0];
+    this.updateFirstCheckers(null);
     this.positionHistory.push(this.board.hash());
     return true;
   }
@@ -342,6 +346,7 @@ export class GameEngine {
 
   private finalizeTurn(movedColor: PlayerColor, record: MoveRecord): MoveResult {
     this.turnNumber++;
+    this.updateFirstCheckers(movedColor);
 
     // Run check detection for all active players
     const checkStatuses = this.buildCheckStatuses();
@@ -500,10 +505,62 @@ export class GameEngine {
     }
   }
 
+  /** The players attacking `color`'s King, in turn order */
+  private checkersOf(color: PlayerColor): PlayerColor[] {
+    const threats = CheckDetection.getCheckInfo(color, this.board).threateningPieces;
+    return this.getActiveColors().filter(c => c !== color && threats.some(t => t.color === c));
+  }
+
+  /**
+   * Remember who first put each player in check. The first checker keeps the claim while
+   * they're still attacking; a check that starts on a move belongs to the player who moved.
+   */
+  private updateFirstCheckers(mover: PlayerColor | null): void {
+    for (const c of this.getActiveColors()) {
+      const checkers = this.checkersOf(c);
+      const current = this.firstChecker[c];
+      if (checkers.length === 0) delete this.firstChecker[c];
+      else if (!current || !checkers.includes(current)) {
+        this.firstChecker[c] = mover && checkers.includes(mover) ? mover : checkers[0];
+      }
+    }
+  }
+
   // ── Resignation & draw ───────────────────────────────────────────────────────
 
+  /**
+   * Forfeit. With two players left, the other one wins. With more, the game goes on:
+   * a player who forfeits while in check counts as checkmated by whoever checked them
+   * first, who takes their pieces; otherwise their pieces leave the board.
+   */
   resign(color: PlayerColor): MoveResult {
     const active = this.getActiveColors();
+    if (active.length > 2 && active.includes(color)) {
+      const checkers = this.checkersOf(color);
+      const checker = checkers.length > 0
+        ? (this.firstChecker[color] && checkers.includes(this.firstChecker[color]!) ? this.firstChecker[color]! : checkers[0])
+        : undefined;
+      if (checker) this.conquest(color, checker);
+      else for (const p of this.board.getPiecesByColor(color)) this.board.removePiece(p.position);
+
+      // Their turn passes to the next player still in the game
+      const wasTheirTurn = this.currentTurn === color;
+      const order = active;
+      this.eliminatePlayer(color);
+      delete this.firstChecker[color];
+      this.startedInCheck = this.startedInCheck.filter(c => c !== color);
+      if (wasTheirTurn) {
+        const i = order.indexOf(color);
+        this.currentTurn = [...order.slice(i + 1), ...order.slice(0, i)].find(c => c !== color) ?? null;
+      }
+      this.updateFirstCheckers(null);
+      const left = this.getActiveColors();
+      if (left.length === 1) {
+        this.phase = 'gameover';
+        return { success: true, newState: this.getState(), eliminatedPlayer: color, conqueredBy: checker, gameOver: { winner: left[0], reason: 'resignation' } };
+      }
+      return { success: true, newState: this.getState(), eliminatedPlayer: color, conqueredBy: checker };
+    }
     if (active.length <= 2) {
       const winner = active.find(c => c !== color) ?? null;
       this.phase = 'gameover';
@@ -514,7 +571,6 @@ export class GameEngine {
         gameOver: { winner, reason: 'resignation' },
       };
     }
-    // Multi-player: just eliminate
     this.eliminatePlayer(color);
     return { success: true, newState: this.getState(), eliminatedPlayer: color };
   }
@@ -593,6 +649,7 @@ export class GameEngine {
       turnsSinceChaos: this.turnsSinceChaos,
       drawOffer: this.drawOffer,
       startedInCheck: [...this.startedInCheck],
+      firstChecker: { ...this.firstChecker },
     };
   }
 
@@ -611,6 +668,7 @@ export class GameEngine {
     engine.turnsSinceChaos = s.turnsSinceChaos;
     engine.drawOffer = s.drawOffer;
     engine.startedInCheck = [...(s.startedInCheck ?? [])];
+    engine.firstChecker = { ...(s.firstChecker ?? {}) };
     return engine;
   }
 
