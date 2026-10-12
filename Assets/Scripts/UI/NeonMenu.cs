@@ -604,7 +604,7 @@ public class NeonMenu : MonoBehaviour
         if (paceRow == null) return;
         paceRow.SetActive(setupOnline);
         timedRow.SetActive(!(setupOnline && slowPace));
-        clockRow.SetActive(ClockOn); // clock length chips only while the clock is on
+        clockRow.SetActive(!(setupOnline && slowPace)); // always shown (greyed out until Speed round is on), like Chaos's chips
         SetSwitch(paceSwitch, paceKnob, slowPace);
         paceNote.text = slowPace ? "Up to a day per move" : "Off: play live";
     }
