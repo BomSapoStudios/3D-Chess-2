@@ -359,6 +359,9 @@ public class CameraController : MonoBehaviour
     /// Smoothly swing the camera to look at the board from a direction (world space, pointing
     /// from the board toward the camera). Used by the player view buttons.
     /// </summary>
+    /// <summary>The camera's current direction from the board (world space)</summary>
+    public Vector3 CurrentViewDirection => Quaternion.Euler(currentVerticalAngle, currentHorizontalAngle, 0f) * Vector3.back;
+
     public void SnapToView(Vector3 fromDirection, float seconds = 0.6f)
     {
         if (fromDirection.sqrMagnitude < 0.0001f) return;

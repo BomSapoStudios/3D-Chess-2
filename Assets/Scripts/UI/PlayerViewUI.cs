@@ -81,23 +81,51 @@ public class PlayerViewUI : MonoBehaviour
         TouchGUI.End();
     }
 
+    private const float TopElevation = 58f;     // the top player looks down at an angle, not straight down
+
     private void ViewFrom(PieceColor color)
     {
         if (cameraController == null) cameraController = FindFirstObjectByType<CameraController>();
         if (cameraController == null) return;
 
+        // Aim at the player's real bench when there is one, so the view always faces it
+        // whatever way the board has been turned
         Vector3 outward = HomeSideDirection(color, out Vector3 up);
-        Vector3 from;
-        if (color == PieceColor.Yellow || color == PieceColor.Orange)
+        PieceTray tray = PieceTray.GetTrayForColor(color);
+        if (tray != null && ChessBoard.Instance != null)
         {
-            from = outward; // straight from beneath / above (the camera keeps a little tilt)
+            Vector3 fromCenter = tray.transform.position - BoardCenter();
+            if (fromCenter.sqrMagnitude > 0.01f) outward = fromCenter.normalized;
+        }
+
+        Vector3 from;
+        if (Mathf.Abs(outward.y) > 0.7f)
+        {
+            // Top or bottom player: come in at an angle from the side the camera is already on,
+            // so the board, bench and horizon stay in view instead of only the ground or the sky
+            Vector3 side = cameraController.CurrentViewDirection;
+            side.y = 0f;
+            if (side.sqrMagnitude < 0.01f) side = Vector3.back;
+            side.Normalize();
+            float e = TopElevation * Mathf.Deg2Rad;
+            from = side * Mathf.Cos(e) + Vector3.up * Mathf.Sign(outward.y) * Mathf.Sin(e);
         }
         else
         {
+            Vector3 flat = new Vector3(outward.x, 0f, outward.z).normalized;
             float e = SideElevation * Mathf.Deg2Rad;
-            from = outward * Mathf.Cos(e) + up * Mathf.Sin(e);
+            from = flat * Mathf.Cos(e) + Vector3.up * Mathf.Sin(e);
         }
         cameraController.SnapToView(from);
+    }
+
+    private static Vector3 BoardCenter()
+    {
+        GameObject container = GameObject.Find("Pieces Container");
+        if (container == null) return ChessBoard.Instance.transform.position;
+        Vector3Int d = BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions() : new Vector3Int(4, 4, 4);
+        Vector3 mid = ChessBoard.Instance.BoardToLocalPosition(new BoardPosition(0, 0, 0)) + ChessBoard.Instance.BoardToLocalPosition(new BoardPosition(d.x - 1, d.y - 1, d.z - 1));
+        return container.transform.TransformPoint(mid * 0.5f);
     }
 
     /// <summary>World direction from the board's centre toward this player's home face</summary>
