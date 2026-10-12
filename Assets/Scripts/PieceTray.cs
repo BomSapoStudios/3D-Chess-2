@@ -451,6 +451,25 @@ public class PieceTray : MonoBehaviour
     /// <summary>
     /// Add a piece to this tray
     /// </summary>
+    /// <summary>Put a piece back into the first empty bench slot (e.g. taken back off the board)</summary>
+    public bool ReturnPiece(ChessPiece piece)
+    {
+        if (piece == null || piece.pieceColor != trayColor) return false;
+        piecesInTray.RemoveAll(p => p == null || p.transform.parent != transform);
+        for (int i = 0; i < piecePositions.Count; i++)
+        {
+            bool taken = false;
+            foreach (ChessPiece p in piecesInTray)
+                if (Vector3.Distance(p.transform.localPosition, piecePositions[i]) < 0.1f) { taken = true; break; }
+            if (taken) continue;
+            piece.transform.SetParent(transform);
+            piece.transform.localPosition = piecePositions[i];
+            piecesInTray.Add(piece);
+            return true;
+        }
+        return AddPiece(piece);
+    }
+
     public bool AddPiece(ChessPiece piece)
     {
         if (piecesInTray.Count >= maxPieces)

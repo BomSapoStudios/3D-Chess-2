@@ -625,7 +625,7 @@ public class PlacementManager : MonoBehaviour
             return;
         }
         PieceColor? color = FocusPlayer();
-        if (color.HasValue && (IsPlayerPlacementCompleted(color.Value) || !OnlineSession.CanControl(color.Value) || NextBenchPiece(color.Value) == null))
+        if (color.HasValue && (IsPlayerReady(color.Value) || !OnlineSession.CanControl(color.Value) || NextBenchPiece(color.Value) == null))
             color = null;
         if (!color.HasValue)
         {
@@ -674,6 +674,27 @@ public class PlacementManager : MonoBehaviour
             foreach (ChessPiece p in pieces)
                 if (p.pieceType == t) return p;
         return null;
+    }
+
+    /// <summary>A piece already on the board is picked up (so it can go back to the bench)</summary>
+    public bool CanReturnSelectedToTray => selectedTrayPiece != null && repositioningPieces.ContainsKey(selectedTrayPiece);
+
+    /// <summary>Take the picked-up board piece off the board and put it back on its bench</summary>
+    public void ReturnSelectedToTray()
+    {
+        if (!CanReturnSelectedToTray || OnlineSession.IsActive) return;
+        ChessPiece piece = selectedTrayPiece;
+        BoardPosition pos = repositioningPieces[piece];
+        repositioningPieces.Remove(piece);
+        if (ChessBoard.Instance != null && pos.IsValid() && ChessBoard.Instance.GetPieceAt(pos) == piece)
+            ChessBoard.Instance.SetPieceAt(pos, null);
+        piece.OnDeselected();
+        selectedTrayPiece = null;
+        ClearPlacementIndicators();
+        piece.SetCurrentPosition(new BoardPosition(-1, -1, -1));
+        PieceTray tray = PieceTray.GetTrayForColor(piece.pieceColor);
+        if (tray != null) tray.ReturnPiece(piece);
+        if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
     }
 
     public void DeselectTrayPiece()

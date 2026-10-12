@@ -259,7 +259,8 @@ public class InputManager : MonoBehaviour
                 {
                     // Local games: only the pieces of the player in view can be picked up. A tap on
                     // anyone else's piece (often the end of turning the cube) is ignored.
-                    if (!OnlineSession.IsActive && PlacementUI.WorkingOn.HasValue && hitPiece.pieceColor != PlacementUI.WorkingOn.Value)
+                    PieceColor? inFocus = PlacementUI.InView ?? PlacementUI.WorkingOn;
+                    if (!OnlineSession.IsActive && inFocus.HasValue && hitPiece.pieceColor != inFocus.Value)
                     {
                         return;
                     }

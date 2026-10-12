@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// While pieces are being placed, hide every floor square outside the placing player's
-/// starting zone, and the other players' pieces, so the bench and the squares you can use
+/// starting zone, and that player's own 3D bench (they use the on-screen one), so the squares you can use
 /// stand out from any angle. Everything comes back when placement ends.
 /// Only re-enables what it hid itself, so the Floors buttons keep working alongside it.
 /// </summary>
@@ -25,6 +25,18 @@ public class PlacementFocus : MonoBehaviour
     private void LateUpdate()
     {
         bool placing = GameStateManager.Instance != null && GameStateManager.Instance.CanPlacePieces() && ChessBoard.Instance != null;
+        // A player who has tapped Ready is done: their bench (and any unused pieces) goes away
+        if (placing && PlacementManager.Instance != null)
+        {
+            foreach (PieceColor c in System.Enum.GetValues(typeof(PieceColor)))
+            {
+                PieceTray tray = PieceTray.GetTrayForColor(c);
+                if (tray == null) continue;
+                bool done = PlacementManager.Instance.IsPlayerReady(c);
+                if (tray.gameObject.activeSelf == done) tray.gameObject.SetActive(!done);
+            }
+        }
+
         PieceColor? color = null;
         if (placing && PlacementManager.Instance != null)
             color = PlacementManager.Instance.SelectedTrayColor ?? PlacementUI.WorkingOn;
@@ -52,10 +64,8 @@ public class PlacementFocus : MonoBehaviour
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
         {
             if (piece.GetComponentInParent<PieceTray>() != null) continue; // benches are handled below
-            BoardPosition pos = piece.CurrentPosition;
-            bool onBoard = pos.IsValid() && ChessBoard.Instance.GetPieceAt(pos) == piece;
-            bool visible = !onBoard || piece.pieceColor == color.Value;
-            foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, visible);
+            // Pieces on the board always show (including ones just moved off a hidden bench)
+            foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, true);
         }
 
         // The in-view player's 3D bench goes away (they pick from the on-screen bench), so it never

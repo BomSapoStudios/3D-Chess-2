@@ -165,6 +165,16 @@ public class PlacementUI : MonoBehaviour
                 {
                     OnDeselectButtonClicked();
                 }
+                // A piece picked up off the board can go back to the bench
+                if (PlacementManager.Instance.CanReturnSelectedToTray)
+                {
+                    Rect back = new Rect(deselect.x, deselect.yMax + 8f, deselect.width, deselect.height);
+                    if (TouchGUI.NeonButton(back, "Back to bench", NeonTheme.Pink, NeonTheme.Cyan))
+                    {
+                        Haptics.Selection();
+                        PlacementManager.Instance.ReturnSelectedToTray();
+                    }
+                }
             }
         }
 
@@ -190,6 +200,9 @@ public class PlacementUI : MonoBehaviour
 
     /// <summary>The player whose pieces the setup tools are showing (null when nobody places by hand)</summary>
     public static PieceColor? WorkingOn { get; private set; }
+
+    /// <summary>Local games: the not-yet-ready player whose face is toward the camera</summary>
+    public static PieceColor? InView { get; private set; }
 
     private static readonly ChessPieceType[] BenchOrder =
         { ChessPieceType.King, ChessPieceType.Queen, ChessPieceType.Rook, ChessPieceType.Bishop, ChessPieceType.Knight, ChessPieceType.Pawn };
@@ -288,19 +301,25 @@ public class PlacementUI : MonoBehaviour
 
     private int ShowAutoPlaceButtons()
     {
-        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) { WorkingOn = null; return 0; }
+        if (PlacementManager.Instance == null || PlacementManager.Instance.IsAutoPlacing) { WorkingOn = null; InView = null; return 0; }
 
         // Players who can still place by hand on this device, in seat order
         var placing = new List<PieceColor>();
+        var editable = new List<PieceColor>(); // still before Ready (may have placed everything)
         float x = float.MaxValue, width = 0f;
         foreach (var entry in playerReadyButtonRects)
         {
             if (entry.Value.x < x) { x = entry.Value.x; width = entry.Value.width; }
             PieceColor player = entry.Key;
             bool isHuman = TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(player);
-            if (isHuman && OnlineSession.CanControl(player) && !PlacementManager.Instance.IsPlayerPlacementCompleted(player)) placing.Add(player);
+            if (!isHuman || !OnlineSession.CanControl(player) || PlacementManager.Instance.IsPlayerReady(player)) continue;
+            editable.Add(player);
+            if (!PlacementManager.Instance.IsPlayerPlacementCompleted(player)) placing.Add(player);
         }
         placing.Sort();
+        editable.Sort();
+        // The player whose face is toward the camera can still move their placed pieces around
+        InView = OnlineSession.IsActive ? (PieceColor?)null : FacingPlayer(editable);
         if (placing.Count == 0) { WorkingOn = null; return 0; }
 
         // Follow what the player is working on. Local games: the face of the cube toward the
