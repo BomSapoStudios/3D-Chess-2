@@ -39,7 +39,7 @@ public class PlacementFocus : MonoBehaviour
         // Only redo the work when the player changes, or a few times a second for pieces just placed
         if (color == shownFor && Time.unscaledTime < nextRefresh) return;
         shownFor = color;
-        nextRefresh = Time.unscaledTime + 0.3f;
+        nextRefresh = Time.unscaledTime + 0.1f;
 
         if (floors.Count == 0) FindFloors();
         PlacementZone zone = PlacementManager.GetPlacementZoneForColor(color.Value);
@@ -51,10 +51,22 @@ public class PlacementFocus : MonoBehaviour
         }
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
         {
+            if (piece.GetComponentInParent<PieceTray>() != null) continue; // benches are handled below
             BoardPosition pos = piece.CurrentPosition;
             bool onBoard = pos.IsValid() && ChessBoard.Instance.GetPieceAt(pos) == piece;
             bool visible = !onBoard || piece.pieceColor == color.Value;
             foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, visible);
+        }
+
+        // The in-view player's 3D bench goes away (they pick from the on-screen bench), so it never
+        // sits between the camera and their squares. Taps pass through it too.
+        foreach (PieceColor c in System.Enum.GetValues(typeof(PieceColor)))
+        {
+            PieceTray tray = PieceTray.GetTrayForColor(c);
+            if (tray == null) continue;
+            bool show = c != color.Value;
+            foreach (Renderer r in tray.GetComponentsInChildren<Renderer>(true)) SetVisible(r, show);
+            foreach (Collider col in tray.GetComponentsInChildren<Collider>(true)) SetEnabled(col, show);
         }
     }
 
@@ -75,10 +87,19 @@ public class PlacementFocus : MonoBehaviour
         else if (visible && hidden.Remove(r)) r.enabled = true;
     }
 
+    private readonly HashSet<Collider> disabled = new HashSet<Collider>();
+
+    private void SetEnabled(Collider c, bool on)
+    {
+        if (!on && c.enabled) { c.enabled = false; disabled.Add(c); }
+        else if (on && disabled.Remove(c)) c.enabled = true;
+    }
+
     private void RestoreAll()
     {
-        if (hidden.Count == 0) return;
         foreach (Renderer r in hidden) if (r != null) r.enabled = true;
         hidden.Clear();
+        foreach (Collider c in disabled) if (c != null) c.enabled = true;
+        disabled.Clear();
     }
 }
