@@ -11,6 +11,8 @@ public class PlacementFocus : MonoBehaviour
 {
     private readonly HashSet<Renderer> hidden = new HashSet<Renderer>();
     private readonly List<(Renderer renderer, BoardPosition pos)> floors = new List<(Renderer, BoardPosition)>();
+    private PieceColor? shownFor;
+    private float nextRefresh;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Create()
@@ -28,10 +30,16 @@ public class PlacementFocus : MonoBehaviour
             color = PlacementManager.Instance.SelectedTrayColor ?? PlacementUI.WorkingOn;
         if (!color.HasValue)
         {
+            shownFor = null;
             RestoreAll();
             if (!placing) floors.Clear(); // a new game builds new floors
             return;
         }
+
+        // Only redo the work when the player changes, or a few times a second for pieces just placed
+        if (color == shownFor && Time.unscaledTime < nextRefresh) return;
+        shownFor = color;
+        nextRefresh = Time.unscaledTime + 0.3f;
 
         if (floors.Count == 0) FindFloors();
         PlacementZone zone = PlacementManager.GetPlacementZoneForColor(color.Value);

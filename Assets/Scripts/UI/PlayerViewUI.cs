@@ -129,7 +129,7 @@ public class PlayerViewUI : MonoBehaviour
     }
 
     /// <summary>World direction from the board's centre toward this player's home face</summary>
-    private static Vector3 HomeSideDirection(PieceColor color, out Vector3 up)
+    public static Vector3 HomeSideDirection(PieceColor color, out Vector3 up)
     {
         Vector3 local;
         switch (color)

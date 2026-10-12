@@ -338,22 +338,27 @@ public class PlacementUI : MonoBehaviour
 
     private PieceColor? lastViewSeen, lastFacing;
 
-    /// <summary>The placing player whose bench is most squarely in front of the camera</summary>
-    private static PieceColor? FacingPlayer(List<PieceColor> placing)
+    /// <summary>
+    /// The placing player whose side of the cube faces the camera most squarely. Uses each
+    /// player's home face direction (the benches aren't all centred on their face, which made
+    /// the top and bottom players switch late). Sticks with the current player until another
+    /// is clearly more in view, so it doesn't flicker on the diagonals.
+    /// </summary>
+    private PieceColor? FacingPlayer(List<PieceColor> placing)
     {
         Camera cam = Camera.main;
         if (cam == null || ChessBoard.Instance == null) return null;
-        Vector3 center = PlayerViewUI.BoardCenter();
-        Vector3 toCamera = (cam.transform.position - center).normalized;
+        Vector3 toCamera = (cam.transform.position - PlayerViewUI.BoardCenter()).normalized;
         PieceColor? best = null;
-        float bestDot = 0.25f; // must actually be on the camera's side of the cube
+        float bestScore = float.NegativeInfinity, currentScore = float.NegativeInfinity;
         foreach (PieceColor c in placing)
         {
-            PieceTray tray = PieceTray.GetTrayForColor(c);
-            if (tray == null) continue;
-            float dot = Vector3.Dot((tray.transform.position - center).normalized, toCamera);
-            if (dot > bestDot) { bestDot = dot; best = c; }
+            float score = Vector3.Dot(PlayerViewUI.HomeSideDirection(c, out _), toCamera);
+            if (score > bestScore) { bestScore = score; best = c; }
+            if (lastFacing == c) currentScore = score;
         }
+        if (bestScore < 0.2f) return null;
+        if (lastFacing.HasValue && placing.Contains(lastFacing.Value) && currentScore > bestScore - 0.05f) return lastFacing;
         return best;
     }
 
