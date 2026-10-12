@@ -303,20 +303,28 @@ public class PlacementUI : MonoBehaviour
         placing.Sort();
         if (placing.Count == 0) { WorkingOn = null; return 0; }
 
-        // Follow what the player is working on
-        PieceColor? tapped = PlacementManager.Instance.SelectedTrayColor;
-        if (tapped.HasValue && placing.Contains(tapped.Value)) autoPlaceFor = tapped;
-        else if (PlayerViewUI.LastViewed.HasValue && placing.Contains(PlayerViewUI.LastViewed.Value) && lastViewSeen != PlayerViewUI.LastViewed)
-            autoPlaceFor = PlayerViewUI.LastViewed;
-        lastViewSeen = PlayerViewUI.LastViewed;
-        // Local games: whoever's bench the camera is facing is the player you're setting up.
+        // Follow what the player is working on. Local games: the face of the cube toward the
+        // camera decides, and turning to another face puts down a piece held for someone else.
         // (Online, this device only ever places its own pieces.)
+        bool faceChanged = false;
         if (!OnlineSession.IsActive)
         {
             PieceColor? facing = FacingPlayer(placing);
-            if (facing.HasValue && facing != lastFacing) autoPlaceFor = facing;
+            if (facing.HasValue && facing != lastFacing)
+            {
+                autoPlaceFor = facing;
+                faceChanged = true;
+                PieceColor? held = PlacementManager.Instance.SelectedTrayColor;
+                if (held.HasValue && held != facing) PlacementManager.Instance.DeselectTrayPiece();
+            }
             lastFacing = facing;
         }
+        // Tapping a piece on a 3D bench picks that player until the view moves on
+        PieceColor? tapped = PlacementManager.Instance.SelectedTrayColor;
+        if (!faceChanged && tapped.HasValue && placing.Contains(tapped.Value)) autoPlaceFor = tapped;
+        else if (PlayerViewUI.LastViewed.HasValue && placing.Contains(PlayerViewUI.LastViewed.Value) && lastViewSeen != PlayerViewUI.LastViewed)
+            autoPlaceFor = PlayerViewUI.LastViewed;
+        lastViewSeen = PlayerViewUI.LastViewed;
         if (!autoPlaceFor.HasValue || !placing.Contains(autoPlaceFor.Value)) autoPlaceFor = placing[0];
         PieceColor current = autoPlaceFor.Value;
         WorkingOn = current;
@@ -332,6 +340,8 @@ public class PlacementUI : MonoBehaviour
         if (many && TouchGUI.NeonButton(new Rect(rect.xMax + 6f, 140, arrow, buttonHeight), ">", NeonTheme.Yellow, NeonTheme.Pink, outlined: true, fontSize: 18))
         {
             autoPlaceFor = placing[(placing.IndexOf(current) + 1) % placing.Count];
+            if (PlacementManager.Instance.SelectedTrayColor.HasValue && PlacementManager.Instance.SelectedTrayColor != autoPlaceFor)
+                PlacementManager.Instance.DeselectTrayPiece();
         }
         return 1;
     }
