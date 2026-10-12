@@ -375,15 +375,23 @@ public class CameraController : MonoBehaviour
     private System.Collections.IEnumerator SnapRoutine(float yaw, float pitch, float seconds)
     {
         float startYaw = currentHorizontalAngle, startPitch = currentVerticalAngle;
+        // Also come back to the zoom that frames the board: from far out, a view from above or
+        // below would otherwise show mostly the ground or sky with a tiny board in the middle
+        float startDistance = distance;
+        FitDistanceToBoard();
+        float fitDistance = distance;
+        distance = startDistance;
         for (float t = 0f; t < seconds; t += Time.deltaTime)
         {
             float k = Mathf.SmoothStep(0f, 1f, t / seconds);
             currentHorizontalAngle = Mathf.LerpAngle(startYaw, yaw, k);
             currentVerticalAngle = Mathf.Lerp(startPitch, pitch, k);
+            distance = Mathf.Lerp(startDistance, fitDistance, k);
             yield return null;
         }
         currentHorizontalAngle = yaw;
         currentVerticalAngle = pitch;
+        distance = fitDistance;
     }
 
     public void SetTarget(Transform newTarget)
