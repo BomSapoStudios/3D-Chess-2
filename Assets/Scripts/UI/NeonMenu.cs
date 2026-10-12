@@ -710,6 +710,10 @@ public class NeonMenu : MonoBehaviour
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
             BackdropChip(Backdrops.Kind.CyberCity),
+            BackdropChip(Backdrops.Kind.NeonJungle),
+        }, NeonTheme.Cyan, 16);
+        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
             BackdropChip(Backdrops.Kind.NeonGlow),
         }, NeonTheme.Cyan, 16);
         backdropNote = NewText("Note", right, "", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
@@ -717,10 +721,6 @@ public class NeonMenu : MonoBehaviour
         backdropNote.enableWordWrapping = true;
         backdropNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
 
-        TextMeshProUGUI more = NewText("More", right, "More backdrops and piece sets on the way.", 14, NeonTheme.Muted, TextAlignmentOptions.TopLeft);
-        more.fontStyle = FontStyles.Normal;
-        more.enableWordWrapping = true;
-        more.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
     }
 
     private (string, System.Action, System.Func<bool>, System.Func<bool>) BackdropChip(Backdrops.Kind kind)

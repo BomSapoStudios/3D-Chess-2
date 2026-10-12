@@ -14,9 +14,10 @@ public static class Backdrops
         DeepSpace = 1,
         NeonDesert = 2,
         CyberCity = 3,
+        NeonJungle = 4,
     }
 
-    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonGlow };
+    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.NeonGlow };
 
     private const string PrefKey = "Backdrop";
 
@@ -37,6 +38,7 @@ public static class Backdrops
             case Kind.DeepSpace: return "Deep Space";
             case Kind.NeonDesert: return "Neon Desert";
             case Kind.CyberCity: return "Cyber City";
+            case Kind.NeonJungle: return "Neon Jungle";
             default: return "Neon Glow";
         }
     }
@@ -48,6 +50,7 @@ public static class Backdrops
             case Kind.DeepSpace: return "Stars, galaxies and glowing nebulae all around the board";
             case Kind.NeonDesert: return "Synthwave sunset over shifting sand dunes, with drifting dust";
             case Kind.CyberCity: return "High above a rainy neon megacity at night, with flying traffic";
+            case Kind.NeonJungle: return "A glowing night jungle above a frog pond, with robot critters";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
@@ -64,13 +67,14 @@ public static class Backdrops
         {
             case Kind.NeonDesert: return () => DesertSky.Generate(SkyWidth, SkyHeight, 1984);
             case Kind.CyberCity: return () => CitySky.Generate(SkyWidth, SkyHeight, 2077);
+            case Kind.NeonJungle: return () => JungleSky.Generate(SkyWidth, SkyHeight, 1066);
             default: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 20261006);
         }
     }
 
     // Color shown while a sky is still being generated
     private static Color LoadingColor(Kind kind) =>
-        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : new Color32(4, 2, 14, 255);
+        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : new Color32(4, 2, 14, 255);
 
     /// <summary>
     /// Apply the chosen backdrop to a camera. Returns false while a sky is still being
@@ -138,6 +142,7 @@ public static class Backdrops
 
         if (kind == Kind.NeonDesert) Scenery.BuildDesert(cam);
         else if (kind == Kind.CyberCity) Scenery.BuildCity(cam);
+        else if (kind == Kind.NeonJungle) Scenery.BuildJungle(cam);
         else Scenery.Clear();
 
         RefreshReflections();
@@ -297,6 +302,35 @@ public static class Scenery
             light.color = new Color(0.7f, 0.8f, 1f);
             light.intensity = Mathf.Min(light.intensity, 0.9f);
             light.transform.rotation = Quaternion.Euler(55f, -30f, 0f);
+        }
+    }
+
+    public static void BuildJungle(Camera cam)
+    {
+        Clear();
+        fogWasOn = RenderSettings.fog;
+        savedAmbient = RenderSettings.ambientLight;
+        changed = true;
+
+        root = new GameObject("Neon Jungle Scenery");
+        JungleScenery.Build(root.transform);
+
+        // Damp night air: the far trees fade into the sky's horizon mist
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = JungleSky.HazeColor;
+        RenderSettings.fogStartDistance = 45f;
+        RenderSettings.fogEndDistance = 170f;
+
+        // Cool moonlight from the moon's side, teal glow from the jungle as ambient
+        RenderSettings.ambientLight = new Color(0.2f, 0.34f, 0.36f);
+        foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            savedLights[light] = (light.color, light.intensity, light.transform.rotation);
+            light.color = new Color(0.65f, 0.9f, 1f);
+            light.intensity = Mathf.Min(light.intensity, 0.95f);
+            light.transform.rotation = Quaternion.Euler(40f, 45f, 0f);
         }
     }
 
