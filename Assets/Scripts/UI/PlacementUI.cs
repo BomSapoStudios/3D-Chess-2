@@ -215,6 +215,7 @@ public class PlacementUI : MonoBehaviour
             list.Add(p);
         }
         if (byType.Count == 0) return;
+        if (Event.current.type == EventType.Repaint) benchShown = true;
 
         var types = new List<ChessPieceType>();
         foreach (ChessPieceType t in BenchOrder) if (byType.ContainsKey(t)) types.Add(t);
@@ -252,6 +253,28 @@ public class PlacementUI : MonoBehaviour
         }
     }
 
+    // While the on-screen bench is up, the 3D view is nudged up so the board and its glowing
+    // squares sit above the bench instead of behind it
+    private bool benchShown;
+    private float viewShift;
+    private const float BenchShift = 0.28f; // in screen heights/2 (normalized device units)
+
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        float target = benchShown && GameStateManager.Instance != null && GameStateManager.Instance.CanPlacePieces() ? BenchShift : 0f;
+        viewShift = Mathf.MoveTowards(viewShift, target, Time.unscaledDeltaTime * 0.8f);
+        cam.ResetProjectionMatrix();
+        if (viewShift > 0.0001f)
+        {
+            Matrix4x4 m = cam.projectionMatrix;
+            m[1, 2] = -viewShift; // shifts the whole picture up
+            cam.projectionMatrix = m;
+        }
+        benchShown = false; // set again each frame the bench is drawn
+    }
+
     private Texture2D Icon(PieceColor color, ChessPieceType type)
     {
         string key = (color == PieceColor.White ? "Light_" : "Dark_") + type;
@@ -286,6 +309,14 @@ public class PlacementUI : MonoBehaviour
         else if (PlayerViewUI.LastViewed.HasValue && placing.Contains(PlayerViewUI.LastViewed.Value) && lastViewSeen != PlayerViewUI.LastViewed)
             autoPlaceFor = PlayerViewUI.LastViewed;
         lastViewSeen = PlayerViewUI.LastViewed;
+        // Local games: whoever's bench the camera is facing is the player you're setting up.
+        // (Online, this device only ever places its own pieces.)
+        if (!OnlineSession.IsActive)
+        {
+            PieceColor? facing = FacingPlayer(placing);
+            if (facing.HasValue && facing != lastFacing) autoPlaceFor = facing;
+            lastFacing = facing;
+        }
         if (!autoPlaceFor.HasValue || !placing.Contains(autoPlaceFor.Value)) autoPlaceFor = placing[0];
         PieceColor current = autoPlaceFor.Value;
         WorkingOn = current;
@@ -305,7 +336,26 @@ public class PlacementUI : MonoBehaviour
         return 1;
     }
 
-    private PieceColor? lastViewSeen;
+    private PieceColor? lastViewSeen, lastFacing;
+
+    /// <summary>The placing player whose bench is most squarely in front of the camera</summary>
+    private static PieceColor? FacingPlayer(List<PieceColor> placing)
+    {
+        Camera cam = Camera.main;
+        if (cam == null || ChessBoard.Instance == null) return null;
+        Vector3 center = PlayerViewUI.BoardCenter();
+        Vector3 toCamera = (cam.transform.position - center).normalized;
+        PieceColor? best = null;
+        float bestDot = 0.25f; // must actually be on the camera's side of the cube
+        foreach (PieceColor c in placing)
+        {
+            PieceTray tray = PieceTray.GetTrayForColor(c);
+            if (tray == null) continue;
+            float dot = Vector3.Dot((tray.transform.position - center).normalized, toCamera);
+            if (dot > bestDot) { bestDot = dot; best = c; }
+        }
+        return best;
+    }
 
     
     /// <summary>

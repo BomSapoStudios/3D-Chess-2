@@ -119,7 +119,7 @@ public class PlayerViewUI : MonoBehaviour
         cameraController.SnapToView(from);
     }
 
-    private static Vector3 BoardCenter()
+    public static Vector3 BoardCenter()
     {
         GameObject container = GameObject.Find("Pieces Container");
         if (container == null) return ChessBoard.Instance.transform.position;
