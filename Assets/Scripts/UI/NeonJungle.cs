@@ -696,8 +696,13 @@ public class JungleFrog : MonoBehaviour
     private System.Random rng;
     private FrogParts parts;
     private float nextCroak, nextBlink, nextHop;
-    private bool hopping;
+    private bool hopping, eating;
     private Vector3 throatScale;
+
+    // Snacks: a glowing bug drifts around in front of the frog until the frog's tongue gets it
+    private Transform bug, tongue;
+    private float nextSnack, bugArrives, bugSeed;
+    private Vector3 bugFrom;
     private Color throatGlow;
 
     public void Init(List<Transform> allPads, Transform home, int seed)
@@ -717,6 +722,125 @@ public class JungleFrog : MonoBehaviour
         nextCroak = now + 1f + (float)rng.NextDouble() * 4f;
         nextBlink = now + 2f + (float)rng.NextDouble() * 3f;
         nextHop = now + 6f + (float)rng.NextDouble() * 8f;
+        nextSnack = now + 5f + (float)rng.NextDouble() * 10f;
+        BuildBugAndTongue();
+    }
+
+    private void BuildBugAndTongue()
+    {
+        Transform world = transform.parent;
+        bug = new GameObject("Bug").transform;
+        bug.SetParent(world, false);
+        var glow = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.95f, 0.35f) };
+        var wings = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.4f, 1f, 0.95f) };
+        JungleScenery.Part(bug, PrimitiveType.Sphere, Vector3.zero, new Vector3(0.35f, 0.3f, 0.5f), glow);
+        JungleScenery.Part(bug, PrimitiveType.Cube, new Vector3(0.28f, 0.12f, 0f), new Vector3(0.45f, 0.03f, 0.22f), wings);
+        JungleScenery.Part(bug, PrimitiveType.Cube, new Vector3(-0.28f, 0.12f, 0f), new Vector3(0.45f, 0.03f, 0.22f), wings);
+        bug.localScale = Vector3.one * 2.2f;
+        bugSeed = (float)rng.NextDouble() * 50f;
+        SpawnBug();
+
+        tongue = JungleScenery.Part(world, PrimitiveType.Cylinder, Vector3.zero, Vector3.one, new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.35f, 0.7f) });
+        tongue.name = "Tongue";
+        tongue.gameObject.SetActive(false);
+    }
+
+    /// <summary>Where the bug hovers: a lazy figure-eight in front of and above the frog</summary>
+    private Vector3 BugSpot(float t)
+    {
+        float s = transform.localScale.x;
+        Vector3 local = new Vector3(Mathf.Sin(t * 0.8f + bugSeed) * 2.5f, 3.2f + Mathf.Sin(t * 1.7f + bugSeed) * 1.0f, 5.5f + Mathf.Sin(t * 0.55f + bugSeed) * 1.5f) * s;
+        return transform.position + transform.rotation * local;
+    }
+
+    /// <summary>A new bug flies in from off to the side</summary>
+    private void SpawnBug()
+    {
+        bug.gameObject.SetActive(true);
+        bugFrom = transform.position + new Vector3((float)rng.NextDouble() - 0.5f, 0.4f, (float)rng.NextDouble() - 0.5f).normalized * 25f + Vector3.up * 8f;
+        bugArrives = Time.time + 3f;
+    }
+
+    private void MoveBug()
+    {
+        if (bug == null || !bug.gameObject.activeSelf || (tongue != null && tongue.gameObject.activeSelf)) return;
+        float now = Time.time;
+        Vector3 spot = BugSpot(now) + new Vector3(Mathf.Sin(now * 23f), Mathf.Sin(now * 31f), 0) * 0.08f; // buzzing jitter
+        float k = Mathf.Clamp01(1f - (bugArrives - now) / 3f);
+        Vector3 pos = Vector3.Lerp(bugFrom, spot, Mathf.SmoothStep(0f, 1f, k));
+        if ((pos - bug.position).sqrMagnitude > 0.0001f) bug.rotation = Quaternion.LookRotation(pos - bug.position);
+        bug.position = pos;
+        // Wings buzz
+        float flap = Mathf.Sin(now * 60f) * 40f;
+        if (bug.childCount >= 3)
+        {
+            bug.GetChild(1).localRotation = Quaternion.Euler(0, 0, flap);
+            bug.GetChild(2).localRotation = Quaternion.Euler(0, 0, -flap);
+        }
+    }
+
+    private Vector3 Mouth() => parts.body.TransformPoint(new Vector3(0, 1.45f, 1.9f));
+
+    /// <summary>Stretch the tongue cylinder from the mouth to a point</summary>
+    private void PlaceTongue(Vector3 tip)
+    {
+        Vector3 mouth = Mouth();
+        Vector3 d = tip - mouth;
+        float thick = 0.28f * transform.localScale.x;
+        tongue.position = mouth + d * 0.5f;
+        tongue.rotation = Quaternion.FromToRotation(Vector3.up, d.sqrMagnitude > 0.0001f ? d.normalized : Vector3.up);
+        tongue.localScale = new Vector3(thick, d.magnitude * 0.5f, thick);
+    }
+
+    private System.Collections.IEnumerator Snack()
+    {
+        eating = true;
+        // Eyes lock on, a little wiggle of anticipation
+        for (float t = 0; t < 0.3f; t += Time.deltaTime) { parts.body.localScale = new Vector3(1.04f, 0.94f, 1.04f); MoveBug(); yield return null; }
+        parts.body.localScale = Vector3.one;
+
+        // Thwip: out to the bug
+#if DEVELOPMENT_BUILD
+        Debug.Log("JUNGLE: frog snack");
+#endif
+        tongue.gameObject.SetActive(true);
+        Vector3 target = bug.position;
+        for (float t = 0; t < 0.1f; t += Time.deltaTime)
+        {
+            PlaceTongue(Vector3.Lerp(Mouth(), target, t / 0.1f));
+            yield return null;
+        }
+        // Back in with the bug stuck to the tip
+        for (float t = 0; t < 0.14f; t += Time.deltaTime)
+        {
+            Vector3 tip = Vector3.Lerp(target, Mouth(), t / 0.14f);
+            PlaceTongue(tip);
+            bug.position = tip;
+            yield return null;
+        }
+        tongue.gameObject.SetActive(false);
+        bug.gameObject.SetActive(false);
+
+        // Gulp: the throat bulges and the eyes squeeze shut
+        for (float t = 0; t < 0.45f; t += Time.deltaTime)
+        {
+            float k = Mathf.Sin(t / 0.45f * Mathf.PI);
+            parts.throat.localScale = throatScale * (1f + k * 0.6f);
+            foreach (Transform e in parts.eyes) e.localScale = new Vector3(0.5f, 0.5f * (1f - k * 0.9f), 0.25f);
+            yield return null;
+        }
+        parts.throat.localScale = throatScale;
+        eating = false;
+        nextSnack = Time.time + 10f + (float)rng.NextDouble() * 14f;
+        // Another bug wanders over a little later
+        yield return new WaitForSeconds(2f + (float)rng.NextDouble() * 3f);
+        SpawnBug();
+    }
+
+    private void OnDestroy()
+    {
+        if (bug != null) Destroy(bug.gameObject);
+        if (tongue != null) Destroy(tongue.gameObject);
     }
 
     private void Settle()
@@ -736,7 +860,7 @@ public class JungleFrog : MonoBehaviour
         float now = Time.time;
 
         // Breathing
-        if (!hopping)
+        if (!hopping && !eating)
         {
             float b = 1f + Mathf.Sin(now * 2.2f) * 0.025f;
             parts.body.localScale = new Vector3(1f, b, 1f);
@@ -760,13 +884,16 @@ public class JungleFrog : MonoBehaviour
         // Blink: pupils squash shut for a moment
         float sinceBlink = now - nextBlink;
         float lid = sinceBlink >= 0f && sinceBlink < 0.14f ? 0.1f : 1f;
-        foreach (Transform e in parts.eyes) e.localScale = new Vector3(0.5f, 0.5f * lid, 0.25f);
+        if (!eating) foreach (Transform e in parts.eyes) e.localScale = new Vector3(0.5f, 0.5f * lid, 0.25f);
         if (sinceBlink >= 0.14f) nextBlink = now + 2.5f + (float)rng.NextDouble() * 4f;
 
         // Antenna tip blinks
         parts.antenna.localScale = Vector3.one * (Mathf.Repeat(now, 1.6f) < 0.2f ? 0.32f : 0.2f);
 
-        if (!hopping && now >= nextHop) StartCoroutine(Hop());
+        MoveBug();
+        bool bugReady = bug != null && bug.gameObject.activeSelf && now > bugArrives;
+        if (!hopping && !eating && bugReady && now >= nextSnack && now < nextCroak) StartCoroutine(Snack());
+        else if (!hopping && !eating && now >= nextHop) StartCoroutine(Hop());
     }
 
     private System.Collections.IEnumerator Hop()
