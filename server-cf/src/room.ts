@@ -6,6 +6,7 @@ import {
 } from './types/game.js';
 import { accounts, createRoom, type Env } from './index.js';
 import type { PushMessage } from './push.js';
+import type { GameResult, RatingChange } from './ratings.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Room — one Durable Object per game, addressed by its 6-character code.
@@ -39,6 +40,13 @@ interface RoomMeta {
   reserved?: Record<string, PlayerColor> | null;
   /** After the game: who wants a rematch, until when, and the new room once everyone agrees */
   rematch?: Rematch | null;
+  /** Colours knocked out, in order (for finishing places) */
+  eliminated?: PlayerColor[];
+  /** Players who walked out (gone too long, or let a Take your time move lapse) */
+  walkouts?: string[];
+  /** Each colour's rating change once the result is recorded */
+  ratings?: Record<string, RatingChange> | null;
+  resultSent?: boolean;
 }
 
 interface Rematch {
@@ -367,8 +375,12 @@ export class Room extends DurableObject<Env> {
     this.notifyAway([mover], { kind: 'turn', title: 'Your move', body: `It's your turn${vs}` });
   }
 
-  private async afterResult(result: MoveResult, event: Record<string, unknown>): Promise<void> {
-    if (this.meta) this.meta.lastPlayAt = Date.now();
+  private async afterResult(result: MoveResult, event: Record<string, unknown>, walkout?: PlayerColor): Promise<void> {
+    if (this.meta) {
+      this.meta.lastPlayAt = Date.now();
+      if (result.eliminatedPlayer && !(this.meta.eliminated ??= []).includes(result.eliminatedPlayer)) this.meta.eliminated.push(result.eliminatedPlayer);
+      if (walkout) this.markWalkout(walkout);
+    }
     if (result.gameOver) {
       this.gameOver = result.gameOver;
       this.turnStartedAt = null;
@@ -388,6 +400,7 @@ export class Room extends DurableObject<Env> {
     if (result.gameOver) await this.logEvent({ type: 'game:over', ...result.gameOver });
     else this.notifyTurn();
     this.broadcast({ type: 'game:stateUpdate', reason: event.type, state: this.stateForClients() });
+    if (result.gameOver) this.ctx.waitUntil(this.sendResult());
   }
 
   // ── Disconnects, timers and cleanup ───────────────────────────────────────────
@@ -412,6 +425,73 @@ export class Room extends DurableObject<Env> {
     this.broadcast({ type: 'room:playerLeft', color: me.color, name: me.name, graceMs, pace: this.engine.config.pace, state: this.stateForClients() }, ws);
     // Leaving the result screen counts as not wanting a rematch
     if (this.meta?.rematch && !this.meta.rematch.code && !this.meta.rematch.failed) await this.settleRematch(ws);
+  }
+
+  // ── Results and ratings ───────────────────────────────────────────────────────
+
+  private markWalkout(color: PlayerColor): void {
+    const userId = Object.keys(this.seats).find(id => this.seats[id] === color);
+    if (!userId || userId.startsWith('ai:') || !this.meta) return;
+    if (!(this.meta.walkouts ??= []).includes(userId)) this.meta.walkouts.push(userId);
+  }
+
+  /**
+   * Finishing places: the winner, then anyone still in, then those knocked out, latest first.
+   * With no winner (a draw) everyone still in shares first place.
+   */
+  private finishingPlaces(): Record<string, number> {
+    const state = this.engine!.getState();
+    const winner = this.gameOver?.winner ?? null;
+    const out = this.meta?.eliminated ?? [];
+    const groups: PlayerColor[][] = [];
+    if (winner) groups.push([winner]);
+    groups.push(state.players.map(p => p.color).filter(c => c !== winner && !out.includes(c)));
+    for (const c of [...out].reverse()) if (c !== winner) groups.push([c]);
+    const places: Record<string, number> = {};
+    let place = 1;
+    for (const g of groups) {
+      if (g.length === 0) continue;
+      for (const c of g) places[c] = place;
+      place += g.length;
+    }
+    return places;
+  }
+
+  /** Tell the accounts store how the game went, then show everyone their rating change */
+  private async sendResult(): Promise<void> {
+    const meta = this.meta, engine = this.engine;
+    if (!meta || !engine || !this.gameOver || meta.resultSent) return;
+    meta.resultSent = true;
+    await this.ctx.storage.put('meta', meta);
+    const state = engine.getState();
+    const places = this.finishingPlaces();
+    const walkouts = meta.walkouts ?? [];
+    const result: GameResult = {
+      roomCode: meta.code,
+      rated: this.gameOver.reason !== 'abandoned',
+      players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => ({
+        userId, color, place: places[color] ?? state.players.length, walkout: walkouts.includes(userId),
+      })),
+      boardSize: engine.config.boardSize,
+      playerCount: engine.config.playerCount,
+      pace: engine.config.pace ?? 'live',
+      endReason: this.gameOver.reason,
+      moves: state.moveHistory.length,
+      durationMs: Date.now() - (meta.placementStartedAt ?? meta.createdAt),
+    };
+    try {
+      const { status, data } = await accounts(this.env, 'game-result', { result });
+      if (status !== 200 || !this.meta) return;
+      const byUser = (data.changes ?? {}) as Record<string, RatingChange>;
+      const ratings: Record<string, RatingChange> = {};
+      for (const [userId, change] of Object.entries(byUser)) if (this.seats[userId]) ratings[this.seats[userId]] = change;
+      if (Object.keys(ratings).length === 0) return;
+      this.meta.ratings = ratings;
+      await this.ctx.storage.put('meta', this.meta);
+      this.broadcast({ type: 'game:rated', ratings });
+    } catch (e) {
+      console.log(`[room ${meta.code}] result not recorded: ${String(e)}`);
+    }
   }
 
   // ── Rematch ──────────────────────────────────────────────────────────────────
@@ -505,7 +585,14 @@ export class Room extends DurableObject<Env> {
       const stalled = slow
         ? meta.placementStartedAt != null && now - meta.placementStartedAt >= this.t(SLOW_MOVE_MS)
         : engine.getState().players.some(p => p.type !== 'ai' && !p.isConnected && p.disconnectedAt != null && now - p.disconnectedAt >= this.t(DISCONNECT_GRACE_MS));
-      if (stalled) await this.endAbandoned();
+      if (stalled) {
+        // Whoever held up setup walked out: a Live player who never came back, or anyone not ready after a day
+        for (const p of engine.getState().players) {
+          if (p.type === 'ai') continue;
+          if (slow ? !p.placementComplete : (!p.isConnected && p.disconnectedAt != null && now - p.disconnectedAt >= this.t(DISCONNECT_GRACE_MS))) this.markWalkout(p.color);
+        }
+        await this.endAbandoned();
+      }
     }
 
     // Timed games: the player on move ran out of time
@@ -520,7 +607,7 @@ export class Room extends DurableObject<Env> {
       const loser = engine.getState().currentTurn!;
       const result = engine.resign(loser);
       if (result.gameOver) result.gameOver.reason = 'timeout';
-      await this.afterResult(result, { type: 'game:timeout', color: loser });
+      await this.afterResult(result, { type: 'game:timeout', color: loser }, loser);
     }
 
     // Live: seats held too long for players who never came back
@@ -530,7 +617,7 @@ export class Room extends DurableObject<Env> {
         if (p.type !== 'ai' && !p.isConnected && !p.isEliminated && p.disconnectedAt && now - p.disconnectedAt >= this.t(DISCONNECT_GRACE_MS)) {
           if (engine.getState().phase !== 'playing') break;
           const result = engine.resign(p.color);
-          await this.afterResult(result, { type: 'game:abandoned', color: p.color });
+          await this.afterResult(result, { type: 'game:abandoned', color: p.color }, p.color);
         }
       }
     }
@@ -601,6 +688,7 @@ export class Room extends DurableObject<Env> {
     this.forgetRoom();
     await this.persist();
     await this.logEvent({ type: 'game:over', ...this.gameOver });
+    this.ctx.waitUntil(this.sendResult());
   }
 
   /** Take this room off its players' active games lists */
@@ -731,6 +819,7 @@ export class Room extends DurableObject<Env> {
       lobbyClosesAt: state.phase === 'waiting' ? this.meta?.expiresAt ?? null : null,
       moveDeadline: this.slowDeadline() ?? this.clockDeadline(),
       rematch: this.rematchInfo(),
+      ratings: this.meta?.ratings ?? null,
     };
   }
 

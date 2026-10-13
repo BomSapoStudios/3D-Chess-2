@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './index.js';
 import { isGeneratedName, randomName } from './names.js';
 import { sendPush, type PushKind, type PushMessage } from './push.js';
+import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, stats, tiersOf, type GameResult, type Mode } from './ratings.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accounts — one Durable Object (SQLite) holding every player account.
@@ -56,6 +57,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
     `);
+    setupTables(this.sql);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -95,6 +97,11 @@ export class Accounts extends DurableObject<Env> {
       case 'push-register': return this.pushRegister(userId, String(b.token ?? ''), b.sandbox === true);
       case 'push-unregister': return this.pushUnregister(String(b.token ?? ''));
       case 'push-settings': return this.pushSettings(userId, b.prefs as Record<string, boolean> | undefined);
+      case 'game-result': return { changes: recordGame(this.sql, b.result as GameResult, Date.now()) };
+      case 'walkout': recordWalkout(this.sql, String(b.walkoutUserId ?? ''), Date.now()); return { ok: true };
+      case 'cooldown': return { until: cooldownUntil(this.sql, userId, Date.now()) };
+      case 'stats': return this.statsFor(userId, String(b.of ?? '') || userId);
+      case 'leaderboard': return this.board(userId, b.mode === 'melee' ? 'melee' : 'duel', b.scope === 'everyone' ? 'everyone' : 'friends');
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
       default: throw new HttpError(404, 'Unknown operation');
     }
@@ -280,6 +287,23 @@ export class Accounts extends DurableObject<Env> {
     return { sent: targets.length };
   }
 
+  // ── Ratings and stats (see ratings.ts) ───────────────────────────────────────
+
+  private statsFor(viewerId: string, userId: string) {
+    this.account(userId);
+    if (viewerId && viewerId !== userId && this.isBlocked(userId, viewerId)) throw new HttpError(404, 'Player not found');
+    return stats(this.sql, userId, viewerId || null, id => this.nameOf(id));
+  }
+
+  private board(userId: string, mode: Mode, scope: 'friends' | 'everyone') {
+    let among: string[] | null = null;
+    if (scope === 'friends') {
+      among = this.sql.exec("SELECT friend_id FROM friends WHERE account_id = ? AND status = 'friends'", userId).toArray().map(r => r.friend_id as string);
+      among.push(userId);
+    }
+    return { mode, scope, players: leaderboard(this.sql, mode, among, id => this.nameOf(id)) };
+  }
+
   private nameOf(userId: string): string {
     const row = this.sql.exec('SELECT name FROM accounts WHERE id = ?', userId).toArray()[0];
     return (row?.name as string) ?? 'A player';
@@ -298,6 +322,8 @@ export class Accounts extends DurableObject<Env> {
       FROM friends f JOIN accounts a ON a.id = f.friend_id
       WHERE f.account_id = ? ORDER BY a.name`, userId).toArray()
       .map(r => ({ userId: r.userId, name: r.name ?? '(away)', status: r.status, online: now - (r.activeAt as number) < ONLINE_WINDOW_MS }));
+    const tiers = tiersOf(this.sql, friends.map(f => f.userId as string));
+    for (const f of friends) (f as Record<string, unknown>).tier = tiers[f.userId as string];
     const challenges = this.sql.exec(`
       SELECT c.from_id AS fromUserId, a.name AS fromName, c.room_code AS roomCode, c.created_at AS at
       FROM challenges c JOIN accounts a ON a.id = c.from_id

@@ -33,6 +33,9 @@ export { Accounts } from './accounts.js';
 //   GET  /rooms/:code                   → room summary (players, open seats)
 //   GET  /rooms/:code/connect?token=…   → WebSocket into the room
 //   GET  /matchmaking/connect?token=…   → WebSocket into the Find Match queue
+//   GET  /matchmaking/cooldown          → { until } (Unix ms, 0 = not paused)
+//   GET  /stats?of=<userId>             → a player's ratings and stats (yours without ?of)
+//   GET  /leaderboard?mode=duel|melee&scope=friends|everyone
 //
 // The token is passed as a query parameter for WebSockets because neither
 // browsers nor Unity's WebGL WebSocket can set headers on the upgrade request.
@@ -148,6 +151,14 @@ export default {
       return account('push-settings', request.method === 'POST' ? { prefs: body.prefs } : {});
     }
 
+    // Ratings and stats: a player's profile, the leaderboards, and the Find Match cooldown
+    if (request.method === 'GET' && (path === '/stats' || path === '/leaderboard' || path === '/matchmaking/cooldown')) {
+      if (!user) return needUser();
+      if (path === '/stats') return account('stats', { of: url.searchParams.get('of') ?? '' });
+      if (path === '/leaderboard') return account('leaderboard', { mode: url.searchParams.get('mode'), scope: url.searchParams.get('scope') });
+      return account('cooldown');
+    }
+
     if (path.startsWith('/friends')) {
       if (!user) return needUser();
       if (request.method === 'GET' && path === '/friends') return account('friends');
@@ -207,6 +218,9 @@ export default {
 
     if (path === '/matchmaking/connect') {
       if (!user) return new Response('Sign in first', { status: 401 });
+      // Walked out of too many games lately: no Find Match until the cooldown ends
+      const { data } = await accounts(env, 'cooldown', { userId: user.userId });
+      if ((data.until as number) > 0) return new Response('Find Match is paused for you', { status: 403 });
       const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName('global'));
       return stub.fetch('https://matchmaker/connect', {
         headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name },
