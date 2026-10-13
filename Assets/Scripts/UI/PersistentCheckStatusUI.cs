@@ -343,7 +343,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
     /// <summary>The New Game button (shown at game over), in the same place and style as Turn Planner</summary>
     private void OnGUI()
     {
-        if (newGameButton == null || !newGameButton.activeSelf) return;
+        if (newGameButton == null || !newGameButton.activeSelf || RematchUI.Showing) return; // the result panel has its own Home
         TouchGUI.Begin();
         if (TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "New Game", NeonTheme.Pink, NeonTheme.Cyan, fontSize: 16)) HandleNewGame();
         TouchGUI.End();

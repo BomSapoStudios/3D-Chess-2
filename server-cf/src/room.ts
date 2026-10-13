@@ -4,7 +4,7 @@ import {
   PLAYER_COLORS_BY_COUNT,
   type BoardPosition, type EndReason, type GameConfig, type PieceType, type PlayerColor,
 } from './types/game.js';
-import { accounts, type Env } from './index.js';
+import { accounts, createRoom, type Env } from './index.js';
 import type { PushMessage } from './push.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +35,18 @@ interface RoomMeta {
   lastPlayAt?: number;
   /** When the game ended; the room closes a few minutes later even if players stay on the result screen */
   gameOverAt?: number | null;
+  /** Seats kept for particular players (a rematch room): nobody else can join */
+  reserved?: Record<string, PlayerColor> | null;
+  /** After the game: who wants a rematch, until when, and the new room once everyone agrees */
+  rematch?: Rematch | null;
+}
+
+interface Rematch {
+  deadline: number;
+  votes: Record<string, boolean>; // userId → yes / no
+  code: string | null;            // the new room, once started
+  failed: boolean;                // not happening (someone said no or left, or time ran out)
+  seats?: Record<string, PlayerColor>; // each player's colour in the new room
 }
 
 interface Attachment {
@@ -61,6 +73,7 @@ const FINISHED_EMPTY_MS = MINUTE;            // finished rooms are cleared a min
 const IDLE_CAP_MS = 7 * 24 * HOUR;           // any room nobody touches for a week is cleared
 const LIVE_IDLE_MS = 30 * MINUTE;            // Live: nobody places or moves for this long (app left open) ends the game
 const GAME_OVER_LINGER_MS = 5 * MINUTE;      // finished games close this long after they end, connected or not
+const REMATCH_MS = 15 * 1000;                // players have this long after a game to agree to a rematch
 
 
 export class Room extends DurableObject<Env> {
@@ -94,11 +107,11 @@ export class Room extends DurableObject<Env> {
 
     if (url.pathname === '/init' && request.method === 'POST') {
       if (this.meta) return Response.json({ error: 'exists' }, { status: 409 });
-      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig> };
+      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig>; reserved?: Record<string, PlayerColor> };
       const now = Date.now();
       this.engine = new GameEngine(body.code, sanitizeConfig(body.config));
       const lobbyMs = this.engine.config.pace === 'slow' ? this.t(LOBBY_SLOW_MS) : this.t(LOBBY_LIVE_MS);
-      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null };
+      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null, reserved: body.reserved ?? null };
       // Robot seats are filled now; the host's device plays them
       for (const color of this.engine.config.aiColors ?? []) {
         const robotId = `ai:${color}`;
@@ -155,7 +168,8 @@ export class Room extends DurableObject<Env> {
 
     if (!rejoining) {
       const taken = new Set(Object.values(this.seats));
-      color = PLAYER_COLORS_BY_COUNT[engine.config.playerCount].find(c => !taken.has(c))!;
+      const reserved = this.meta!.reserved;
+      color = reserved ? reserved[userId] : PLAYER_COLORS_BY_COUNT[engine.config.playerCount].find(c => !taken.has(c))!;
       if (!color || engine.getState().phase !== 'waiting') {
         return new Response('Room is full', { status: 409 });
       }
@@ -246,6 +260,17 @@ export class Room extends DurableObject<Env> {
         await this.persist();
         reply(true, undefined, { expiresAt: meta.expiresAt });
         return this.broadcast({ type: 'room:extended', expiresAt: meta.expiresAt, state: this.stateForClients() });
+      }
+
+      case 'room:rematch': {
+        const rematch = this.meta?.rematch;
+        if (!this.gameOver || !rematch) return reply(false, 'No rematch on offer');
+        if (me.userId.startsWith('ai:') || msg.as !== undefined) return reply(false, 'Robots always say yes');
+        if (rematch.code) return reply(true, undefined, { rematch: this.rematchInfo() });
+        if (rematch.failed || Date.now() >= rematch.deadline) return reply(false, 'Too late for a rematch');
+        rematch.votes[me.userId] = msg.accept === true;
+        reply(true);
+        return this.settleRematch();
       }
 
       case 'game:placePiece': {
@@ -348,6 +373,7 @@ export class Room extends DurableObject<Env> {
       this.gameOver = result.gameOver;
       this.turnStartedAt = null;
       if (this.meta) this.meta.gameOverAt = Date.now();
+      this.offerRematch();
       this.forgetRoom();
     } else {
       this.startTurnClock();
@@ -384,6 +410,80 @@ export class Room extends DurableObject<Env> {
     await this.persist();
     const graceMs = this.engine.config.pace === 'slow' ? null : this.t(DISCONNECT_GRACE_MS);
     this.broadcast({ type: 'room:playerLeft', color: me.color, name: me.name, graceMs, pace: this.engine.config.pace, state: this.stateForClients() }, ws);
+    // Leaving the result screen counts as not wanting a rematch
+    if (this.meta?.rematch && !this.meta.rematch.code && !this.meta.rematch.failed) await this.settleRematch(ws);
+  }
+
+  // ── Rematch ──────────────────────────────────────────────────────────────────
+
+  private offerRematch(): void {
+    if (!this.meta || this.meta.rematch) return;
+    this.meta.rematch = { deadline: Date.now() + this.t(REMATCH_MS), votes: {}, code: null, failed: false };
+  }
+
+  /** Players still on the result screen who haven't said no */
+  private rematchCandidates(leaving?: WebSocket): string[] {
+    const votes = this.meta?.rematch?.votes ?? {};
+    return Object.keys(this.seats).filter(id => !id.startsWith('ai:') && votes[id] !== false
+      && this.ctx.getWebSockets(id).some(ws => ws !== leaving));
+  }
+
+  /**
+   * Start the rematch once everyone still here has said yes (at least two players), or call it
+   * off once that can't happen. Then tell everyone where things stand.
+   */
+  private async settleRematch(leaving?: WebSocket): Promise<void> {
+    const rematch = this.meta?.rematch;
+    const engine = this.engine;
+    if (!rematch || !engine || rematch.code || rematch.failed) return;
+    const players = this.rematchCandidates(leaving);
+    if (players.length < 2) rematch.failed = true;
+    else if (players.every(id => rematch.votes[id] === true)) {
+      rematch.seats = this.rematchSeats(players);
+      const robots = PLAYER_COLORS_BY_COUNT[engine.config.playerCount].filter(c => !Object.values(rematch.seats!).includes(c));
+      const host = Object.keys(rematch.seats).find(id => rematch.seats![id] === 'White')!;
+      try {
+        const room = await createRoom(this.env, host, { ...engine.config, aiColors: robots }, false, rematch.seats);
+        rematch.code = room.code;
+      } catch (e) {
+        console.log(`[room ${this.meta?.code}] rematch room failed: ${String(e)}`);
+        rematch.failed = true;
+      }
+    }
+    await this.persist();
+    this.broadcast({ type: 'room:rematch', rematch: this.rematchInfo() }, leaving);
+  }
+
+  /**
+   * Colours for the new game. Robots keep their seats, and the human seats pass along one
+   * place, so a different player is White (hosts and moves first). A player who left is
+   * replaced by a robot.
+   */
+  private rematchSeats(players: string[]): Record<string, PlayerColor> {
+    const colors = PLAYER_COLORS_BY_COUNT[this.engine!.config.playerCount];
+    const robots = this.engine!.config.aiColors ?? [];
+    const order = [...players].sort((a, b) => colors.indexOf(this.seats[a]) - colors.indexOf(this.seats[b]));
+    const humanSeats = colors.filter(c => !robots.includes(c)).slice(0, order.length); // always starts with White
+    const seats: Record<string, PlayerColor> = {};
+    order.forEach((id, i) => { seats[id] = humanSeats[(i - 1 + order.length) % order.length]; });
+    return seats;
+  }
+
+  /** What the result screen shows: who's in, who's out, the countdown, and the new room */
+  private rematchInfo() {
+    const rematch = this.meta?.rematch;
+    if (!rematch) return null;
+    const colorsOf = (ids: string[]) => ids.map(id => this.seats[id]).filter(Boolean);
+    const humans = Object.keys(this.seats).filter(id => !id.startsWith('ai:'));
+    return {
+      deadline: rematch.deadline,
+      code: rematch.code,
+      failed: rematch.failed,
+      accepted: colorsOf(humans.filter(id => rematch.votes[id] === true)),
+      declined: colorsOf(humans.filter(id => rematch.votes[id] === false)),
+      present: colorsOf(humans.filter(id => this.ctx.getWebSockets(id).length > 0)),
+      newColors: rematch.seats ? Object.fromEntries(Object.entries(rematch.seats).map(([id, c]) => [this.seats[id], c])) : null,
+    };
   }
 
   async alarm(): Promise<void> {
@@ -452,6 +552,13 @@ export class Room extends DurableObject<Env> {
     const live = engine.getState();
     if (live.phase === 'playing' && !live.players.some(p => p.type !== 'ai' && !p.isEliminated)) await this.endAbandoned();
 
+    // Rematch countdown ran out
+    if (meta.rematch && !meta.rematch.code && !meta.rematch.failed && now >= meta.rematch.deadline) {
+      meta.rematch.failed = true;
+      await this.ctx.storage.put('meta', meta);
+      this.broadcast({ type: 'room:rematch', rematch: this.rematchInfo() });
+    }
+
     // Rooms that finished before gameOverAt existed: start their closing time now
     if (this.gameOver && meta.gameOverAt == null) {
       meta.gameOverAt = now;
@@ -490,6 +597,7 @@ export class Room extends DurableObject<Env> {
     this.gameOver = { winner: null, reason: 'abandoned' as EndReason };
     this.turnStartedAt = null;
     this.meta!.gameOverAt = Date.now();
+    this.offerRematch();
     this.forgetRoom();
     await this.persist();
     await this.logEvent({ type: 'game:over', ...this.gameOver });
@@ -540,6 +648,7 @@ export class Room extends DurableObject<Env> {
     if (move) times.push(move);
     if (this.gameOver && meta.emptySince != null) times.push(meta.emptySince + this.t(FINISHED_EMPTY_MS));
     if (this.gameOver && meta.gameOverAt != null) times.push(meta.gameOverAt + this.t(GAME_OVER_LINGER_MS));
+    if (meta.rematch && !meta.rematch.code && !meta.rematch.failed) times.push(meta.rematch.deadline);
     if (this.gameOver && meta.emptySince == null && this.ctx.getWebSockets().length === 0) times.push(now + this.t(FINISHED_EMPTY_MS));
     if (!slow && !this.gameOver && (state.phase === 'placement' || state.phase === 'playing')) {
       times.push((meta.lastPlayAt ?? meta.createdAt) + this.t(LIVE_IDLE_MS));
@@ -621,6 +730,7 @@ export class Room extends DurableObject<Env> {
       seq: this.seq,
       lobbyClosesAt: state.phase === 'waiting' ? this.meta?.expiresAt ?? null : null,
       moveDeadline: this.slowDeadline() ?? this.clockDeadline(),
+      rematch: this.rematchInfo(),
     };
   }
 

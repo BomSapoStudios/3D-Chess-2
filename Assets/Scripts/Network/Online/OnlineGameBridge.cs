@@ -23,6 +23,11 @@ public class OnlineGameBridge : MonoBehaviour
     private long moveDeadline;      // Unix ms the player on move must move by (Take your time); 0 if none
     private string currentTurn;
 
+    /// <summary>The latest rematch news from the server (null until the game ends)</summary>
+    public NetRematch Rematch { get; private set; }
+    /// <summary>The server says this game is over (it can end there before this device notices)</summary>
+    public bool ServerGameOver { get; private set; }
+
     public static void Begin()
     {
         if (Instance != null) Destroy(Instance.gameObject);
@@ -126,7 +131,11 @@ public class OnlineGameBridge : MonoBehaviour
         {
             moveDeadline = msg.state.moveDeadline;
             currentTurn = msg.state.currentTurn;
+            if (msg.state.phase == "gameover") ServerGameOver = true;
+            if (msg.state.rematch != null && msg.state.rematch.deadline > 0) Rematch = msg.state.rematch;
         }
+        if (msg.type == "room:rematch" && msg.rematch != null) Rematch = msg.rematch;
+        if (msg.type == "game:over") ServerGameOver = true;
         if (GameReady() && backlog.Count == 0 && !OnlineSession.Replaying) Apply(msg);
         else backlog.Enqueue(msg);
     }

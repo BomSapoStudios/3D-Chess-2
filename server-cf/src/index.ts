@@ -1,6 +1,6 @@
 import { issueToken, verifyToken } from './auth.js';
 import { verifyIdToken, type Provider } from './oidc.js';
-import type { GameConfig } from './types/game.js';
+import type { GameConfig, PlayerColor } from './types/game.js';
 
 export { Room } from './room.js';
 export { Matchmaker } from './matchmaker.js';
@@ -71,13 +71,13 @@ function newCode(): string {
 }
 
 /** Create a room with a fresh code (retrying on the rare collision) */
-export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean): Promise<{ code: string; config: GameConfig }> {
+export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean, reserved?: Record<string, PlayerColor>): Promise<{ code: string; config: GameConfig }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = newCode();
     const stub = env.ROOM.get(env.ROOM.idFromName(code));
     const res = await stub.fetch('https://room/init', {
       method: 'POST',
-      body: JSON.stringify({ code, hostUserId, isPublic, config }),
+      body: JSON.stringify({ code, hostUserId, isPublic, config, reserved }),
     });
     if (res.ok) return await res.json() as { code: string; config: GameConfig };
   }

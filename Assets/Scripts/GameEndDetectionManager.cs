@@ -17,6 +17,8 @@ public class GameEndDetectionManager : MonoBehaviour
     public System.Action<PieceColor> OnCheckmate;
     public System.Action<PieceColor> OnStalemate;
     public System.Action<string> OnGameEnd; // reason for game end
+    /// <summary>Who won the game that just ended (null for a draw)</summary>
+    public PieceColor? Winner { get; private set; }
 
     // Conquest events for multi-player games
     public System.Action<PieceColor, PieceColor, int> OnConquest; // (conqueror, defeated, pieces transferred)
@@ -210,6 +212,7 @@ public class GameEndDetectionManager : MonoBehaviour
         ClearDrawOffer();
         
         // Fire events
+        Winner = winner;
         OnGameEnd?.Invoke(reason);
         
         // End the game
@@ -492,6 +495,7 @@ public class GameEndDetectionManager : MonoBehaviour
 
         // Fire events
         OnCheckmate?.Invoke(checkmatedPlayer);
+        Winner = winner;
         OnGameEnd?.Invoke(reason);
 
         // End the game
@@ -560,6 +564,7 @@ public class GameEndDetectionManager : MonoBehaviour
 
             // Fire events
             OnStalemate?.Invoke(stalematedPlayer);
+            Winner = null;
             OnGameEnd?.Invoke(reason);
 
             // End the game
@@ -710,6 +715,7 @@ public class GameEndDetectionManager : MonoBehaviour
         }
         
         // Fire events
+        Winner = null;
         OnGameEnd?.Invoke(reason);
         
         // End the game
@@ -820,6 +826,7 @@ public class GameEndDetectionManager : MonoBehaviour
         {
             PieceColor winner = PlayerManager.Instance.GetActivePlayers()[0];
             if (TimerManager.Instance != null) TimerManager.Instance.StopAllTimers();
+            Winner = winner;
             OnGameEnd?.Invoke($"{winner} wins - everyone else is out");
             if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
         }
@@ -880,6 +887,7 @@ public class GameEndDetectionManager : MonoBehaviour
         
         // Fire events
         OnForfeit?.Invoke(forfeitingPlayer);
+        Winner = winner;
         OnGameEnd?.Invoke(reason);
         
         // End the game
@@ -1009,6 +1017,7 @@ public class GameEndDetectionManager : MonoBehaviour
             
             // Fire events
             OnDrawAccepted?.Invoke(respondingPlayer);
+            Winner = null;
             OnGameEnd?.Invoke(reason);
             
             // End the game

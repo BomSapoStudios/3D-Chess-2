@@ -77,6 +77,18 @@ public class NeonMenu : MonoBehaviour
         // Coming back to the menu from an online game ends the session
         if (OnlineSession.IsActive && OnlineClient.Instance != null) OnlineClient.Instance.LeaveOnline();
 
+        // Back from a game's result panel: a note to show, or a rematch room to go straight into
+        if (!string.IsNullOrEmpty(RematchUI.PendingNote)) { ShowToast(RematchUI.PendingNote); RematchUI.PendingNote = null; }
+        if (!string.IsNullOrEmpty(RematchUI.PendingRoom))
+        {
+            string rematchRoom = RematchUI.PendingRoom;
+            RematchUI.PendingRoom = null;
+            float waitUntil = Time.unscaledTime + 5f;
+            while (OnlineSession.IsActive && Time.unscaledTime < waitUntil) yield return null; // the old room is closing
+            rematchJoining = true;
+            ResumeGame(rematchRoom);
+        }
+
         // The old menu builds its UI in its own Start; hide it once it exists
         yield return null;
         yield return null;
@@ -146,6 +158,8 @@ public class NeonMenu : MonoBehaviour
         string status = g.phase == "waiting" ? "lobby" : g.phase == "placement" ? "setting up" : g.yourTurn ? "your move" : "their move";
         return $"{vs} · {status}";
     }
+
+    private bool rematchJoining; // joining a rematch room from the result panel
 
     private void ResumeGame(string code)
     {
@@ -279,12 +293,21 @@ public class NeonMenu : MonoBehaviour
         NeonButton(row, "Local Game", new Vector2(178, 52), NeonTheme.Lime, NeonTheme.Pink, 1f, 18, ShowSetup);
         onlineMenuLabel = NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline).GetComponentInChildren<TextMeshProUGUI>();
 
-        NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
-
         if (PushNotifications.Supported)
         {
-            Button alerts = NeonButton(menuScreen.transform, "Notifications", new Vector2(150, 38), NeonTheme.Lavender, NeonTheme.Pink, 0f, 15, ShowNotify);
-            Place((RectTransform)alerts.transform, new Vector2(1, 1), new Vector2(150, 38), new Vector2(-95, -32));
+            RectTransform lower = NewRect("Row", column);
+            lower.sizeDelta = new Vector2(370, 44);
+            var lowerLayout = lower.gameObject.AddComponent<HorizontalLayoutGroup>();
+            lowerLayout.spacing = 14;
+            lowerLayout.childControlWidth = false;
+            lowerLayout.childControlHeight = false;
+            lowerLayout.childForceExpandWidth = false;
+            NeonButton(lower, "Customize", new Vector2(178, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
+            NeonButton(lower, "Notifications", new Vector2(178, 44), NeonTheme.Lavender, NeonTheme.Pink, -0.5f, 16, ShowNotify);
+        }
+        else
+        {
+            NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
         }
 
         // Toasts sit above every screen (setup errors show while the setup screen is open)
@@ -1156,7 +1179,7 @@ public class NeonMenu : MonoBehaviour
         else if (msg.type == "room:joined")
         {
             roomClosed = false;
-            SetOnlineStatus($"Your game code is {msg.roomCode}. Waiting for your opponent to join…");
+            SetOnlineStatus(rematchJoining ? "Rematch! Waiting for everyone to come back…" : $"Your game code is {msg.roomCode}. Waiting for your opponent to join…");
             if (msg.state != null) SetLobby(msg.state.lobbyClosesAt, msg.roomCode, msg.isHost);
         }
         else if (msg.type == "room:extended")

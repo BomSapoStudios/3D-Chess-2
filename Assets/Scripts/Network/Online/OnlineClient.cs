@@ -436,6 +436,9 @@ public class OnlineClient : MonoBehaviour
     /// <summary>Keep the lobby open longer (host only); the server answers with room:extended</summary>
     public void SendExtendRoom() => Send("{\"type\":\"room:extend\"}");
 
+    /// <summary>Yes or no to playing again after the game</summary>
+    public void SendRematch(bool accept) => Send("{\"type\":\"room:rematch\",\"accept\":" + (accept ? "true" : "false") + "}");
+
     private string As(PieceColor color) => color == LocalColor ? "" : "\"as\":\"" + color + "\",";
 
     /// <summary>Send a request; the server's ack (ok/error) goes to the callback if given</summary>
@@ -588,6 +591,7 @@ public class ServerMessage
     public long expiresAt;   // room:extended
     public long graceMs;     // room:playerLeft; 0 in Take your time games
     public string pace;
+    public NetRematch rematch;  // room:rematch
 }
 
 [Serializable]
@@ -622,6 +626,19 @@ public class NetState
     public int seq;
     public long lobbyClosesAt;  // while waiting for players (Unix ms)
     public long moveDeadline;   // Take your time / timed games: when the player on move must move by (Unix ms)
+    public NetRematch rematch;  // after the game
+}
+
+/// <summary>Where a rematch stands after the game (deadline 0 when none is on offer)</summary>
+[Serializable]
+public class NetRematch
+{
+    public long deadline;       // Unix ms
+    public string code;         // the new room, once everyone said yes
+    public bool failed;         // called off
+    public string[] accepted;   // colours that said yes
+    public string[] declined;   // colours that said no
+    public string[] present;    // colours still connected
 }
 
 [Serializable]
