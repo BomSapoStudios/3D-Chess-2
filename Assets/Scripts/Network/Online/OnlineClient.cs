@@ -257,6 +257,46 @@ public class OnlineClient : MonoBehaviour
         done(code, error);
     }
 
+    // ───────────────────────── Ratings and stats ─────────────────────────
+
+    /// <summary>A player's ratings and stats (your own when userId is null)</summary>
+    public IEnumerator GetStats(string userId, Action<PlayerStats, string> done)
+    {
+        PlayerStats result = null;
+        string error = null;
+        string path = "/stats" + (string.IsNullOrEmpty(userId) ? "" : "?of=" + UnityWebRequest.EscapeURL(userId));
+        yield return Call("GET", path, null, Token, (status, text) =>
+        {
+            if (status == 200) result = JsonUtility.FromJson<PlayerStats>(text);
+            else error = ErrorText(status, text);
+        });
+        done(result, error);
+    }
+
+    /// <summary>Top players: mode duel | melee, scope friends | everyone</summary>
+    public IEnumerator GetLeaderboard(string mode, string scope, Action<LeaderboardEntry[], string> done)
+    {
+        LeaderboardEntry[] result = null;
+        string error = null;
+        yield return Call("GET", $"/leaderboard?mode={mode}&scope={scope}", null, Token, (status, text) =>
+        {
+            if (status == 200) result = JsonUtility.FromJson<LeaderboardResponse>(text).players ?? new LeaderboardEntry[0];
+            else error = ErrorText(status, text);
+        });
+        done(result, error);
+    }
+
+    /// <summary>When Find Match opens again for this player after walking out of games (0 = it's open)</summary>
+    public IEnumerator GetMatchCooldown(Action<long> done)
+    {
+        long until = 0;
+        yield return Call("GET", "/matchmaking/cooldown", null, Token, (status, text) =>
+        {
+            if (status == 200) until = JsonUtility.FromJson<CooldownResponse>(text).until;
+        });
+        done(until);
+    }
+
     // ───────────────────────── Push notifications ─────────────────────────
 
     /// <summary>Tell the server this device's push token (sandbox for development builds)</summary>
@@ -510,6 +550,8 @@ public class OnlineClient : MonoBehaviour
     [Serializable] private class FriendStatusResponse { public string status; }
     [Serializable] private class ErrorResponse { public string error; }
     [Serializable] private class PushPrefsResponse { public PushPrefs prefs; }
+    [Serializable] private class LeaderboardResponse { public LeaderboardEntry[] players; }
+    [Serializable] private class CooldownResponse { public long until; }
     [Serializable] private class SearchResponse { public FriendInfo[] results; }
 }
 
@@ -558,6 +600,39 @@ public class FriendInfo
     public string name;
     public string status;   // friends | incoming | outgoing (| none, in search results)
     public bool online;
+    public string tier;     // Pawn … King
+}
+
+[Serializable]
+public class PlayerStats
+{
+    public string userId, name, tier, favorite;
+    public ModeRating duel, melee;
+    public int games, wins, losses, draws, winRate, streak, bestStreak, walkoutRate;
+    public StatsEndings endings;
+    public RecentGame[] recent;
+    public HeadToHead headToHead;
+}
+
+[Serializable] public class ModeRating { public int rating, best, games; public string tier; }
+[Serializable] public class StatsEndings { public int checkmate, resignation, timeout, walkout, draw; }
+[Serializable] public class RecentGame { public long endedAt; public string mode, result, endReason; public string[] opponents; public int change; }
+[Serializable] public class HeadToHead { public int wins, losses, draws; }
+[Serializable] public class LeaderboardEntry { public int rank, rating, games; public string userId, name, tier; }
+
+/// <summary>A player's rating change after a game (game:rated)</summary>
+[Serializable] public class NetRatingChange { public string mode, tier, tierBefore; public int before, after, games; }
+
+/// <summary>Rating changes by colour (JsonUtility can't read a dictionary)</summary>
+[Serializable]
+public class NetRatings
+{
+    public NetRatingChange White, Black, Green, Purple, Yellow, Orange;
+    public NetRatingChange For(PieceColor c)
+    {
+        NetRatingChange r = c == PieceColor.White ? White : c == PieceColor.Black ? Black : c == PieceColor.Green ? Green : c == PieceColor.Purple ? Purple : c == PieceColor.Yellow ? Yellow : Orange;
+        return r != null && !string.IsNullOrEmpty(r.mode) ? r : null;
+    }
 }
 
 [Serializable]
@@ -597,6 +672,7 @@ public class ServerMessage
     public long graceMs;     // room:playerLeft; 0 in Take your time games
     public string pace;
     public string fromColor;    // game:drawOffered
+    public NetRatings ratings;  // game:rated
     public NetRematch rematch;  // room:rematch
 }
 
@@ -633,6 +709,7 @@ public class NetState
     public long lobbyClosesAt;  // while waiting for players (Unix ms)
     public long moveDeadline;   // Take your time / timed games: when the player on move must move by (Unix ms)
     public NetRematch rematch;  // after the game
+    public NetRatings ratings;  // after the game, once recorded
 }
 
 /// <summary>Where a rematch stands after the game (deadline 0 when none is on offer)</summary>

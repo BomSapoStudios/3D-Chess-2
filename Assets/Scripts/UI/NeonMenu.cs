@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// Neon-styled main menu and one-screen game setup. Replaces the older multi-step
 /// MainMenuController UI (which stays in the scene but is hidden).
 /// </summary>
-public class NeonMenu : MonoBehaviour
+public partial class NeonMenu : MonoBehaviour
 {
     private static readonly string[] ColorNames = { "White", "Black", "Green", "Purple", "Yellow", "Orange" };
 
@@ -72,6 +72,7 @@ public class NeonMenu : MonoBehaviour
         BuildOnlineScreen();
         BuildFriendsScreen();
         BuildNotifyScreen();
+        BuildStatsScreen();
         ShowMenu();
 
         // Coming back to the menu from an online game ends the session
@@ -96,6 +97,12 @@ public class NeonMenu : MonoBehaviour
 
         // Games still going (say the app was closed mid-game): show them on the Online Game button
         yield return RefreshGames();
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+        // Simulator checks: `defaults write BomSapo.Chess3D DebugOpenStats -int 1` (your stats) or 2 (leaderboard)
+        int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
+        if (debugStats == 1) ShowProfile(null, ShowOnline);
+        else if (debugStats == 2) ShowLeaderboard();
+#endif
     }
 
     // ───────────────────────── Your games (resume after a restart) ─────────────────────────
@@ -808,6 +815,8 @@ public class NeonMenu : MonoBehaviour
         friendsButton = NeonButton(header, "Friends", new Vector2(140, 44), NeonTheme.Yellow, NeonTheme.Pink, 0f, 17, ShowFriends);
         Place((RectTransform)friendsButton.transform, new Vector2(1, 0.5f), new Vector2(140, 44), new Vector2(-70, 0));
         friendsButtonLabel = friendsButton.GetComponentInChildren<TextMeshProUGUI>();
+        Button myStats = NeonButton(header, "My stats", new Vector2(130, 44), NeonTheme.Cyan, NeonTheme.Pink, 0f, 17, () => ShowProfile(null, ShowOnline));
+        Place((RectTransform)myStats.transform, new Vector2(1, 0.5f), new Vector2(130, 44), new Vector2(-215, 0));
 
         TextMeshProUGUI title = NewText("Title", header, "PLAY ONLINE", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
         NeonTheme.ApplyFont(title, display: true);
@@ -1011,6 +1020,7 @@ public class NeonMenu : MonoBehaviour
     private void ShowOnline()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -1142,6 +1152,17 @@ public class NeonMenu : MonoBehaviour
         yield return SignIn(ok => signedIn = ok);
         if (!signedIn) { SetSearching(null); onlineBusy = false; yield break; }
         if (!onlineBusy) yield break;  // cancelled while signing in
+        // Walked out of too many games lately: Find Match is paused for a while
+        long pausedUntil = 0;
+        yield return OnlineClient.Instance.GetMatchCooldown(until => pausedUntil = until);
+        if (pausedUntil > 0)
+        {
+            int minutes = Mathf.Max(1, Mathf.CeilToInt((pausedUntil - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) / 60000f));
+            SetSearching(null);
+            onlineBusy = false;
+            SetOnlineStatus($"You left 3 games early today, so Find Match is paused for {minutes} more minute{(minutes == 1 ? "" : "s")}. Games with friends still work.");
+            yield break;
+        }
         ListenForStart();
         SetSearching("Finding you an opponent…");
         OnlineClient.Instance.FindMatch("4x4x4",
@@ -1271,6 +1292,8 @@ public class NeonMenu : MonoBehaviour
         header.offsetMax = new Vector2(-24, -12);
         Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowOnline);
         Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
+        Button leaderboard = NeonButton(header, "Leaderboard", new Vector2(160, 44), NeonTheme.Yellow, NeonTheme.Pink, 0f, 17, ShowLeaderboard);
+        Place((RectTransform)leaderboard.transform, new Vector2(1, 0.5f), new Vector2(160, 44), new Vector2(-80, 0));
         TextMeshProUGUI title = NewText("Title", header, "FRIENDS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
         NeonTheme.ApplyFont(title, display: true);
         title.rectTransform.anchorMin = new Vector2(0, 0);
@@ -1359,6 +1382,7 @@ public class NeonMenu : MonoBehaviour
 
     private void ShowFriends()
     {
+        if (statsScreen != null) statsScreen.SetActive(false);
         onlineScreen.SetActive(false);
         friendsScreen.SetActive(true);
         friendsStatus.text = onlineBusy ? friendsStatus.text : "";
@@ -1475,7 +1499,14 @@ public class NeonMenu : MonoBehaviour
 
     private void FriendRow(FriendInfo f)
     {
-        RectTransform row = ListRow(f.name, f.online ? NeonTheme.Lime : NeonTheme.Muted, f.online);
+        RectTransform row = ListRow(string.IsNullOrEmpty(f.tier) ? f.name : $"{f.name} · {f.tier}", f.online ? NeonTheme.Lime : NeonTheme.Muted, f.online);
+        // Tap the name for their profile
+        Transform name = row.Find("Name");
+        if (name != null)
+        {
+            name.GetComponent<TextMeshProUGUI>().raycastTarget = true;
+            name.gameObject.AddComponent<Button>().onClick.AddListener(() => { Haptics.Selection(); ShowProfile(f.userId, ShowFriends); });
+        }
         RowButton(row, "Challenge", NeonTheme.Lime, () => StartCoroutine(ChallengeRoutine(f)));
         RowButton(row, "Remove", NeonTheme.Cyan, () => StartCoroutine(Act(OnlineClient.Instance.RemoveFriend(f.userId, ActDone))));
         RowButton(row, "Block", NeonTheme.Pink, () => StartCoroutine(Act(OnlineClient.Instance.BlockPlayer(f.userId, ActDone))));
@@ -1797,6 +1828,7 @@ public class NeonMenu : MonoBehaviour
 
     private void ShowNotify()
     {
+        if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         notifyScreen.SetActive(true);
         shownPushStatus = null;
@@ -1864,6 +1896,7 @@ public class NeonMenu : MonoBehaviour
     private void ShowMenu()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(true);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -1874,6 +1907,7 @@ public class NeonMenu : MonoBehaviour
     private void ShowCustomize()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         onlineScreen.SetActive(false);
@@ -1899,6 +1933,7 @@ public class NeonMenu : MonoBehaviour
     private void ShowSetupScreen()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         customizeScreen.SetActive(false);
         onlineScreen.SetActive(false);

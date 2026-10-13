@@ -62,6 +62,7 @@ public class RematchUI : MonoBehaviour
             gameOverAt = Time.unscaledTime;
             localDeadline = Time.unscaledTime + RematchSeconds;
             Haptics.Selection();
+            if (!Online) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
         if (!Online) return;
@@ -170,6 +171,16 @@ public class RematchUI : MonoBehaviour
 
         var (title, color) = Headline();
         GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), title, NeonTheme.GUILabelStyle(color, 24, true, TextAnchor.MiddleLeft, display: true));
+        // Online: the rating change once the server has recorded the game
+        NetRatingChange rating = Online && Bridge != null ? Bridge.MyRating : null;
+        if (rating != null)
+        {
+            int change = rating.after - rating.before;
+            string mode = rating.mode == "melee" ? "Melee" : "Duel";
+            string line = $"{mode} {rating.after} ({(change >= 0 ? "+" : "")}{change})";
+            if (rating.tier != rating.tierBefore) line += $"  Now {rating.tier}!";
+            GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), line, NeonTheme.GUILabelStyle(change >= 0 ? NeonTheme.Lime : NeonTheme.PinkSoft, 16, true, TextAnchor.MiddleRight));
+        }
         string reason = Reason();
         if (!string.IsNullOrEmpty(reason))
             GUI.Label(new Rect(panel.x + 18, panel.y + 40, w - 36, 20), reason, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 13, false));
@@ -216,6 +227,19 @@ public class RematchUI : MonoBehaviour
                 .Where(c => TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(c)).ToArray();
         if (mine.Length == 1) return mine[0] == winner.Value ? ("YOU WIN!", NeonTheme.Lime) : ("YOU LOST", NeonTheme.Pink);
         return ($"{winner.Value.ToString().ToUpperInvariant()} WINS!", NeonTheme.Lime);
+    }
+
+    /// <summary>Quick Play and local games against robots: tally wins, losses and draws by difficulty on this phone</summary>
+    private void RecordVsComputer()
+    {
+        if (TurnManager.Instance == null || PlayerManager.Instance == null) return;
+        var players = PlayerManager.Instance.GetAllPlayers();
+        PieceColor[] humans = players.Where(c => !TurnManager.Instance.IsPlayerAI(c)).ToArray();
+        if (humans.Length != 1 || humans.Length == players.Count) return; // only one person against the computer
+        GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
+        if (config == null) return;
+        PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
+        ComputerStats.Record(config.aiDifficulty, winner == null ? 0 : winner.Value == humans[0] ? 1 : -1);
     }
 
     private string lastReason;
