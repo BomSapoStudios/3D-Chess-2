@@ -56,6 +56,21 @@ function client(url) {
   });
 }
 
+/** Put the rest of a side's pieces on the board (Ready needs all 8), skipping the given cells */
+const SET = { King: 1, Queen: 1, Rook: 2, Bishop: 2, Knight: 2 };
+async function fillRest(c, size, color, avoid = [], as) {
+  const skip = new Set(avoid.map(p => `${p.x},${p.y},${p.z}`));
+  const state = (await c.request({ type: 'room:state' })).state;
+  for (const [type, count] of Object.entries(SET)) {
+    let have = state.board.flat(2).filter(p => p && p.type === type && p.color === color).length;
+    for (let x = 0; x < size && have < count; x++) for (let y = 0; y < size && have < count; y++) for (let z = 0; z < size && have < count; z++) {
+      if (skip.has(`${x},${y},${z}`)) continue;
+      const r = await c.request({ type: 'game:placePiece', pieceType: type, position: { x, y, z }, ...(as ? { as } : {}) });
+      if (r.ok) { have++; skip.add(`${x},${y},${z}`); }
+    }
+  }
+}
+
 
 // Run against `npx wrangler dev --var ROOM_TIME_SCALE:0.0002` so every room timer is 5000x shorter:
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -69,6 +84,7 @@ async function finishedGame(alice, bob, config = {}) {
   const [b] = await join(room.code, bob);
   await a.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 0, z: 0 } });
   await b.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } });
+  await fillRest(a, 4, 'White'); await fillRest(b, 4, 'Black');
   await a.request({ type: 'game:ready' }); await b.request({ type: 'game:ready' });
   await a.wait(m => m.type === 'game:phaseChanged');
   await a.request({ type: 'game:resign' });
@@ -142,10 +158,10 @@ async function finishedGame(alice, bob, config = {}) {
   for (const who of p) c.push((await join(room.code, who))[0]);
   // Every human seat resigns but one (P1 resigns, P2 resigns: P3 wins, as the robot can't play here)
   for (const [i, color] of [[0, 'White'], [1, 'Black'], [2, 'Green']]) {
-    await c[i].request({ type: 'game:placePiece', pieceType: 'King', position: { x: i * 2, y: 0, z: 0 } });
+    await fillRest(c[i], 6, color);
     await c[i].request({ type: 'game:ready' });
   }
-  await c[0].request({ type: 'game:placePiece', as: 'Purple', pieceType: 'King', position: { x: 5, y: 5, z: 5 } });
+  await fillRest(c[0], 6, 'Purple', [], 'Purple');
   await c[0].request({ type: 'game:ready', as: 'Purple' });
   await c[0].wait(m => m.type === 'game:phaseChanged');
   await c[0].request({ type: 'game:resign' });

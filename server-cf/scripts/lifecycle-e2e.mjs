@@ -56,6 +56,21 @@ function client(url) {
   });
 }
 
+/** Put the rest of a side's pieces on the board (Ready needs all 8), skipping the given cells */
+const SET = { King: 1, Queen: 1, Rook: 2, Bishop: 2, Knight: 2 };
+async function fillRest(c, size, color, avoid = [], as) {
+  const skip = new Set(avoid.map(p => `${p.x},${p.y},${p.z}`));
+  const state = (await c.request({ type: 'room:state' })).state;
+  for (const [type, count] of Object.entries(SET)) {
+    let have = state.board.flat(2).filter(p => p && p.type === type && p.color === color).length;
+    for (let x = 0; x < size && have < count; x++) for (let y = 0; y < size && have < count; y++) for (let z = 0; z < size && have < count; z++) {
+      if (skip.has(`${x},${y},${z}`)) continue;
+      const r = await c.request({ type: 'game:placePiece', pieceType: type, position: { x, y, z }, ...(as ? { as } : {}) });
+      if (r.ok) { have++; skip.add(`${x},${y},${z}`); }
+    }
+  }
+}
+
 
 // Run against `npx wrangler dev --var ROOM_TIME_SCALE:0.0002` so every room timer is 5000x shorter:
 // lobby 10 min → 0.12 s (alarms fire no sooner than 1 s), reconnect 5 min → 0.06 s, move day → 17 s.
@@ -72,6 +87,8 @@ async function startGame(config) {
   const [b] = await join(room.code, bob);
   await a.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 0, z: 0 } });
   await b.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } });
+  await fillRest(a, 4, 'White', [{ x: 0, y: 1, z: 0 }]);
+  await fillRest(b, 4, 'Black', [{ x: 3, y: 2, z: 3 }, { x: 3, y: 0, z: 0 }]);
   await a.request({ type: 'game:ready' }); await b.request({ type: 'game:ready' });
   await a.wait(m => m.type === 'game:phaseChanged');
   return { room, a, b };

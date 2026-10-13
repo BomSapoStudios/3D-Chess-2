@@ -285,7 +285,7 @@ export class Room extends DurableObject<Env> {
 
       case 'game:ready': {
         if (engine.getState().phase !== 'placement') return reply(false, 'Not in placement phase');
-        engine.completePlacement(me.color);
+        if (!engine.completePlacement(me.color)) return reply(false, `Place all your pieces first (${engine.piecesLeftToPlace(me.color)} left)`);
         this.meta!.lastPlayAt = Date.now();
         await this.logEvent({ type: 'game:playerReady', color: me.color });
         if (engine.allPlacementsComplete()) {

@@ -12,6 +12,9 @@ import { GameEndDetection } from './GameEndDetection.js';
 import { ChaosRotationEngine } from './ChaosRotation.js';
 import { Pawn } from './pieces/index.js';
 
+/** Each side's pieces, placed during setup (matches the game's trays) */
+export const STARTING_SET: Partial<Record<PieceType, number>> = { King: 1, Queen: 1, Rook: 2, Bishop: 2, Knight: 2 };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GameEngine — authoritative game coordinator
 //
@@ -155,9 +158,17 @@ export class GameEngine {
     return true;
   }
 
+  /** Pieces this player still has to put on the board */
+  piecesLeftToPlace(color: PlayerColor): number {
+    const total = Object.values(STARTING_SET).reduce((a, b) => a + b, 0);
+    return total - this.board.getPiecesByColor(color).length;
+  }
+
+  /** A player is done setting up. Every piece must be on the board first. */
   completePlacement(color: PlayerColor): boolean {
     const p = this.players.find(p => p.color === color);
     if (!p) return false;
+    if (this.piecesLeftToPlace(color) > 0) return false;
     p.placementComplete = true;
     return true;
   }
@@ -224,6 +235,13 @@ export class GameEngine {
     }
     if (!this.isValidPlacementZone(color, pos)) {
       return { success: false, error: 'Position outside your placement zone' };
+    }
+    if (this.players.find(p => p.color === color)?.placementComplete) {
+      return { success: false, error: 'You already said you are ready' };
+    }
+    const placed = this.board.getPiecesByColor(color).filter(p => p.type === pieceType).length;
+    if (placed >= (STARTING_SET[pieceType] ?? 0)) {
+      return { success: false, error: `No ${pieceType} left to place` };
     }
     this.board.placePiece(pos, pieceType, color);
     return { success: true };

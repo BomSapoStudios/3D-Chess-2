@@ -9,6 +9,12 @@ import { Bishop } from '../game/pieces/Bishop';
 import { Knight } from '../game/pieces/Knight';
 import { Pawn } from '../game/pieces/Pawn';
 
+/** These tests set up small positions, so skip the full-set check that Ready makes */
+function markPlaced(engine: GameEngine, color: string): void {
+  const player = (engine as unknown as { players: { color: string; placementComplete: boolean }[] }).players.find(p => p.color === color);
+  if (player) player.placementComplete = true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Core game logic tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,8 +247,8 @@ describe('GameEngine', () => {
     // Place minimal pieces for Black
     engine.placePiece('Black', 'King', { x: 3, y: 1, z: 1 });
     engine.placePiece('Black', 'Rook', { x: 3, y: 2, z: 2 });
-    engine.completePlacement('White');
-    engine.completePlacement('Black');
+    markPlaced(engine, 'White');
+    markPlaced(engine, 'Black');
     engine.setPlayerReady('White', true);
     engine.setPlayerReady('Black', true);
     engine.startGame();
@@ -262,8 +268,8 @@ describe('GameEngine', () => {
     expect(engine.getState().phase).toBe('placement');
     engine.placePiece('White', 'King', { x: 0, y: 0, z: 0 });
     engine.placePiece('Black', 'King', { x: 3, y: 0, z: 0 });
-    engine.completePlacement('White');
-    engine.completePlacement('Black');
+    markPlaced(engine, 'White');
+    markPlaced(engine, 'Black');
     engine.startGame();
     expect(engine.getState().phase).toBe('playing');
   });
@@ -364,7 +370,7 @@ describe('Opening check (multiplayer)', () => {
     board.placePiece({ x: 2, y: 0, z: 4 }, 'Rook', 'White'); // checks Green along z
     e.board = board;
     e.phase = 'placement';
-    for (const c of ['White', 'Black', 'Green', 'Purple'] as const) engine.completePlacement(c);
+    for (const c of ['White', 'Black', 'Green', 'Purple'] as const) markPlaced(engine, c);
     (engine as unknown as { spawnPawns: () => void }).spawnPawns = () => {};
     expect(engine.startGame()).toBe(true);
     expect(engine.getState().currentTurn).toBe('Green');
@@ -415,5 +421,23 @@ describe('Forfeit (multiplayer)', () => {
     expect(board.getPiece({ x: 4, y: 2, z: 2 })?.color).toBe('Purple');
     expect(board.findKing('Green')).toBeNull();
     expect(engine.getState().phase).toBe('playing');
+  });
+});
+
+describe('Setup', () => {
+  test('Ready needs every piece on the board, and extra pieces are refused', () => {
+    const engine = new GameEngine('SETUP1', { boardSize: '4x4x4', playerCount: 2 });
+    engine.addPlayer('u1', 'Alice', 'White');
+    engine.addPlayer('u2', 'Bob', 'Black');
+    engine.startPlacement();
+    expect(engine.placePiece('White', 'King', { x: 0, y: 0, z: 0 }).success).toBe(true);
+    expect(engine.placePiece('White', 'King', { x: 0, y: 1, z: 0 }).success).toBe(false);
+    expect(engine.placePiece('White', 'Pawn', { x: 0, y: 1, z: 0 }).success).toBe(false);
+    expect(engine.completePlacement('White')).toBe(false);
+    expect(engine.piecesLeftToPlace('White')).toBe(7);
+    const rest: [string, number, number][] = [['Queen', 1, 0], ['Rook', 2, 0], ['Rook', 3, 0], ['Bishop', 0, 1], ['Bishop', 1, 1], ['Knight', 2, 1], ['Knight', 3, 1]];
+    for (const [type, y, z] of rest) expect(engine.placePiece('White', type as never, { x: 0, y, z }).success).toBe(true);
+    expect(engine.completePlacement('White')).toBe(true);
+    expect(engine.placePiece('White', 'Queen', { x: 0, y: 2, z: 2 }).success).toBe(false);
   });
 });

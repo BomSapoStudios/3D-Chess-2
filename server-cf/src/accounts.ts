@@ -342,9 +342,11 @@ export class Accounts extends DurableObject<Env> {
 
   private friendRequest(userId: string, name: string) {
     this.account(userId);
-    const target = isGeneratedName(name.trim())
-      ? this.sql.exec('SELECT id FROM accounts WHERE name = ?', name.trim()).toArray()[0]
+    // Names are matched ignoring capitals ("shinyrook359" finds ShinyRook359)
+    const found = /^[a-z]+[0-9]{1,3}$/i.test(name.trim())
+      ? this.sql.exec('SELECT id, name FROM accounts WHERE name = ? COLLATE NOCASE', name.trim()).toArray()[0]
       : undefined;
+    const target = found && isGeneratedName(found.name as string) ? found : undefined;
     // Blocked players look exactly like names that don't exist
     if (!target || this.isBlocked(userId, target.id as string)) throw new HttpError(404, 'No player has that name');
     const friendId = target.id as string;

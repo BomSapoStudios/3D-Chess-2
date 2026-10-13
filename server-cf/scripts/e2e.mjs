@@ -58,6 +58,21 @@ function client(url) {
   });
 }
 
+/** Put the rest of a side's pieces on the board (Ready needs all 8), skipping the given cells */
+const SET = { King: 1, Queen: 1, Rook: 2, Bishop: 2, Knight: 2 };
+async function fillRest(c, size, color, avoid = [], as) {
+  const skip = new Set(avoid.map(p => `${p.x},${p.y},${p.z}`));
+  const state = (await c.request({ type: 'room:state' })).state;
+  for (const [type, count] of Object.entries(SET)) {
+    let have = state.board.flat(2).filter(p => p && p.type === type && p.color === color).length;
+    for (let x = 0; x < size && have < count; x++) for (let y = 0; y < size && have < count; y++) for (let z = 0; z < size && have < count; z++) {
+      if (skip.has(`${x},${y},${z}`)) continue;
+      const r = await c.request({ type: 'game:placePiece', pieceType: type, position: { x, y, z }, ...(as ? { as } : {}) });
+      if (r.ok) { have++; skip.add(`${x},${y},${z}`); }
+    }
+  }
+}
+
 const health = await fetch(BASE + '/health').then(r => r.json());
 check(health.ok === true, 'health check');
 
@@ -90,6 +105,12 @@ check((await a.request({ type: 'game:placePiece', pieceType: 'Rook', position: {
 check((await b.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } })).ok, 'Black places King');
 const badZone = await b.request({ type: 'game:placePiece', pieceType: 'Queen', position: { x: 0, y: 1, z: 1 } });
 check(!badZone.ok, `placement outside your zone is refused (${badZone.error})`);
+const earlyReady = await a.request({ type: 'game:ready' });
+check(!earlyReady.ok, `Ready is refused until every piece is placed (${earlyReady.error})`);
+const extraKing = await a.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 2, z: 2 } });
+check(!extraKing.ok, `a second King is refused (${extraKing.error})`);
+await fillRest(a, 4, 'White', [{ x: 0, y: 1, z: 0 }]);
+await fillRest(b, 4, 'Black', [{ x: 3, y: 2, z: 3 }, { x: 3, y: 0, z: 0 }]);
 
 await a.request({ type: 'game:ready' });
 await b.request({ type: 'game:ready' });
@@ -166,6 +187,8 @@ h.close(); g.close();
   await cb.wait(m => m.type === 'room:joined');
   await ca.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 0, z: 0 } });
   await cb.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } });
+  await fillRest(ca, 4, 'White', [{ x: 0, y: 1, z: 0 }]);
+  await fillRest(cb, 4, 'Black', [{ x: 3, y: 2, z: 3 }, { x: 3, y: 0, z: 0 }]);
   await ca.request({ type: 'game:ready' }); await cb.request({ type: 'game:ready' });
   await ca.wait(m => m.type === 'game:phaseChanged');
   await ca.request({ type: 'game:move', from: { x: 1, y: 0, z: 0 }, to: { x: 2, y: 0, z: 0 } });
