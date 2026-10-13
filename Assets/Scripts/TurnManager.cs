@@ -1469,7 +1469,6 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public void RequestDrawOffer()
     {
-        if (OnlineSession.IsActive) return; // not supported in online games yet
         if (GameStateManager.Instance == null || !GameStateManager.Instance.CanMovePieces())
         {
             Debug.LogWarning("TurnManager: Cannot offer draw - not in playing state");
@@ -1530,16 +1529,7 @@ public class TurnManager : MonoBehaviour
         }
         
         PieceColor drawOfferingPlayer = GameEndDetectionManager.Instance.GetDrawOfferingPlayer();
-
-        // For multi-player games, the responding player is typically the current player
-        // (the one whose turn it is when the draw response UI is shown)
-        PieceColor respondingPlayer = currentPlayer;
-
-        // Fallback for 2-player games: determine opponent if PlayerManager unavailable
-        if (PlayerManager.Instance == null && respondingPlayer == drawOfferingPlayer)
-        {
-            respondingPlayer = (drawOfferingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
-        }
+        PieceColor respondingPlayer = DrawResponder(drawOfferingPlayer);
 
         // Allow both human and AI players to respond to draws
         // For AI players, the response decision should come from AIPlayer class
@@ -1583,7 +1573,10 @@ public class TurnManager : MonoBehaviour
         {
             return false;
         }
-        
+
+        // Online: only on your own turn, for your own side
+        if (OnlineSession.IsActive && (!OnlineSession.IsLocal(currentPlayer) || IsPlayerAI(currentPlayer))) return false;
+
         return true;
     }
     
@@ -1603,17 +1596,19 @@ public class TurnManager : MonoBehaviour
         }
         
         PieceColor drawOfferingPlayer = GameEndDetectionManager.Instance.GetDrawOfferingPlayer();
-
-        // For multi-player games, the responding player is typically the current player
-        PieceColor respondingPlayer = currentPlayer;
-
-        // Fallback for 2-player games: determine opponent if needed
-        if (PlayerManager.Instance == null && respondingPlayer == drawOfferingPlayer)
-        {
-            respondingPlayer = (drawOfferingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
-        }
+        PieceColor respondingPlayer = DrawResponder(drawOfferingPlayer);
 
         // Must be human player and the correct responder (not the one who offered)
-        return !IsPlayerAI(respondingPlayer) && respondingPlayer != drawOfferingPlayer;
+        return !IsPlayerAI(respondingPlayer) && respondingPlayer != drawOfferingPlayer && OnlineSession.CanControl(respondingPlayer);
+    }
+
+    /// <summary>
+    /// Who answers a draw offer: online, the player on this device; otherwise the offerer's
+    /// opponent (draws are a two-player option, like the check in GameEndDetectionManager)
+    /// </summary>
+    private static PieceColor DrawResponder(PieceColor offeringPlayer)
+    {
+        if (OnlineSession.IsActive) return OnlineSession.LocalColor;
+        return offeringPlayer == PieceColor.White ? PieceColor.Black : PieceColor.White;
     }
 }

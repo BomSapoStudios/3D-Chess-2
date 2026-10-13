@@ -431,6 +431,11 @@ public class OnlineClient : MonoBehaviour
     public void SendPromotion(PieceColor color, BoardPosition position, ChessPieceType type) =>
         Send("{\"type\":\"game:promotePawn\"," + As(color) + "\"position\":" + Pos(position) + ",\"pieceType\":\"" + type + "\"}");
 
+    public void SendOfferDraw(PieceColor color) => Send("{\"type\":\"game:offerDraw\"" + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
+
+    public void SendRespondDraw(PieceColor color, bool accept) =>
+        Send("{\"type\":\"game:respondDraw\",\"accept\":" + (accept ? "true" : "false") + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
+
     public void SendResign(PieceColor color) => Send("{\"type\":\"game:resign\"" + (color == LocalColor ? "" : "," + As(color).TrimEnd(',')) + "}");
 
     /// <summary>Keep the lobby open longer (host only); the server answers with room:extended</summary>
@@ -591,6 +596,7 @@ public class ServerMessage
     public long expiresAt;   // room:extended
     public long graceMs;     // room:playerLeft; 0 in Take your time games
     public string pace;
+    public string fromColor;    // game:drawOffered
     public NetRematch rematch;  // room:rematch
 }
 

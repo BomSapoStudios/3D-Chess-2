@@ -55,6 +55,7 @@ ws.on('message', async data => {
     if (!rematchSent) { rematchSent = true; setTimeout(async () => log('rematch yes', (await request({ type: 'room:rematch', accept: true })).ok), 2000); }
   }
   if (msg.type === 'room:rematch') log('rematch', JSON.stringify(msg.rematch));
+  if (msg.type === 'game:drawOffered') log('draw accepted', (await request({ type: 'game:respondDraw', accept: true })).ok);
 });
 ws.on('close', (c, r) => { log('closed', c, r.toString()); process.exit(0); });
 ws.on('error', e => log('error', e.message));

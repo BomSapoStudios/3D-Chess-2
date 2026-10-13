@@ -192,6 +192,25 @@ public class OnlineGameBridge : MonoBehaviour
                 }
                 break;
 
+            case "game:drawOffered":
+                // The other player offers a draw: the Accept / Decline buttons appear here
+                if (Enum.TryParse(msg.fromColor, out PieceColor offerer) && !OnlineSession.IsLocal(offerer) && GameEndDetectionManager.Instance != null)
+                {
+                    Remote(() => GameEndDetectionManager.Instance.HandleDrawOffer(offerer));
+                    Show($"{offerer} offers a draw. Open the menu to accept or decline.", 8f);
+                }
+                break;
+
+            case "game:drawAccepted":
+            case "game:drawDeclined":
+                if (fromOpponent && GameEndDetectionManager.Instance != null)
+                {
+                    bool accepted = msg.type == "game:drawAccepted";
+                    Remote(() => GameEndDetectionManager.Instance.HandleDrawResponse(color.Value, accepted));
+                    if (!accepted) Show($"{color.Value} declined the draw.", 4f);
+                }
+                break;
+
             case "game:moveRejected":
                 // The server's rules disagreed with this device's; say so plainly
                 Show($"The server didn't accept that move ({msg.error}).", 6f);

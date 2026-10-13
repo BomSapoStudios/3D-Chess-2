@@ -943,6 +943,7 @@ public class GameEndDetectionManager : MonoBehaviour
         drawOfferPending = true;
         drawOfferingPlayer = offeringPlayer;
         drawOfferTimestamp = Time.time;
+        if (OnlineSession.ShouldSend(offeringPlayer)) OnlineClient.Instance.SendOfferDraw(offeringPlayer);
         
         Debug.Log($"🤝 GameEndDetectionManager: Draw offered by {offeringPlayer}");
         
@@ -1001,6 +1002,8 @@ public class GameEndDetectionManager : MonoBehaviour
             Debug.Log($"GameEndDetectionManager: Processing AI player {respondingPlayer} draw response");
         }
         
+        if (OnlineSession.ShouldSend(respondingPlayer)) OnlineClient.Instance.SendRespondDraw(respondingPlayer, accepted);
+
         if (accepted)
         {
             // Draw accepted - end game in draw
