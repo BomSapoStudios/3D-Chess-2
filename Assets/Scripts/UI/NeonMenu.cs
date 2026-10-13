@@ -325,6 +325,9 @@ public partial class NeonMenu : MonoBehaviour
             NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
         }
 
+        // Every home screen button rocks gently, each on its own beat
+        foreach (Button b in menuScreen.GetComponentsInChildren<Button>(true)) b.gameObject.AddComponent<Swivel>();
+
         // Toasts sit above every screen (setup errors show while the setup screen is open)
         toastPanel = NewImage("Toast", safeRoot, NeonTheme.Ground);
         toastPanel.sprite = NeonTheme.Rounded;
