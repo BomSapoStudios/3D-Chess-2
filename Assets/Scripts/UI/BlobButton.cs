@@ -12,7 +12,7 @@ public class BlobGraphic : MaskableGraphic
 {
     private const int Points = 72;
     public float wobble = 0.07f;   // how far the edge moves, as a share of the shorter side
-    public float minSeconds = 6f, maxSeconds = 8f; // each ripple takes this long to come round
+    public float minSeconds = 2.5f, maxSeconds = 3.5f; // each ripple takes this long to come round (the swivel stays 6-8 s)
     private float seed, omega;
 
     protected override void Awake()
