@@ -1,4 +1,4 @@
-// Plays a very simple opponent in a live room, for trying the app against: places a few pieces
+// Plays a very simple opponent in a live room, for trying the app against: places a full set
 // wherever the server accepts them, readies up, then on its turn tries king/rook steps until one is legal.
 //   node scripts/test-opponent.mjs <ROOMCODE> <token> [server]
 import WebSocket from 'ws';
@@ -15,7 +15,7 @@ async function place(state) {
   const n = Number(state.config.boardSize[0]);
   const cells = [];
   for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) for (let z = 0; z < n; z++) cells.push({ x, y, z });
-  for (const type of ['King', 'Rook', 'Knight', 'Bishop']) {
+  for (const type of ['King', 'Queen', 'Rook', 'Rook', 'Bishop', 'Bishop', 'Knight', 'Knight']) {
     for (const pos of cells) {
       const r = await request({ type: 'game:placePiece', pieceType: type, position: pos });
       if (r.ok) { log('placed', type, JSON.stringify(pos)); mine.push(pos); break; }
