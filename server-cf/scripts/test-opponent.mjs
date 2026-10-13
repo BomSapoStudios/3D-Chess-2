@@ -31,6 +31,14 @@ async function move(state) {
   state.board.flat(2).forEach(p => { if (p && p.color === me) pieces.push(p); });
   const steps = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) if (dx || dy || dz) steps.push([dx, dy, dz]);
+  // Knight jumps: two along one axis and one along another
+  const jumps = [];
+  for (const a of [0, 1, 2]) for (const b of [0, 1, 2]) if (a !== b) for (const sa of [-2, 2]) for (const sb of [-1, 1]) { const d = [0, 0, 0]; d[a] = sa; d[b] = sb; jumps.push(d); }
+  for (const p of pieces.filter(p => p.type === 'Knight')) for (const [dx, dy, dz] of jumps) {
+    const to = { x: p.position.x + dx, y: p.position.y + dy, z: p.position.z + dz };
+    const r = await request({ type: 'game:move', from: p.position, to });
+    if (r.ok) { log('moved', p.type, JSON.stringify(p.position), '→', JSON.stringify(to)); busy = false; return; }
+  }
   for (const k of [1, 2, 3]) for (const p of pieces.sort(() => Math.random() - 0.5)) {
     for (const [dx, dy, dz] of steps.sort(() => Math.random() - 0.5)) {
       const to = { x: p.position.x + dx * k, y: p.position.y + dy * k, z: p.position.z + dz * k };
