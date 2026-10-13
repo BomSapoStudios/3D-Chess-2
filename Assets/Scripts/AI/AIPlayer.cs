@@ -283,12 +283,13 @@ public class AIPlayer : MonoBehaviour
         float thinkingStartTime = Time.time;
         AIMove bestMove = null;
         
-        // Think for as long as the difficulty allows, a little each frame
-        var search = new RobotSearch();
+        // Think for as long as the difficulty allows,
+        // on a copy of the board in the background, so the screen keeps moving
+        var search = new RobotBrain();
         int searchDepth = 0;
-        yield return search.FindMoveRoutine(playerColor, RobotSearch.Settings.For(difficulty), m => bestMove = m);
+        yield return search.FindMoveRoutine(playerColor, RobotBrain.Settings.For(difficulty), m => bestMove = m);
         searchDepth = search.DepthReached;
-        Debug.Log($"AIPlayer: {playerColor} ({difficulty}) chose {bestMove} after {search.Nodes} positions, {searchDepth} moves deep");
+        Debug.Log($"AIPlayer: {playerColor} ({difficulty}) chose {bestMove} after {search.Nodes} positions, {searchDepth} moves deep, {search.Seconds:F2}s");
 
         if (bestMove != null)
         {

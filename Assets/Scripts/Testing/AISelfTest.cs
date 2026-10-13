@@ -43,6 +43,7 @@ public class AISelfTest : MonoBehaviour
         float wait = 0f;
         while (GameStateManager.Instance.currentState != GameState.Playing && wait < 120f) { wait += Time.deltaTime; yield return null; }
         yield return new WaitForSeconds(4f); // let the robot's first reply finish
+        RulesMatch(); // the real opening position, full of pawns
 
         // 1. A free queen: everyone but Easy should take it
         Setup(() =>
@@ -122,7 +123,52 @@ public class AISelfTest : MonoBehaviour
         {
             AIMove m = Solve(PieceColor.White, d, out float seconds);
             Expect(m != null && m.piece.GetLegalMoves().Contains(m.toPosition), $"{d}: move must be legal, chose {m}");
-            Expect(seconds < RobotSearch.Settings.For(d).seconds + 0.6f, $"{d}: took {seconds:F2}s");
+            Expect(seconds < RobotBrain.Settings.For(d).seconds + 0.6f, $"{d}: took {seconds:F2}s");
+            if (d == AIDifficulty.Hard) Expect(lastDepth >= 4, $"Hard: should look at least 4 moves ahead here, reached {lastDepth}");
+        }
+
+        // 6. Pawns of every colour, blocked and capturing, match the real rules
+        Setup(() =>
+        {
+            Put<King>(PieceColor.White, P(0, 0, 0));
+            Put<King>(PieceColor.Black, P(3, 3, 3));
+            Put<Pawn>(PieceColor.White, P(1, 1, 1));
+            Put<Pawn>(PieceColor.White, P(2, 3, 0));
+            Put<Pawn>(PieceColor.Black, P(2, 2, 2));
+            Put<Pawn>(PieceColor.Black, P(2, 1, 1));
+            Put<Pawn>(PieceColor.Green, P(1, 2, 1));
+            Put<Pawn>(PieceColor.Purple, P(1, 2, 2));
+            Put<Pawn>(PieceColor.Yellow, P(0, 1, 3));
+            Put<Pawn>(PieceColor.Orange, P(0, 2, 3));
+            Put<Knight>(PieceColor.Green, P(3, 0, 2));
+            Put<Bishop>(PieceColor.Purple, P(2, 0, 3));
+        });
+        RulesMatch();
+
+        // 7. Thinking in the background: the screen keeps drawing while Hard decides
+        Setup(() =>
+        {
+            Put<King>(PieceColor.White, P(0, 0, 0));
+            Put<King>(PieceColor.Black, P(3, 3, 3));
+            Put<Queen>(PieceColor.White, P(1, 0, 0));
+            Put<Rook>(PieceColor.White, P(0, 3, 0));
+            Put<Bishop>(PieceColor.White, P(1, 0, 1));
+            Put<Knight>(PieceColor.White, P(0, 1, 2));
+            Put<Queen>(PieceColor.Black, P(3, 2, 3));
+            Put<Rook>(PieceColor.Black, P(2, 3, 3));
+            Put<Knight>(PieceColor.Black, P(3, 3, 1));
+        });
+        {
+            AIMove bg = null;
+            bool finished = false;
+            int frames = 0;
+            var brain = new RobotBrain();
+            var sw = Stopwatch.StartNew();
+            StartCoroutine(brain.FindMoveRoutine(PieceColor.White, RobotBrain.Settings.For(AIDifficulty.Hard), m => { bg = m; finished = true; }));
+            while (!finished && sw.Elapsed.TotalSeconds < 10) { frames++; yield return null; }
+            Debug.Log($"AI SELF-TEST: background Hard chose {bg} in {sw.Elapsed.TotalSeconds:F2}s over {frames} frames, depth {brain.DepthReached}");
+            Expect(finished && bg != null && bg.piece.GetLegalMoves().Contains(bg.toPosition), $"Background search should give a legal move, got {bg}");
+            Expect(frames >= 10, $"The screen should keep drawing while the robot thinks ({frames} frames)");
         }
 
         Debug.Log($"AI SELF-TEST: {passed} passed, {failures.Count} failed");
@@ -131,14 +177,55 @@ public class AISelfTest : MonoBehaviour
 
     // ───────── helpers ─────────
 
+    private int lastDepth;
+
     private AIMove Solve(PieceColor color, AIDifficulty d, out float seconds)
     {
-        var search = new RobotSearch();
+        RulesMatch();
+        var brain = new RobotBrain();
         var sw = Stopwatch.StartNew();
-        AIMove m = search.FindMove(color, RobotSearch.Settings.For(d));
+        AIMove m = brain.FindMove(color, RobotBrain.Settings.For(d));
         seconds = (float)sw.Elapsed.TotalSeconds;
-        Debug.Log($"AI SELF-TEST: {d} chose {m} ({search.Nodes} positions, depth {search.DepthReached}, {seconds:F2}s)");
+        lastDepth = brain.DepthReached;
+        Debug.Log($"AI SELF-TEST: {d} chose {m} ({brain.Nodes} positions, depth {brain.DepthReached}, {seconds:F2}s)");
         return m;
+    }
+
+    /// <summary>The robots' board copy must allow exactly the moves the real pieces do</summary>
+    private void RulesMatch()
+    {
+        int n = BoardDimensionsManager.Instance.GetDimensions().x;
+        var lite = new LiteBoard(n);
+        foreach (ChessPiece p in AllPieces())
+            lite.Put(lite.Index(p.CurrentPosition.x, p.CurrentPosition.y, p.CurrentPosition.z), LiteBoard.Make((int)p.pieceColor, RobotBrain.TypeCode(p.pieceType)));
+        var moves = new List<int>();
+        int checkedPieces = 0;
+        foreach (ChessPiece p in AllPieces())
+        {
+            BoardPosition at = p.CurrentPosition;
+            var expected = new HashSet<BoardPosition>();
+            foreach (BoardPosition to in p.GetValidMoves())
+            {
+                ChessPiece there = ChessBoard.Instance.GetPieceAt(to);
+                if (there == null || there.pieceColor != p.pieceColor) expected.Add(to);
+            }
+            moves.Clear();
+            lite.PieceMoves(lite.Index(at.x, at.y, at.z), moves, false);
+            var got = new HashSet<BoardPosition>();
+            foreach (int m in moves)
+            {
+                lite.Coords(LiteBoard.To(m), out int x, out int y, out int z);
+                got.Add(new BoardPosition(x, y, z));
+            }
+            checkedPieces++;
+            if (!got.SetEquals(expected))
+            {
+                var missing = new List<BoardPosition>(expected); missing.RemoveAll(got.Contains);
+                var extra = new List<BoardPosition>(got); extra.RemoveAll(expected.Contains);
+                Expect(false, $"Board copy disagrees for {p.pieceColor} {p.pieceType} at {at}: missing [{string.Join(", ", missing)}], extra [{string.Join(", ", extra)}]");
+            }
+        }
+        Expect(checkedPieces > 0, "Board copy rules: no pieces to check");
     }
 
     private bool QueenSafeAfter(AIMove m)
