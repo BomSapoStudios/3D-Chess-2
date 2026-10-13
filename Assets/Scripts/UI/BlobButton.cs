@@ -12,14 +12,14 @@ public class BlobGraphic : MaskableGraphic
 {
     private const int Points = 72;
     public float wobble = 0.07f;   // how far the edge moves, as a share of the shorter side
-    public float speed = 0.5f;    // half the original pace: a slow lava-lamp drift
-    private float seed;
+    public float minSeconds = 6f, maxSeconds = 8f; // each ripple takes this long to come round
+    private float seed, omega;
 
     protected override void Awake()
     {
         base.Awake();
         seed = Random.value * 100f;
-        speed *= Random.Range(0.8f, 1.25f);
+        omega = Mathf.PI * 2f / Random.Range(minSeconds, maxSeconds); // this button's own rhythm
     }
 
     private void Update() => SetVerticesDirty();
@@ -33,7 +33,7 @@ public class BlobGraphic : MaskableGraphic
         // Inset so the bulges reach, but don't pass, the button's edge
         float a = r.width / 2f - amp, b = r.height / 2f - amp;
         Vector2 c = r.center;
-        float t = Application.isPlaying ? Time.unscaledTime * speed : 0f;
+        float t = Application.isPlaying ? Time.unscaledTime * omega : 0f;
 
         UIVertex v = UIVertex.simpleVert;
         v.color = color;
@@ -47,9 +47,10 @@ public class BlobGraphic : MaskableGraphic
             const float p = 2f / 4.5f;
             Vector2 edge = new Vector2(a * Mathf.Sign(cs) * Mathf.Pow(Mathf.Abs(cs), p), b * Mathf.Sign(sn) * Mathf.Pow(Mathf.Abs(sn), p));
             // Ripples: a few slow waves running round the edge at different speeds
-            float n = Mathf.Sin(th * 2f + t * 1.3f + seed) * 0.5f
-                    + Mathf.Sin(th * 3f - t * 0.9f + seed * 1.7f) * 0.35f
-                    + Mathf.Sin(th * 5f + t * 2.1f + seed * 0.6f) * 0.15f;
+            // (all three come round once per period, two one way and one the other)
+            float n = Mathf.Sin(th * 2f + t + seed) * 0.5f
+                    + Mathf.Sin(th * 3f - t + seed * 1.7f) * 0.35f
+                    + Mathf.Sin(th * 5f + t + seed * 0.6f) * 0.15f;
             Vector2 dir = edge.sqrMagnitude > 0.001f ? edge.normalized : Vector2.up;
             v.position = c + edge + dir * (amp * (0.4f + 0.6f * n));
             vh.AddVert(v);

@@ -4,7 +4,8 @@ using UnityEngine;
 public class Swivel : MonoBehaviour
 {
     public float degrees = 1.6f;   // how far either side
-    public float seconds = 5f;     // one full back-and-forth (on average; each button differs)
+    public float minSeconds = 6f, maxSeconds = 8f; // one full back-and-forth, spread across the buttons
+    private float seconds;
 
     private float baseAngle, phase;
     private static int next;
@@ -14,8 +15,8 @@ public class Swivel : MonoBehaviour
         baseAngle = transform.localEulerAngles.z;
         if (baseAngle > 180f) baseAngle -= 360f;
         phase = Random.value * Mathf.PI * 2f;   // each button on its own beat
-        // and at its own speed: spread around the set time, never two the same
-        seconds *= 0.7f + 0.12f * (next++ % 6) + Random.Range(0f, 0.08f);
+        // and at its own speed: six evenly spaced from min to max, never two the same
+        seconds = minSeconds + (maxSeconds - minSeconds) * (next++ % 6) / 5f;
     }
 
     private void Update()
