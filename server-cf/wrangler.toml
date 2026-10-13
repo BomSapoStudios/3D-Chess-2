@@ -31,6 +31,11 @@ new_sqlite_classes = ["Accounts"]
 APPLE_AUDIENCES = "BomSapo.Chess3D"
 # Google: OAuth client ids; empty means Sign in with Google is off.
 GOOGLE_CLIENT_IDS = ""
+# Apple push notifications. The key itself is a secret: `npx wrangler secret put APNS_KEY`
+# (paste the whole AuthKey_KTA43349Y7.p8 file).
+APNS_KEY_ID = "KTA43349Y7"
+APNS_TEAM_ID = "KX25Q9LD97"
+APNS_TOPIC = "BomSapo.Chess3D"
 
 # TOKEN_SECRET is a secret: set it with `npx wrangler secret put TOKEN_SECRET`.
 # For local development it comes from .dev.vars (not committed).

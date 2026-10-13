@@ -5,6 +5,7 @@ import {
   type BoardPosition, type EndReason, type GameConfig, type PieceType, type PlayerColor,
 } from './types/game.js';
 import { accounts, type Env } from './index.js';
+import type { PushMessage } from './push.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Room — one Durable Object per game, addressed by its 6-character code.
@@ -181,6 +182,9 @@ export class Room extends DurableObject<Env> {
       engine.startPlacement();
       this.meta!.placementStartedAt = Date.now();
       this.meta!.lastPlayAt = Date.now();
+      this.notifyAway(Object.keys(this.seats), { kind: 'started', title: 'Your game is ready', body: 'Everyone has joined. Time to place your pieces!' }, userId);
+    } else if (!rejoining) {
+      this.notifyAway([this.meta!.hostUserId], { kind: 'joined', title: 'Someone joined your game', body: `${name} joined your game` }, userId);
     }
     await this.persist();
 
@@ -263,6 +267,7 @@ export class Room extends DurableObject<Env> {
           engine.startGame();
           this.startTurnClock();
           await this.logEvent({ type: 'game:phaseChanged', phase: 'playing' });
+          this.notifyTurn();
         }
         await this.persist();
         reply(true);
@@ -314,6 +319,29 @@ export class Room extends DurableObject<Env> {
   }
 
   /** Persist and broadcast the outcome of any rule-engine action */
+  /**
+   * Push a notification to players who aren't in the room right now (robots and the player
+   * who caused it are skipped). Sent through the Accounts object, which knows their devices
+   * and notification settings.
+   */
+  private notifyAway(userIds: string[], message: Omit<PushMessage, 'roomCode'>, except?: string): void {
+    if (!this.meta) return;
+    const away = userIds.filter(id => id !== except && !id.startsWith('ai:') && this.ctx.getWebSockets(id).length === 0);
+    if (away.length === 0) return;
+    this.ctx.waitUntil(accounts(this.env, 'notify', { userIds: away, message: { ...message, roomCode: this.meta.code } }).catch(() => undefined));
+  }
+
+  /** "Your move" for the player whose turn it is, if they're away */
+  private notifyTurn(): void {
+    const state = this.engine?.getState();
+    if (!state || state.phase !== 'playing' || !state.currentTurn) return;
+    const mover = Object.keys(this.seats).find(id => this.seats[id] === state.currentTurn);
+    if (!mover) return;
+    const others = state.players.filter(p => p.color !== state.currentTurn && !p.isEliminated).map(p => p.username);
+    const vs = others.length === 1 ? ` against ${others[0]}` : '';
+    this.notifyAway([mover], { kind: 'turn', title: 'Your move', body: `It's your turn${vs}` });
+  }
+
   private async afterResult(result: MoveResult, event: Record<string, unknown>): Promise<void> {
     if (this.meta) this.meta.lastPlayAt = Date.now();
     if (result.gameOver) {
@@ -332,6 +360,7 @@ export class Room extends DurableObject<Env> {
       await this.logEvent({ type: 'game:playerEliminated', color: result.eliminatedPlayer, conqueredBy: result.conqueredBy ?? null });
     }
     if (result.gameOver) await this.logEvent({ type: 'game:over', ...result.gameOver });
+    else this.notifyTurn();
     this.broadcast({ type: 'game:stateUpdate', reason: event.type, state: this.stateForClients() });
   }
 

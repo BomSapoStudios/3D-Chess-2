@@ -49,6 +49,11 @@ export interface Env {
   ROOM_TIME_SCALE?: string;
   /** Local tests only: multiply friend request expiry by this */
   REQUEST_TIME_SCALE?: string;
+  /** Apple push: the .p8 key's contents (secret), its key id, the team id and the app's bundle id */
+  APNS_KEY?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
+  APNS_TOPIC?: string;
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */
@@ -135,6 +140,14 @@ export default {
       const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
       return json({ ...data, token });
     }
+    // Push notifications: register this device, and read or change the notification switches
+    if (path === '/push/register' && request.method === 'POST') return user ? account('push-register', { token: body.token, sandbox: body.sandbox === true }) : needUser();
+    if (path === '/push/unregister' && request.method === 'POST') return account('push-unregister', { token: body.token });
+    if (path === '/push/settings') {
+      if (!user) return needUser();
+      return account('push-settings', request.method === 'POST' ? { prefs: body.prefs } : {});
+    }
+
     if (path.startsWith('/friends')) {
       if (!user) return needUser();
       if (request.method === 'GET' && path === '/friends') return account('friends');

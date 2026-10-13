@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './index.js';
 import { isGeneratedName, randomName } from './names.js';
+import { sendPush, type PushKind, type PushMessage } from './push.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accounts — one Durable Object (SQLite) holding every player account.
@@ -48,6 +49,8 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS link_codes (code TEXT PRIMARY KEY, account_id TEXT, expires INTEGER);
       CREATE TABLE IF NOT EXISTS friends (account_id TEXT, friend_id TEXT, status TEXT, created_at INTEGER, PRIMARY KEY (account_id, friend_id));
       CREATE TABLE IF NOT EXISTS blocks (account_id TEXT, blocked_id TEXT, PRIMARY KEY (account_id, blocked_id));
+      CREATE TABLE IF NOT EXISTS push_tokens (token TEXT PRIMARY KEY, account_id TEXT, sandbox INTEGER, updated INTEGER);
+      CREATE TABLE IF NOT EXISTS push_prefs (account_id TEXT PRIMARY KEY, prefs TEXT);
       CREATE TABLE IF NOT EXISTS active_games (account_id TEXT, room_code TEXT, joined_at INTEGER, PRIMARY KEY (account_id, room_code));
       CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
@@ -89,6 +92,10 @@ export class Accounts extends DurableObject<Env> {
       case 'game-add': return this.gameAdd(String(b.roomCode ?? ''), Array.isArray(b.userIds) ? b.userIds.map(String) : []);
       case 'game-remove': return this.gameRemove(String(b.roomCode ?? ''), typeof b.userId === 'string' ? b.userId : null);
       case 'games': return this.games(userId);
+      case 'push-register': return this.pushRegister(userId, String(b.token ?? ''), b.sandbox === true);
+      case 'push-unregister': return this.pushUnregister(String(b.token ?? ''));
+      case 'push-settings': return this.pushSettings(userId, b.prefs as Record<string, boolean> | undefined);
+      case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
       default: throw new HttpError(404, 'Unknown operation');
     }
   }
@@ -219,6 +226,65 @@ export class Accounts extends DurableObject<Env> {
     return { codes };
   }
 
+  // ── Push notifications ──────────────────────────────────────────────────────
+
+  private static readonly PUSH_KINDS: PushKind[] = ['joined', 'started', 'turn', 'challenge', 'friend'];
+
+  private pushRegister(userId: string, token: string, sandbox: boolean) {
+    this.account(userId);
+    if (!/^[0-9a-f]{64,200}$/i.test(token)) throw new HttpError(400, 'Bad device token');
+    // A device belongs to whoever signed in on it last
+    this.sql.exec('INSERT OR REPLACE INTO push_tokens (token, account_id, sandbox, updated) VALUES (?, ?, ?, ?)', token.toLowerCase(), userId, sandbox ? 1 : 0, Date.now());
+    return { ok: true };
+  }
+
+  private pushUnregister(token: string) {
+    this.sql.exec('DELETE FROM push_tokens WHERE token = ?', token.toLowerCase());
+    return { ok: true };
+  }
+
+  /** Read (and optionally change) a player's notification switches. Everything is on by default. */
+  private pushSettings(userId: string, update?: Record<string, boolean>) {
+    this.account(userId);
+    const prefs = this.prefsOf(userId);
+    if (update) {
+      for (const key of ['all', ...Accounts.PUSH_KINDS]) if (typeof update[key] === 'boolean') prefs[key] = update[key];
+      this.sql.exec('INSERT OR REPLACE INTO push_prefs (account_id, prefs) VALUES (?, ?)', userId, JSON.stringify(prefs));
+    }
+    return { prefs };
+  }
+
+  private prefsOf(userId: string): Record<string, boolean> {
+    const prefs: Record<string, boolean> = { all: true };
+    for (const k of Accounts.PUSH_KINDS) prefs[k] = true;
+    const row = this.sql.exec('SELECT prefs FROM push_prefs WHERE account_id = ?', userId).toArray()[0];
+    if (row) Object.assign(prefs, JSON.parse(row.prefs as string));
+    return prefs;
+  }
+
+  /** Send a notification to these players' devices, if they want this kind */
+  private notify(userIds: string[], message: PushMessage) {
+    if (!message || !Accounts.PUSH_KINDS.includes(message.kind)) return { sent: 0 };
+    const targets: { token: string; sandbox: boolean }[] = [];
+    for (const id of new Set(userIds)) {
+      const prefs = this.prefsOf(id);
+      if (!prefs.all || !prefs[message.kind]) continue;
+      for (const r of this.sql.exec('SELECT token, sandbox FROM push_tokens WHERE account_id = ?', id).toArray())
+        targets.push({ token: r.token as string, sandbox: r.sandbox === 1 });
+    }
+    this.ctx.waitUntil((async () => {
+      for (const t of targets) {
+        if (await sendPush(this.env, t.token, t.sandbox, message) === 'gone') this.pushUnregister(t.token);
+      }
+    })());
+    return { sent: targets.length };
+  }
+
+  private nameOf(userId: string): string {
+    const row = this.sql.exec('SELECT name FROM accounts WHERE id = ?', userId).toArray()[0];
+    return (row?.name as string) ?? 'A player';
+  }
+
   // ── Friends ──────────────────────────────────────────────────────────────────
 
   private friends(userId: string) {
@@ -286,7 +352,11 @@ export class Accounts extends DurableObject<Env> {
     this.expireRequests();
     const current = this.status(userId, friendId);
     if (current === 'friends') return { status: 'friends' };
-    if (current === 'incoming') { this.setPair(userId, friendId, 'friends', 'friends'); return { status: 'friends' }; }
+    if (current === 'incoming') {
+      this.setPair(userId, friendId, 'friends', 'friends');
+      this.notify([friendId], { kind: 'friend', title: 'New friend', body: `${this.nameOf(userId)} is now your friend` });
+      return { status: 'friends' };
+    }
     if (current === 'outgoing') return { status: 'outgoing' };
     // Declined once means no more requests to that player (they can still send one to you)
     if (this.sql.exec('SELECT 1 FROM declines WHERE decliner_id = ? AND sender_id = ?', friendId, userId).toArray().length) {
@@ -296,13 +366,16 @@ export class Accounts extends DurableObject<Env> {
     // Asking someone you once declined clears that decline
     this.sql.exec('DELETE FROM declines WHERE decliner_id = ? AND sender_id = ?', userId, friendId);
     this.setPair(userId, friendId, 'outgoing', 'incoming');
+    this.notify([friendId], { kind: 'friend', title: 'Friend request', body: `${this.nameOf(userId)} wants to be your friend` });
     return { status: 'outgoing' };
   }
 
   private respond(userId: string, friendId: string, accept: boolean) {
     if (this.status(userId, friendId) !== 'incoming') throw new HttpError(404, 'No request from that player');
-    if (accept) this.setPair(userId, friendId, 'friends', 'friends');
-    else {
+    if (accept) {
+      this.setPair(userId, friendId, 'friends', 'friends');
+      this.notify([friendId], { kind: 'friend', title: 'Friend request accepted', body: `${this.nameOf(userId)} accepted your friend request` });
+    } else {
       this.removeFriend(userId, friendId);
       this.sql.exec('INSERT OR REPLACE INTO declines (decliner_id, sender_id, created_at) VALUES (?, ?, ?)', userId, friendId, Date.now());
     }
@@ -331,6 +404,7 @@ export class Accounts extends DurableObject<Env> {
   private challenge(userId: string, friendId: string, roomCode: string) {
     if (this.status(userId, friendId) !== 'friends') throw new HttpError(403, 'You can only challenge friends');
     this.sql.exec('INSERT OR REPLACE INTO challenges (to_id, from_id, room_code, created_at) VALUES (?, ?, ?, ?)', friendId, userId, roomCode, Date.now());
+    this.notify([friendId], { kind: 'challenge', title: 'You\'ve been challenged!', body: `${this.nameOf(userId)} wants to play 3D Chess`, roomCode });
     return { ok: true };
   }
 

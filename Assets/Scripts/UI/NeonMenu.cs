@@ -71,6 +71,7 @@ public class NeonMenu : MonoBehaviour
         BuildCustomizeScreen();
         BuildOnlineScreen();
         BuildFriendsScreen();
+        BuildNotifyScreen();
         ShowMenu();
 
         // Coming back to the menu from an online game ends the session
@@ -170,6 +171,8 @@ public class NeonMenu : MonoBehaviour
         if (Screen.safeArea != lastSafeArea) ApplySafeArea();
         PollFriendsIfNeeded();
         UpdateLobbyCountdown();
+        OpenTappedNotification();
+        if (notifyScreen != null && notifyScreen.activeSelf) RefreshNotifyStatus();
     }
 
     // ───────────────────────── Canvas ─────────────────────────
@@ -277,6 +280,12 @@ public class NeonMenu : MonoBehaviour
         onlineMenuLabel = NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline).GetComponentInChildren<TextMeshProUGUI>();
 
         NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
+
+        if (PushNotifications.Supported)
+        {
+            Button alerts = NeonButton(menuScreen.transform, "Notifications", new Vector2(150, 38), NeonTheme.Lavender, NeonTheme.Pink, 0f, 15, ShowNotify);
+            Place((RectTransform)alerts.transform, new Vector2(1, 1), new Vector2(150, 38), new Vector2(-95, -32));
+        }
 
         // Toasts sit above every screen (setup errors show while the setup screen is open)
         toastPanel = NewImage("Toast", safeRoot, NeonTheme.Ground);
@@ -978,6 +987,7 @@ public class NeonMenu : MonoBehaviour
 
     private void ShowOnline()
     {
+        if (notifyScreen != null) notifyScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -986,6 +996,8 @@ public class NeonMenu : MonoBehaviour
         onlineStatus.text = "";
         SetSearching(null);
         StartCoroutine(SignInAndShowName());
+        // Playing online is when notifications start to matter: ask the first time
+        if (PushNotifications.Status == "notDetermined") PushNotifications.RequestPermission();
     }
 
     private string CurrentName()
@@ -1639,10 +1651,196 @@ public class NeonMenu : MonoBehaviour
         nextFriendsPoll = 0f;
     }
 
+    // ───────────────────────── Notifications ─────────────────────────
+
+    private GameObject notifyScreen;
+    private TextMeshProUGUI notifyStatus;
+    private Button notifyAction;
+    private TextMeshProUGUI notifyActionLabel;
+    private PushPrefs pushPrefs = new PushPrefs();
+    private string shownPushStatus;
+    private readonly List<(string key, Image track, RectTransform knob, TextMeshProUGUI note, string onText)> pushSwitches =
+        new List<(string, Image, RectTransform, TextMeshProUGUI, string)>();
+
+    private void BuildNotifyScreen()
+    {
+        notifyScreen = NewRect("Notifications Screen", safeRoot).gameObject;
+        RectTransform root = notifyScreen.GetComponent<RectTransform>();
+        Stretch(root);
+
+        RectTransform header = NewRect("Header", root);
+        header.anchorMin = new Vector2(0, 1);
+        header.anchorMax = new Vector2(1, 1);
+        header.pivot = new Vector2(0.5f, 1);
+        header.offsetMin = new Vector2(16, -64);
+        header.offsetMax = new Vector2(-24, -12);
+
+        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowMenu);
+        Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
+
+        TextMeshProUGUI title = NewText("Title", header, "NOTIFICATIONS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
+        NeonTheme.ApplyFont(title, display: true);
+        title.rectTransform.anchorMin = new Vector2(0, 0);
+        title.rectTransform.anchorMax = new Vector2(1, 1);
+        title.rectTransform.offsetMin = new Vector2(70, 0);
+        title.rectTransform.offsetMax = new Vector2(-180, 0);
+        title.rectTransform.localEulerAngles = new Vector3(0, 0, -1);
+
+        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowMenu);
+        Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
+
+        RectTransform left = Card(root, "Permission Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.42f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
+        RectTransform right = Card(root, "Kinds Card", NeonTheme.Pink, new Vector2(0.42f, 0f), new Vector2(1f, 1f), new Vector2(8, 14), new Vector2(-24, -74));
+
+        SectionLabel(left, "On this iPhone", NeonTheme.Cyan);
+        notifyStatus = NewText("Status", left, "", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
+        notifyStatus.fontStyle = FontStyles.Normal;
+        notifyStatus.enableWordWrapping = true;
+        notifyStatus.gameObject.AddComponent<LayoutElement>().preferredHeight = 66;
+        notifyAction = NeonButton(left, "Turn on", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 17, () =>
+        {
+            if (PushNotifications.Status == "denied") PushNotifications.OpenSettings();
+            else PushNotifications.RequestPermission();
+        });
+        notifyAction.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
+        notifyActionLabel = notifyAction.GetComponentInChildren<TextMeshProUGUI>();
+        PushSwitch(left, "all", "All notifications", "On", "Off: nothing will be sent");
+
+        SectionLabel(right, "Tell me when…", NeonTheme.PinkSoft);
+        PushSwitch(right, "turn", "It's my move", "In online games", null);
+        PushSwitch(right, "joined", "Someone joins my game", "While you wait in a lobby", null);
+        PushSwitch(right, "started", "My game is ready", "Every seat has filled", null);
+        PushSwitch(right, "challenge", "A friend challenges me", "Tap to see the challenge", null);
+        PushSwitch(right, "friend", "Friend requests", "New and accepted requests", null);
+    }
+
+    private void PushSwitch(RectTransform parent, string key, string title, string onText, string offText)
+    {
+        SwitchRow(parent, title, out TextMeshProUGUI note, out Image track, out RectTransform knob, () =>
+        {
+            bool on = !GetPref(key);
+            SetPref(key, on);
+            RefreshPushSwitches();
+            var change = new PushPrefs();
+            // The server only changes what's sent, so send everything as it now stands
+            change.all = pushPrefs.all; change.turn = pushPrefs.turn; change.joined = pushPrefs.joined;
+            change.started = pushPrefs.started; change.challenge = pushPrefs.challenge; change.friend = pushPrefs.friend;
+            StartCoroutine(OnlineClient.GetOrCreate().PushSettings(change, (prefs, error) =>
+            {
+                if (error != null) ShowToast("Couldn't save that: " + error);
+            }));
+        });
+        track.transform.parent.GetComponent<LayoutElement>().preferredHeight = parent.name == "Kinds Card" ? 46 : 54;
+        pushSwitches.Add((key, track, knob, note, offText == null ? onText : onText + "|" + offText));
+    }
+
+    private bool GetPref(string key)
+    {
+        switch (key)
+        {
+            case "all": return pushPrefs.all;
+            case "turn": return pushPrefs.turn;
+            case "joined": return pushPrefs.joined;
+            case "started": return pushPrefs.started;
+            case "challenge": return pushPrefs.challenge;
+            default: return pushPrefs.friend;
+        }
+    }
+
+    private void SetPref(string key, bool on)
+    {
+        switch (key)
+        {
+            case "all": pushPrefs.all = on; break;
+            case "turn": pushPrefs.turn = on; break;
+            case "joined": pushPrefs.joined = on; break;
+            case "started": pushPrefs.started = on; break;
+            case "challenge": pushPrefs.challenge = on; break;
+            default: pushPrefs.friend = on; break;
+        }
+    }
+
+    private void RefreshPushSwitches()
+    {
+        foreach (var s in pushSwitches)
+        {
+            bool on = GetPref(s.key);
+            SetSwitch(s.track, s.knob, on);
+            string[] texts = s.onText.Split('|');
+            if (s.key == "all") s.note.text = on ? texts[0] : texts[1];
+            else s.note.text = !pushPrefs.all ? "Muted: all notifications are off" : on ? texts[0] : "Off";
+        }
+    }
+
+    private void ShowNotify()
+    {
+        menuScreen.SetActive(false);
+        notifyScreen.SetActive(true);
+        shownPushStatus = null;
+        PushNotifications.RefreshStatus();
+        RefreshPushSwitches();
+        StartCoroutine(LoadPushPrefs());
+    }
+
+    private IEnumerator LoadPushPrefs()
+    {
+        var client = OnlineClient.GetOrCreate();
+        bool signedIn = false;
+        yield return client.EnsureSignedIn((ok, error) => signedIn = ok);
+        if (!signedIn) yield break;
+        yield return client.PushSettings(null, (prefs, error) =>
+        {
+            if (prefs == null) return;
+            pushPrefs = prefs;
+            RefreshPushSwitches();
+        });
+    }
+
+    /// <summary>Keep the permission card in step with iOS (the player may come back from Settings)</summary>
+    private void RefreshNotifyStatus()
+    {
+        string status = PushNotifications.Status;
+        if (status == shownPushStatus) return;
+        shownPushStatus = status;
+        switch (status)
+        {
+            case "authorized":
+                notifyStatus.text = "Notifications are on. Choose which ones you get.";
+                notifyAction.gameObject.SetActive(false);
+                break;
+            case "denied":
+                notifyStatus.text = "Notifications are turned off for 3D Chess in your iPhone's Settings.";
+                notifyActionLabel.text = "Open Settings";
+                notifyAction.gameObject.SetActive(true);
+                break;
+            default:
+                notifyStatus.text = "Find out when it's your move, even with the app closed.";
+                notifyActionLabel.text = "Turn on";
+                notifyAction.gameObject.SetActive(true);
+                break;
+        }
+    }
+
+    /// <summary>A tapped notification opens its game (or the friends list for friend requests and challenges)</summary>
+    private void OpenTappedNotification()
+    {
+        if (!PushNotifications.Supported || onlineBusy) return;
+        var tap = PushNotifications.TakeTap();
+        if (tap == null) return;
+        var (kind, room) = tap.Value;
+        if (kind == "friend" || kind == "challenge")
+        {
+            ShowOnline();
+            ShowFriends();
+        }
+        else if (!string.IsNullOrEmpty(room)) ResumeGame(room);
+    }
+
     // ───────────────────────── Navigation ─────────────────────────
 
     private void ShowMenu()
     {
+        if (notifyScreen != null) notifyScreen.SetActive(false);
         menuScreen.SetActive(true);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -1652,6 +1850,7 @@ public class NeonMenu : MonoBehaviour
 
     private void ShowCustomize()
     {
+        if (notifyScreen != null) notifyScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         onlineScreen.SetActive(false);
@@ -1676,6 +1875,7 @@ public class NeonMenu : MonoBehaviour
 
     private void ShowSetupScreen()
     {
+        if (notifyScreen != null) notifyScreen.SetActive(false);
         menuScreen.SetActive(false);
         customizeScreen.SetActive(false);
         onlineScreen.SetActive(false);

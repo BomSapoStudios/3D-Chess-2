@@ -257,6 +257,26 @@ public class OnlineClient : MonoBehaviour
         done(code, error);
     }
 
+    // ───────────────────────── Push notifications ─────────────────────────
+
+    /// <summary>Tell the server this device's push token (sandbox for development builds)</summary>
+    public IEnumerator RegisterPush(string deviceToken, bool sandbox, Action<string> done) =>
+        Simple("/push/register", "{\"token\":\"" + deviceToken + "\",\"sandbox\":" + (sandbox ? "true" : "false") + "}", done);
+
+    /// <summary>Which notifications this player wants. Pass changes to save them; null just reads.</summary>
+    public IEnumerator PushSettings(PushPrefs update, Action<PushPrefs, string> done)
+    {
+        PushPrefs result = null;
+        string error = null;
+        string body = update == null ? null : "{\"prefs\":" + JsonUtility.ToJson(update) + "}";
+        yield return Call(update == null ? "GET" : "POST", "/push/settings", body, Token, (status, text) =>
+        {
+            if (status == 200) result = JsonUtility.FromJson<PushPrefsResponse>(text).prefs;
+            else error = ErrorText(status, text);
+        });
+        done(result, error);
+    }
+
     private IEnumerator Simple(string path, string body, Action<string> done)
     {
         string error = null;
@@ -481,6 +501,7 @@ public class OnlineClient : MonoBehaviour
     [Serializable] private class LinkCodeResponse { public string code; }
     [Serializable] private class FriendStatusResponse { public string status; }
     [Serializable] private class ErrorResponse { public string error; }
+    [Serializable] private class PushPrefsResponse { public PushPrefs prefs; }
     [Serializable] private class SearchResponse { public FriendInfo[] results; }
 }
 
