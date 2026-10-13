@@ -288,7 +288,15 @@ public partial class NeonMenu : MonoBehaviour
         TextMeshProUGUI tagline = NewText("Tagline", column, "Up, down, sideways. Go wild.", 18, NeonTheme.Cyan, TextAlignmentOptions.Left);
         tagline.rectTransform.sizeDelta = new Vector2(420, 26);
 
-        NeonButton(column, "Quick Play vs Computer!", new Vector2(370, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 21, ShowSidePicker);
+        RectTransform quickRow = NewRect("Row", column);
+        quickRow.sizeDelta = new Vector2(370, 58);
+        var quickLayout = quickRow.gameObject.AddComponent<HorizontalLayoutGroup>();
+        quickLayout.spacing = 14;
+        quickLayout.childControlWidth = false;
+        quickLayout.childControlHeight = false;
+        quickLayout.childForceExpandWidth = false;
+        NeonButton(quickRow, "Quick Play vs Computer!", new Vector2(236, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, ShowSidePicker);
+        NeonButton(quickRow, "Zombies!", new Vector2(120, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 17, ShowZombiePicker);
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -2119,6 +2127,7 @@ public partial class NeonMenu : MonoBehaviour
         }
         if (!quickPlay) SaveSetup();
         var config = new GameConfiguration();
+        config.zombieMode = zombieRun;
         config.playerCount = playerCount;
         config.boardSize = boardSize;
         config.aiDifficulty = difficulty;

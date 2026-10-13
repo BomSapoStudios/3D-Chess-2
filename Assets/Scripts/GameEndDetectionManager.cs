@@ -105,7 +105,7 @@ public class GameEndDetectionManager : MonoBehaviour
         if (newState == GameState.Playing)
         {
             Debug.Log("GameEndDetectionManager: Game started - enabling game end detection");
-            enableGameEndDetection = true;
+            enableGameEndDetection = !ZombieMode.Active; // zombie runs end when the player has nothing left (ZombieDirector)
         }
         else if (newState == GameState.GameOver)
         {
@@ -735,6 +735,16 @@ public class GameEndDetectionManager : MonoBehaviour
     /// </summary>
     /// <param name="forfeitingPlayer">The player who wants to forfeit</param>
     /// <summary>Who wins when this player forfeits a two-player game</summary>
+    /// <summary>End the game with this result (zombie runs end this way)</summary>
+    public void EndGame(PieceColor? winner, string reason)
+    {
+        if (TimerManager.Instance != null) TimerManager.Instance.StopAllTimers();
+        ClearDrawOffer();
+        Winner = winner;
+        OnGameEnd?.Invoke(reason);
+        if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
+    }
+
     public static PieceColor ForfeitWinner(PieceColor forfeitingPlayer)
     {
         if (PlayerManager.Instance != null)

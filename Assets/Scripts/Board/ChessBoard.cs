@@ -687,7 +687,7 @@ public class ChessBoard : MonoBehaviour
         // CRITICAL FIX: Don't check CanMovePieces() here as it checks for animations
         // The piece might already be animating, which would block NextTurn() from being called
         // NextTurn() has its own guard conditions to ensure we're in the right state
-        if (!isPromotion && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
+        if (!isPromotion && !ZombieMode.HoldTurn && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
         {
             if (TurnManager.Instance != null)
             {

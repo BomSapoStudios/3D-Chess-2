@@ -1912,6 +1912,7 @@ public class PlacementManager : MonoBehaviour
                 }
             }
         }
+        if (ZombieMode.Active) hasBlackPieces = true; // the zombies arrive once play starts
         
         Debug.Log($"PlacementManager: Game setup validation - Total pieces: {totalPieces}, White: {hasWhitePieces}, Black: {hasBlackPieces}");
         
@@ -2047,6 +2048,7 @@ public class PlacementManager : MonoBehaviour
     /// </summary>
     private void SpawnPawnsForGameplay()
     {
+        if (ZombieMode.Active) return; // zombie runs: the player has no pawns, and the zombies bring their own
         Debug.Log("Spawning pawns for gameplay...");
         
         // ANTI-CORRUPTION: First, clean up any existing pawns to prevent duplicates

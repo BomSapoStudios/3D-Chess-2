@@ -730,6 +730,7 @@ public class GameManager : MonoBehaviour
         // Each player gets: 1 King + 1 Queen + 2 Bishops + 2 Knights + 2 Rooks
         foreach (PieceColor color in activePlayers)
         {
+            if (ZombieMode.Active && color == ZombieMode.ZombieColor) continue; // the zombies arrive during play
             Debug.Log($"🎭 Creating pieces for {color} player...");
             CreatePieceInTray(color, ChessPieceType.King);
             CreatePieceInTray(color, ChessPieceType.Queen);

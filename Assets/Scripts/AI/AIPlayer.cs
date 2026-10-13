@@ -82,6 +82,11 @@ public class AIPlayer : MonoBehaviour
     /// </summary>
     public void RequestMove(PieceColor playerColor)
     {
+        if (ZombieMode.Active && playerColor == ZombieMode.ZombieColor)
+        {
+            if (ZombieDirector.Instance != null) ZombieDirector.Instance.TakeTurn();
+            return;
+        }
         if (isThinking)
         {
             Debug.LogWarning($"AIPlayer: Already thinking, ignoring move request for {playerColor}");

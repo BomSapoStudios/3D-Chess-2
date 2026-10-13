@@ -69,7 +69,7 @@ public class RematchUI : MonoBehaviour
             gameOverAt = Time.unscaledTime;
             localDeadline = Time.unscaledTime + RematchSeconds;
             Haptics.Selection();
-            if (!Online) RecordVsComputer();
+            if (!Online && !ZombieMode.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
         if (!Online) return;
@@ -218,13 +218,14 @@ public class RematchUI : MonoBehaviour
         GUI.enabled = true;
         if (TouchGUI.NeonButton(new Rect(x + 184, rowY, 120, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
 
-        string status = Online ? OnlineStatus(r) : "Same players, same settings.";
+        string status = Online ? OnlineStatus(r) : ZombieMode.Active ? $"Another run on {ZombieMode.DifficultyName(ZombieMode.Difficulty)}?" : "Same players, same settings.";
         GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), status, NeonTheme.GUILabelStyle(possible ? NeonTheme.Yellow : NeonTheme.PinkSoft, 14, true));
         TouchGUI.End();
     }
 
     private (string, Color) Headline()
     {
+        if (ZombieMode.Active) return ("OVERRUN!", NeonTheme.Pink);
         PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
         string reason = Reason() ?? "";
         bool draw = winner == null || reason.IndexOf("draw", StringComparison.OrdinalIgnoreCase) >= 0;
