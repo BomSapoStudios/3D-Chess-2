@@ -515,7 +515,9 @@ public class PlacementUI : MonoBehaviour
             bool allPiecesPlaced = PlacementManager.Instance != null &&
                                    PlacementManager.Instance.IsPlayerPlacementCompleted(player);
 
-            GUI.enabled = allPiecesPlaced; // Only enable if all pieces are placed
+            // Only enable your own button once your pieces are down (never a robot's or another device's)
+            bool yours = (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(player)) && OnlineSession.CanControl(player);
+            GUI.enabled = allPiecesPlaced && yours && !playerReady;
 
             // Determine button text - two-line format with full color name
             string colorName = player.ToString(); // White, Black, Green, Purple, Yellow, Orange
@@ -662,11 +664,17 @@ public class PlacementUI : MonoBehaviour
         // Each player can say Ready once their own pieces are down, whatever the others are doing;
         // the game starts when everyone is ready
         
+        // Only your own button: never a robot's, and never another device's player online
+        if (TurnManager.Instance != null && TurnManager.Instance.IsPlayerAI(playerColor)) return;
+        if (!OnlineSession.CanControl(playerColor)) return;
+
         if (PlacementManager.Instance != null)
         {
-            // Toggle player readiness
+            // Ready is final (the bench goes away); a second tap does nothing
             bool currentReadiness = PlacementManager.Instance.IsPlayerReady(playerColor);
-            PlacementManager.Instance.SetPlayerReady(playerColor, !currentReadiness);
+            if (currentReadiness) return;
+            Haptics.Selection();
+            PlacementManager.Instance.SetPlayerReady(playerColor, true);
             
             Debug.Log($"PlacementUI: {playerColor} readiness set to {!currentReadiness}");
         }

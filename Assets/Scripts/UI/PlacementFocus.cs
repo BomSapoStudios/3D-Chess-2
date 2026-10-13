@@ -39,7 +39,7 @@ public class PlacementFocus : MonoBehaviour
 
         PieceColor? color = null;
         if (placing && PlacementManager.Instance != null)
-            color = PlacementManager.Instance.SelectedTrayColor ?? PlacementUI.WorkingOn;
+            color = PlacementManager.Instance.SelectedTrayColor ?? PlacementUI.WorkingOn ?? PlacementUI.InView ?? OnlyOwnPlayer();
         if (!color.HasValue)
         {
             shownFor = null;
@@ -78,6 +78,21 @@ public class PlacementFocus : MonoBehaviour
             foreach (Renderer r in tray.GetComponentsInChildren<Renderer>(true)) SetVisible(r, show);
             foreach (Collider col in tray.GetComponentsInChildren<Collider>(true)) SetEnabled(col, show);
         }
+    }
+
+    /// <summary>When this device has exactly one human player still setting up (Quick Play, online), that player</summary>
+    private static PieceColor? OnlyOwnPlayer()
+    {
+        if (PlayerManager.Instance == null || PlacementManager.Instance == null) return null;
+        PieceColor? only = null;
+        foreach (PieceColor c in PlayerManager.Instance.GetActivePlayers())
+        {
+            bool human = TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(c);
+            if (!human || !OnlineSession.CanControl(c) || PlacementManager.Instance.IsPlayerReady(c)) continue;
+            if (only.HasValue) return null;
+            only = c;
+        }
+        return only;
     }
 
     // Floors are named Floor_x_y_z by EmergencyChessBoard
