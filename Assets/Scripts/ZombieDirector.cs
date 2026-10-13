@@ -66,7 +66,7 @@ public class ZombieDirector : MonoBehaviour
 {
     public static ZombieDirector Instance { get; private set; }
 
-    private const int StartingZombies = 3;
+    private const int StartingZombies = 1;
     private const float StepDelay = 0.08f; // between zombie moves, so the horde moves as a wave
 
     private bool started, busy, ended;
@@ -353,8 +353,11 @@ public class ZombieDirector : MonoBehaviour
         if (!started || ended || GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
         Vector2 ui = TouchGUI.Begin();
         CountZombies(out int pawns, out int promoted);
-        string text = $"Round {ZombieMode.Rounds + 1}   Zombies {pawns + promoted}   Score {ZombieMode.Score}";
-        GUI.Label(new Rect(ui.x / 2f - 220f, 14f, 440f, 30f), text, NeonTheme.GUILabelStyle(NeonTheme.Lime, 18, true, TextAnchor.MiddleCenter, display: true));
+        // Under the turn / last move line, on its own panel so it reads clearly over the board
+        string text = $"Round {ZombieMode.Rounds + 1}    ·    Zombies {pawns + promoted}    ·    Score {ZombieMode.Score}";
+        Rect rect = new Rect(ui.x / 2f - 200f, 56f, 400f, 34f);
+        NeonTheme.GUIPanel(rect, NeonTheme.Lime, 0.85f);
+        GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Lime, 17, true, TextAnchor.MiddleCenter));
         TouchGUI.End();
     }
 }

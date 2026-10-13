@@ -83,6 +83,9 @@ public class PlacementManager : MonoBehaviour
         Vector3Int dims = BoardDimensionsManager.Instance.GetDimensions();
         int boardSize = dims.x; // Board is cubic (x=y=z)
 
+        // Zombie runs: zombies can come from anywhere, so the player may use their whole first plane
+        if (ZombieMode.Active && color == ZombieMode.PlayerColor) return new PlacementZone(0, 0, 0, boardSize - 1, 0, boardSize - 1);
+
         // Initialize zone boundaries
         int xMin = 0, xMax = boardSize - 1;
         int yMin = 0, yMax = boardSize - 1;
