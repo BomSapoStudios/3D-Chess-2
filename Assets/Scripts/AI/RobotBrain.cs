@@ -131,7 +131,7 @@ public class RobotBrain
         return legal.Count > 0 && dims.x == dims.y && dims.y == dims.z;
     }
 
-    private static LiteBoard FromGame(int n)
+    public static LiteBoard FromGame(int n)
     {
         var lite = new LiteBoard(n);
         var game = ChessBoard.Instance;

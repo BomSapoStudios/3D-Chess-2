@@ -43,6 +43,7 @@ public class ZombieDemo : MonoBehaviour
         Debug.Log($"ZOMBIE DEMO: started on {ZombieMode.DifficultyName(level)}, active {ZombieMode.Active}, state {GameStateManager.Instance.currentState}");
 
         int lastRound = -1;
+        bool planned = false;
         float started = Time.time;
         while (GameStateManager.Instance.currentState == GameState.Playing && Time.time - started < 240f)
         {
@@ -53,6 +54,22 @@ public class ZombieDemo : MonoBehaviour
                     lastRound = ZombieMode.Rounds;
                     int white = Count(PieceColor.White), pawns = Count(PieceColor.Black, true), promoted = Count(PieceColor.Black) - pawns;
                     Debug.Log($"ZOMBIE DEMO: round {ZombieMode.Rounds}: White {white} pieces, zombies {pawns} pawns + {promoted} promoted, score {ZombieMode.Score}");
+                }
+                if (ZombieMode.Rounds == 3 && !planned)
+                {
+                    planned = true;
+                    var hunts = ZombieHuntPlanner.Plan();
+                    foreach (var h in hunts)
+                    {
+                        string route = h.Reachable ? string.Join(" > ", h.route.ConvertAll(p => p.ToString())) : "out of reach";
+                        Debug.Log($"ZOMBIE DEMO: hunt zombie {h.zombie.CurrentPosition}: {(h.Reachable ? $"{h.hunter.pieceType} in {h.turns}, safe route {h.safeRoute}, safe after {h.safeAfter}" : "")} route {route}; zombie path {string.Join(" > ", h.zombiePath.ConvertAll(p => p.ToString()))}");
+                        if (h.Reachable && h.turns == 1 && !h.hunter.GetValidMoves().Contains(h.zombie.CurrentPosition)) Debug.Log("ZOMBIE DEMO: FAIL one-move hunt isn't a real capture");
+                        if (h.Reachable && !h.hunter.GetValidMoves().Contains(h.FirstStep)) Debug.Log("ZOMBIE DEMO: FAIL first step isn't a legal move");
+                    }
+                    TurnPlannerUI.Instance.DebugOpen();
+                    Debug.Log("ZOMBIE DEMO: planner open");
+                    yield return new WaitForSeconds(6f);
+                    TurnPlannerUI.Instance.DebugClose();
                 }
                 var brain = new RobotBrain();
                 AIMove move = brain.FindMove(PieceColor.White, RobotBrain.Settings.For(AIDifficulty.Easy));

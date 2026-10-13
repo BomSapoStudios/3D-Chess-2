@@ -24,6 +24,11 @@ public class TurnPlannerUI : MonoBehaviour
     private Vector2 listScroll;
     private string note;
 
+    // Zombie Survival: the planner finds the fastest way to destroy each zombie instead
+    private List<ZombieHuntPlanner.Hunt> hunts = new List<ZombieHuntPlanner.Hunt>();
+    private int huntIndex;
+    private ZombieHuntPlanner.Hunt CurrentHunt => huntIndex < hunts.Count ? hunts[huntIndex] : null;
+
     private readonly HashSet<Renderer> hidden = new HashSet<Renderer>();
     private readonly List<GameObject> markers = new List<GameObject>();
     private readonly List<(Vector3 world, string text, Color color)> tags = new List<(Vector3, string, Color)>();
@@ -91,6 +96,11 @@ public class TurnPlannerUI : MonoBehaviour
         Recompute(keepSelection: false);
     }
 
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    public void DebugOpen() => Open();
+    public void DebugClose() => Close();
+#endif
+
     private void Close()
     {
         open = false;
@@ -101,8 +111,18 @@ public class TurnPlannerUI : MonoBehaviour
     /// <summary>Rebuild the piece and move lists (the board changed or the turn passed)</summary>
     private void Recompute(bool keepSelection)
     {
-        ChessPiece keepPiece = keepSelection && pieceIndex < pieces.Count ? pieces[pieceIndex] : null;
         side = CurrentPlayer;
+        if (ZombieMode.Active)
+        {
+            ChessPiece keepZombie = keepSelection ? CurrentHunt?.zombie : null;
+            hunts = side == ZombieMode.PlayerColor ? ZombieHuntPlanner.Plan() : new List<ZombieHuntPlanner.Hunt>();
+            int keep = keepZombie != null ? hunts.FindIndex(h => h.zombie == keepZombie) : -1;
+            huntIndex = Mathf.Max(0, keep);
+            listScroll = Vector2.zero;
+            ApplyFocus();
+            return;
+        }
+        ChessPiece keepPiece = keepSelection && pieceIndex < pieces.Count ? pieces[pieceIndex] : null;
         pieces = TurnPlannerAnalysis.MovablePieces(side);
         pieceIndex = keepPiece != null ? Mathf.Max(0, pieces.IndexOf(keepPiece)) : 0;
         LoadMoves(0);
@@ -140,6 +160,15 @@ public class TurnPlannerUI : MonoBehaviour
             ChessPiece piece = h.collider.GetComponentInParent<ChessPiece>();
             if (piece == null || piece.IsInTray()) continue;
             if (hidden.Count > 0 && !Involved().Contains(piece)) continue; // hidden while focused: tap goes through
+            if (ZombieMode.Active)
+            {
+                int hunt = hunts.FindIndex(x => x.zombie == piece || x.hunter == piece);
+                if (hunt < 0) { note = "No hunt for that piece"; return; }
+                note = null;
+                huntIndex = hunt;
+                ApplyFocus();
+                return;
+            }
             int index = pieces.IndexOf(piece);
             if (index < 0)
             {
@@ -205,6 +234,12 @@ public class TurnPlannerUI : MonoBehaviour
     private HashSet<ChessPiece> Involved()
     {
         var set = new HashSet<ChessPiece>();
+        if (ZombieMode.Active)
+        {
+            var hunt = CurrentHunt;
+            if (hunt != null) { set.Add(hunt.zombie); if (hunt.hunter != null) set.Add(hunt.hunter); }
+            return set;
+        }
         var o = Current;
         if (o == null) { if (pieceIndex < pieces.Count) set.Add(pieces[pieceIndex]); return set; }
         set.Add(o.piece);
@@ -219,6 +254,7 @@ public class TurnPlannerUI : MonoBehaviour
     private void ApplyFocus()
     {
         ClearMarkers();
+        if (ZombieMode.Active) { HuntFocus(); return; }
         var o = Current;
         if (o == null || ChessBoard.Instance == null) return;
 
@@ -248,6 +284,33 @@ public class TurnPlannerUI : MonoBehaviour
             Line(dest, PieceCenter(t), Info, 0.04f);
             tags.Add((PieceCenter(t), TurnPlannerAnalysis.Label(t.CurrentPosition), Info));
         }
+    }
+
+    /// <summary>The hunter's route in cyan, the zombie's predicted path in pink, the kill square in lime</summary>
+    private void HuntFocus()
+    {
+        var hunt = CurrentHunt;
+        if (hunt == null || ChessBoard.Instance == null) return;
+        if (hunt.zombiePath != null)
+        {
+            for (int i = 0; i < hunt.zombiePath.Count; i++)
+            {
+                Marker(SquareCenter(hunt.zombiePath[i]), Danger, i == 0 ? 0.6f : 0.4f);
+                if (i > 0) Line(SquareCenter(hunt.zombiePath[i - 1]), SquareCenter(hunt.zombiePath[i]), Danger, 0.06f);
+            }
+        }
+        tags.Add((PieceCenter(hunt.zombie), TurnPlannerAnalysis.Label(hunt.zombie.CurrentPosition), Danger));
+        if (!hunt.Reachable) return;
+        for (int i = 1; i < hunt.route.Count; i++)
+        {
+            Vector3 a = i == 1 ? PieceCenter(hunt.hunter) : SquareCenter(hunt.route[i - 1]);
+            Vector3 b = SquareCenter(hunt.route[i]);
+            Line(a, b, Info, 0.1f);
+            bool kill = i == hunt.route.Count - 1;
+            Marker(b, kill ? Good : Info, kill ? 1.15f : 0.8f);
+            tags.Add((b, (kill ? "x " : $"{i}. ") + TurnPlannerAnalysis.Label(hunt.route[i]), kill ? Good : Info));
+        }
+        tags.Add((PieceCenter(hunt.hunter), TurnPlannerAnalysis.Label(hunt.route[0]), Info));
     }
 
     private void ClearFocus()
@@ -333,11 +396,18 @@ public class TurnPlannerUI : MonoBehaviour
         TouchGUI.Block(panel);
         float x = panel.x + 12, y = panel.y + 10, inner = w - 24;
 
-        GUI.Label(new Rect(x, y, inner - 50, 30), "TURN PLANNER", NeonTheme.GUILabelStyle(NeonTheme.Lime, 20, true, TextAnchor.MiddleLeft, display: true));
+        GUI.Label(new Rect(x, y, inner - 50, 30), ZombieMode.Active ? "ZOMBIE HUNT" : "TURN PLANNER", NeonTheme.GUILabelStyle(NeonTheme.Lime, 20, true, TextAnchor.MiddleLeft, display: true));
         if (TouchGUI.NeonButton(new Rect(panel.xMax - 50, y, 40, 32), "X", NeonTheme.Pink, NeonTheme.Ground, fontSize: 16)) { Close(); TouchGUI.End(); return; }
         y += 34;
         GUI.Label(new Rect(x, y, inner, 20), $"{side} to move" + (CanMoveNow() ? "" : " (planning only)") + (focus ? "" : " · tap a piece to plan it"), NeonTheme.GUILabelStyle(NeonTheme.Lavender, 13));
         y += 22;
+
+        if (ZombieMode.Active)
+        {
+            DrawHunts(panel, x, y, inner);
+            TouchGUI.End();
+            return;
+        }
 
         if (pieces.Count == 0)
         {
@@ -418,6 +488,81 @@ public class TurnPlannerUI : MonoBehaviour
 
         if (!string.IsNullOrEmpty(note)) GUI.Label(new Rect(x, bottom - 22, inner, 20), note, NeonTheme.GUILabelStyle(Danger, 12));
         TouchGUI.End();
+    }
+
+    /// <summary>Zombie Survival: step through the zombies and the fastest way to destroy each</summary>
+    private void DrawHunts(Rect panel, float x, float y, float inner)
+    {
+        if (hunts.Count == 0)
+        {
+            GUI.Label(new Rect(x, y, inner, 40), side == ZombieMode.PlayerColor ? "No zombies on the board." : "The zombies are moving…", NeonTheme.GUILabelStyle(Warn, 15));
+            return;
+        }
+        var hunt = CurrentHunt;
+        if (TouchGUI.NeonButton(new Rect(x, y, 40, 40), "<", Danger, NeonTheme.Ground, fontSize: 20)) { huntIndex = (huntIndex - 1 + hunts.Count) % hunts.Count; ApplyFocus(); }
+        GUI.Label(new Rect(x + 46, y, inner - 92, 40), $"Zombie {(hunt.zombie.pieceType == ChessPieceType.Pawn ? "" : hunt.zombie.pieceType + " ")}on {TurnPlannerAnalysis.Label(hunt.zombie.CurrentPosition)}\n<size=11>zombie {huntIndex + 1} of {hunts.Count}, quickest kill first</size>",
+            Rich(NeonTheme.GUILabelStyle(NeonTheme.White, 16, true, TextAnchor.MiddleCenter)));
+        if (TouchGUI.NeonButton(new Rect(x + inner - 40, y, 40, 40), ">", Danger, NeonTheme.Ground, fontSize: 20)) { huntIndex = (huntIndex + 1) % hunts.Count; ApplyFocus(); }
+        y += 48;
+
+        var lines = new List<(string, Color)>();
+        if (hunt.Reachable)
+        {
+            lines.Add(($"Your {hunt.hunter.pieceType} on {TurnPlannerAnalysis.Label(hunt.route[0])} gets it in {hunt.turns} move{(hunt.turns == 1 ? "" : "s")}", Good));
+            var steps = new List<string>();
+            for (int i = 1; i < hunt.route.Count; i++) steps.Add((i == hunt.route.Count - 1 ? "x " : "") + TurnPlannerAnalysis.Label(hunt.route[i]));
+            lines.Add(($"Route: {TurnPlannerAnalysis.Label(hunt.route[0])} → {string.Join(" → ", steps)}", Info));
+            if (hunt.zombiePath.Count > 1)
+                lines.Add(($"The zombie should go {string.Join(" → ", hunt.zombiePath.ConvertAll(p => TurnPlannerAnalysis.Label(p)))}", Danger));
+            lines.Add(hunt.safeRoute ? ("No zombie can bite it on the way", Info) : ("A zombie could bite it on the way", Warn));
+            lines.Add(hunt.safeAfter ? ("Safe after the kill", Info) : ("Can be bitten right after the kill", Warn));
+        }
+        else lines.Add(($"None of your pieces can reach it within {ZombieHuntPlanner.MaxTurns} moves", Warn));
+        lines.Add(("Guesses assume your other pieces stay put; new zombies rise at random.", NeonTheme.Lavender));
+        foreach (var (text, color) in lines)
+        {
+            var style = NeonTheme.GUILabelStyle(color, 13, true, TextAnchor.UpperLeft);
+            float h = style.CalcHeight(new GUIContent(text), inner);
+            GUI.Label(new Rect(x, y, inner, h), text, style);
+            y += h + 3;
+        }
+        y += 4;
+
+        float bottom = panel.yMax - 50;
+        if (TouchGUI.NeonButton(new Rect(x, bottom, 120, 40), focus ? "Show all" : "Focus", Info, NeonTheme.Pink, outlined: true, fontSize: 14))
+        {
+            focus = !focus;
+            if (!focus) { foreach (Renderer r in hidden) if (r != null) r.enabled = true; hidden.Clear(); }
+            else ApplyFocus();
+        }
+        if (hunt.Reachable && CanMoveNow())
+        {
+            if (TouchGUI.NeonButton(new Rect(x + inner - 150, bottom, 150, 40), hunt.turns == 1 ? "Take it" : "Make 1st move", NeonTheme.Lime, NeonTheme.Pink, fontSize: 15))
+            {
+                var h = hunt;
+                Close();
+                if (InputManager.Instance == null || !InputManager.Instance.PlannerMove(h.hunter, h.FirstStep)) note = "Couldn't make that move";
+            }
+        }
+
+        // Every zombie, tap to pick
+        float listHeight = bottom - 8 - y;
+        if (listHeight > 60 && hunts.Count > 1)
+        {
+            Rect view = new Rect(x, y, inner, listHeight);
+            Rect content = new Rect(0, 0, inner - 16, hunts.Count * 30);
+            listScroll = GUI.BeginScrollView(view, listScroll, content);
+            for (int i = 0; i < hunts.Count; i++)
+            {
+                var h = hunts[i];
+                string tag = h.Reachable ? $"{h.turns} move{(h.turns == 1 ? "" : "s")} · {h.hunter.pieceType}{(h.safeRoute ? "" : ", risky")}" : "out of reach";
+                Color c = i == huntIndex ? NeonTheme.Yellow : !h.Reachable ? NeonTheme.Lavender : h.safeRoute ? Good : Warn;
+                if (GUI.Button(new Rect(0, i * 30, inner - 16, 28), GUIContent.none, GUIStyle.none)) { huntIndex = i; ApplyFocus(); }
+                GUI.Label(new Rect(4, i * 30, inner - 24, 28), $"{TurnPlannerAnalysis.Label(h.zombie.CurrentPosition)}  ·  {tag}", NeonTheme.GUILabelStyle(c, 13));
+            }
+            GUI.EndScrollView();
+        }
+        if (!string.IsNullOrEmpty(note)) GUI.Label(new Rect(x, bottom - 22, inner, 20), note, NeonTheme.GUILabelStyle(Danger, 12));
     }
 
     private static IEnumerable<(string, Color)> Describe(TurnPlannerAnalysis.MoveOutcome o)

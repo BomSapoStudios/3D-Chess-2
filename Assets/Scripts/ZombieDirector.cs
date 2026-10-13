@@ -350,7 +350,7 @@ public class ZombieDirector : MonoBehaviour
     // Round, zombies and score along the top while the run is on
     private void OnGUI()
     {
-        if (!started || ended || GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
+        if (!started || ended || TurnPlannerUI.IsOpen || GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
         Vector2 ui = TouchGUI.Begin();
         CountZombies(out int pawns, out int promoted);
         // Under the turn / last move line, on its own panel so it reads clearly over the board
