@@ -326,7 +326,9 @@ public partial class NeonMenu : MonoBehaviour
         }
 
         // Every home screen button rocks gently, each on its own beat
-        foreach (Button b in menuScreen.GetComponentsInChildren<Button>(true)) b.gameObject.AddComponent<Swivel>();
+        var swivels = new List<Button>(menuScreen.GetComponentsInChildren<Button>(true));
+        for (int i = swivels.Count - 1; i > 0; i--) { int j = UnityEngine.Random.Range(0, i + 1); (swivels[i], swivels[j]) = (swivels[j], swivels[i]); }
+        foreach (Button b in swivels) b.gameObject.AddComponent<Swivel>(); // speeds handed out in this shuffled order
 
         // Toasts sit above every screen (setup errors show while the setup screen is open)
         toastPanel = NewImage("Toast", safeRoot, NeonTheme.Ground);

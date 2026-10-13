@@ -7,13 +7,15 @@ public class Swivel : MonoBehaviour
     public float seconds = 3f;     // one full back-and-forth
 
     private float baseAngle, phase;
+    private static int next;
 
     private void Start()
     {
         baseAngle = transform.localEulerAngles.z;
         if (baseAngle > 180f) baseAngle -= 360f;
         phase = Random.value * Mathf.PI * 2f;   // each button on its own beat
-        seconds *= Random.Range(0.85f, 1.15f);
+        // and at its own speed: spread around the set time, never two the same
+        seconds *= 0.7f + 0.12f * (next++ % 6) + Random.Range(0f, 0.08f);
     }
 
     private void Update()
