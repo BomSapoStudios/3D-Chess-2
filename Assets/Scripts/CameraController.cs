@@ -102,8 +102,7 @@ public class CameraController : MonoBehaviour
 
         // Only the board, its trays and the pieces count toward what must be on screen
         var renderers = new System.Collections.Generic.List<Renderer>();
-        foreach (EmergencyChessBoard board in FindObjectsByType<EmergencyChessBoard>(FindObjectsSortMode.None))
-            renderers.AddRange(board.GetComponentsInChildren<Renderer>());
+        // (the cube itself is added from its size below; its neon strips and labels can sit in the border)
         foreach (PieceTray tray in FindObjectsByType<PieceTray>(FindObjectsSortMode.None))
             renderers.AddRange(tray.GetComponentsInChildren<Renderer>());
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
@@ -126,14 +125,42 @@ public class CameraController : MonoBehaviour
             corners.Add(m.MultiplyPoint3x4(new Vector3(min.x, max.y, max.z))); corners.Add(m.MultiplyPoint3x4(new Vector3(max.x, max.y, max.z)));
             for (int k = 0; k < 8; k++) cornerOwners.Add(r.name);
         }
+        // The cube itself, from its size: floors hidden during setup mustn't shrink the fit
+        GameObject container = GameObject.Find("Pieces Container");
+        if (container != null && ChessBoard.Instance != null && BoardDimensionsManager.Instance != null)
+        {
+            Vector3Int d = BoardDimensionsManager.Instance.GetDimensions();
+            Vector3 lo = ChessBoard.Instance.BoardToLocalPosition(new BoardPosition(0, 0, 0));
+            Vector3 hi = ChessBoard.Instance.BoardToLocalPosition(new BoardPosition(d.x - 1, d.y - 1, d.z - 1));
+            Vector3 pad = d.x > 1 ? (hi - lo) / (2f * (d.x - 1)) : Vector3.one * 0.5f; // half a cell
+            Vector3 a = Vector3.Min(lo, hi) - new Vector3(Mathf.Abs(pad.x), Mathf.Abs(pad.y), Mathf.Abs(pad.z));
+            Vector3 b = Vector3.Max(lo, hi) + new Vector3(Mathf.Abs(pad.x), Mathf.Abs(pad.y), Mathf.Abs(pad.z));
+            // Orbit the middle of the cube (the board object itself sits at a corner)
+            Transform focus = container.transform.Find("Camera Focus");
+            if (focus == null)
+            {
+                focus = new GameObject("Camera Focus").transform;
+                focus.SetParent(container.transform, false);
+            }
+            focus.localPosition = (lo + hi) * 0.5f;
+            if (target != focus) { target = focus; targetPosition = focus.position; }
+            for (int k = 0; k < 8; k++)
+            {
+                corners.Add(container.transform.TransformPoint(new Vector3((k & 1) == 0 ? a.x : b.x, (k & 2) == 0 ? a.y : b.y, (k & 4) == 0 ? a.z : b.z)));
+                cornerOwners.Add("Board cube");
+            }
+        }
         if (corners.Count == 0) return;
+        // Measure around where the camera is heading, without nudging its smoothing along
+        Vector3 savedTarget = targetPosition;
+        if (target != null) targetPosition = target.position;
 
         // Find the closest zoom where every corner is in front of the camera and
         // inside the margins below (binary search on distance)
         // Viewport half-size is 0.5. Leave more room top and bottom for the
         // on-screen buttons and status text.
         const float targetExtentX = 0.46f;
-        const float targetExtentY = 0.38f;
+        const float targetExtentY = 0.34f; // a clear border above and below the board
         // Bigger boards (6x6x6, 8x8x8) need to sit further back than the default zoom limit
         float near = minDistance, far = 150f;
         for (int i = 0; i < 20; i++)
@@ -154,6 +181,7 @@ public class CameraController : MonoBehaviour
         }
         distance = far;
         maxDistance = Mathf.Max(35f, distance * 1.6f); // let players zoom out past the fitted view
+        targetPosition = savedTarget;
         UpdateCameraPosition();
         string widest = ""; float widestExtent = 0f;
         for (int i = 0; i < corners.Count; i++)
@@ -376,10 +404,15 @@ public class CameraController : MonoBehaviour
     {
         float startYaw = currentHorizontalAngle, startPitch = currentVerticalAngle;
         // Also come back to the zoom that frames the board: from far out, a view from above or
-        // below would otherwise show mostly the ground or sky with a tiny board in the middle
+        // below would otherwise show mostly the ground or sky with a tiny board in the middle.
+        // The fit is worked out from where the camera ends up, not where it starts.
         float startDistance = distance;
+        currentHorizontalAngle = yaw;
+        currentVerticalAngle = pitch;
         FitDistanceToBoard();
         float fitDistance = distance;
+        currentHorizontalAngle = startYaw;
+        currentVerticalAngle = startPitch;
         distance = startDistance;
         for (float t = 0f; t < seconds; t += Time.deltaTime)
         {

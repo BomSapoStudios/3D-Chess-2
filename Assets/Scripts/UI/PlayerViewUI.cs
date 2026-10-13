@@ -39,17 +39,27 @@ public class PlayerViewUI : MonoBehaviour
     /// <summary>The side last picked with a View button (the setup tools follow it)</summary>
     public static PieceColor? LastViewed;
     private float inGameSince = -1f;
+    private bool startFramed;
 
     private void Update()
     {
-        if (!InGame()) { inGameSince = -1f; return; }
+        if (!InGame()) { inGameSince = -1f; startFramed = false; return; }
         if (inGameSince < 0f) inGameSince = Time.time;
-        // Wait a moment for the camera to frame the board, then swing round
-        if (StartView.HasValue && Time.time - inGameSince > 0.8f)
+        // Once the board exists, start from your own side's view, the same one its View button gives
+        if (!startFramed && Time.time - inGameSince > 0.8f)
         {
-            if (StartView.Value != PieceColor.White) ViewFrom(StartView.Value);
+            startFramed = true;
+            PieceColor side = StartView ?? (OnlineSession.IsActive ? OnlineSession.LocalColor : FirstHuman());
             StartView = null;
+            ViewFrom(side, 0.3f);
         }
+    }
+
+    private PieceColor FirstHuman()
+    {
+        foreach (PieceColor c in Players())
+            if (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(c)) return c;
+        return PieceColor.White;
     }
 
     private void OnGUI()
@@ -80,14 +90,15 @@ public class PlayerViewUI : MonoBehaviour
         TouchGUI.End();
     }
 
-    private void ViewFrom(PieceColor color)
+    private void ViewFrom(PieceColor color, float seconds = 0.6f)
     {
         if (cameraController == null) cameraController = FindFirstObjectByType<CameraController>();
         if (cameraController == null) return;
 
-        // Look straight at the player's own face of the cube (their playing surface)
-        Vector3 face = HomeSideDirection(color, out _);
-        Vector3 from = face;
+        // Look at the player's own face of the cube (their playing surface) from a little above,
+        // so the whole board shows in perspective rather than flat
+        Vector3 face = HomeSideDirection(color, out Vector3 boardUp);
+        Vector3 from = face * 0.9f + boardUp * 0.42f; // about 25 degrees up
         if (Mathf.Abs(face.y) > 0.7f)
         {
             // Top or bottom face: as near head-on as the camera allows, keeping its current heading
@@ -96,7 +107,7 @@ public class PlayerViewUI : MonoBehaviour
             if (side.sqrMagnitude < 0.01f) side = Vector3.back;
             from = side.normalized * 0.17f + Vector3.up * Mathf.Sign(face.y);
         }
-        cameraController.SnapToView(from);
+        cameraController.SnapToView(from, seconds);
     }
 
     public static Vector3 BoardCenter()
