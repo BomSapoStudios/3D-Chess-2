@@ -4,7 +4,7 @@ using UnityEngine;
 public class Swivel : MonoBehaviour
 {
     public float degrees = 1.6f;   // how far either side
-    public float seconds = 3f;     // one full back-and-forth
+    public float seconds = 5f;     // one full back-and-forth (on average; each button differs)
 
     private float baseAngle, phase;
     private static int next;

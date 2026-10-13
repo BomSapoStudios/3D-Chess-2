@@ -12,7 +12,7 @@ public class BlobGraphic : MaskableGraphic
 {
     private const int Points = 72;
     public float wobble = 0.07f;   // how far the edge moves, as a share of the shorter side
-    public float speed = 1f;
+    public float speed = 0.5f;    // half the original pace: a slow lava-lamp drift
     private float seed;
 
     protected override void Awake()
