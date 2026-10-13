@@ -36,6 +36,13 @@ public class RematchDemo : MonoBehaviour
         yield return new WaitForSeconds(2f);
         GameEndDetectionManager.Instance.HandleForfeit(PieceColor.White);
         Debug.Log("REMATCH DEMO: White resigned");
+        // Then tap Rematch: the new game must start clean, without the old result
+        yield return new WaitForSeconds(3f);
+        RematchUI panel = FindFirstObjectByType<RematchUI>();
+        Debug.Log($"REMATCH DEMO: panel showing {RematchUI.Showing}");
+        if (panel != null) panel.DebugRematch();
+        yield return new WaitForSeconds(8f);
+        Debug.Log($"REMATCH DEMO: after rematch, panel showing {RematchUI.Showing}, state {GameStateManager.Instance.currentState}");
     }
 }
 #endif

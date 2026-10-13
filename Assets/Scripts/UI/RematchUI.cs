@@ -46,9 +46,16 @@ public class RematchUI : MonoBehaviour
     private static bool Online => OnlineSession.IsActive;
     private static OnlineGameBridge Bridge => OnlineGameBridge.Instance;
 
+    private bool armed; // seen this game being set up or played (the game state outlives scenes)
+
     private bool GameIsOver()
     {
-        if (GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.GameOver) return true;
+        // A rematch loads straight from a finished game, so the old Game Over lingers for a moment
+        // until the new game starts; only a game seen in progress here can end
+        var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        if (state == GameState.PiecePlacement || state == GameState.Playing) armed = true;
+        if (!armed) return false;
+        if (state == GameState.GameOver) return true;
         return Online && Bridge != null && Bridge.ServerGameOver && !OnlineSession.Replaying;
     }
 
@@ -145,6 +152,11 @@ public class RematchUI : MonoBehaviour
         Showing = false;
         SceneController.Instance.LoadGameScene(config);
     }
+
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    /// <summary>Tap Rematch (RematchDemo)</summary>
+    public void DebugRematch() => Rematch();
+#endif
 
     private void GoHome(string note)
     {
