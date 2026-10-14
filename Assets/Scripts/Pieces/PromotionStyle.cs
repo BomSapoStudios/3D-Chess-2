@@ -24,6 +24,6 @@ public static class PromotionStyle
         : kind == Kind.Coronation
         ? "A glowing ring crowns the pawn, squeezes it to a spark, and the new piece rises in a shockwave."
         : kind == Kind.BlackHole
-        ? "The pawn collapses into a black ball, and the new piece forms out of it."
+        ? "The pawn collapses into a black ball, which morphs into the new piece."
         : "The pawn glitches like a broken hologram, then rebuilds from glowing cubes.";
 }

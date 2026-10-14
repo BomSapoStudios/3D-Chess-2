@@ -766,8 +766,8 @@ public class PieceEffects : MonoBehaviour
 
     /// <summary>
     /// Black hole (a choice in Customize): the pawn twists and collapses into a black ball
-    /// circled by a glowing ring, light streaming in; the ball throbs, then the new piece
-    /// forms out of it as the ball shrinks away.
+    /// circled by a glowing ring, light streaming in; the ball throbs, then morphs into the new
+    /// piece's black silhouette, which lights up and dissolves to reveal the piece.
     /// </summary>
     private IEnumerator BlackHoleRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
     {
@@ -857,29 +857,59 @@ public class PieceEffects : MonoBehaviour
             yield return null;
         }
 
-        // 3. The new piece forms out of the ball, which shrinks away to nothing
-        GameObject flash = Solid("Black Hole Flash", sphere, color, core, Vector3.one * 0.3f);
-        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 1.0f * cell));
-        const float form = 0.5f;
-        for (float time = 0; time < form && t != null; time += Time.deltaTime)
+        // 3. The ball itself morphs into the piece: a black silhouette of the new piece starts
+        //    squeezed into the ball's round shape, stretches into the piece's outline, then
+        //    lights up in the piece's colour and dissolves to reveal it
+        SetSquash(t, 1f, 1f);
+        GameObject shape = VisualCopy(promoted);
+        SetSquash(t, 0f, 0f);
+        var shapeRenderers = new List<Renderer>(shape.GetComponentsInChildren<Renderer>());
+        foreach (Renderer r in shapeRenderers) { r.sharedMaterial = Glow; SetColor(r, Color.black); }
+        Bounds rest = BoundsOf(shape);
+        Vector3 restPos = shape.transform.position;
+        Vector3 restScale = shape.transform.localScale;
+        Vector3 restCentreOffset = rest.center - restPos;
+        float width = Mathf.Max(rest.size.x, rest.size.z), height = Mathf.Max(0.01f, rest.size.y);
+        // Squash and stretch that make the piece as round and as big as the ball
+        float roundWide = ballSize / Mathf.Max(0.01f, width), roundTall = ballSize / height;
+        Destroy(ball);
+
+        const float morph = 0.6f;
+        for (float time = 0; time < morph; time += Time.deltaTime)
         {
-            float k = time / form;
-            float e = 1f - (1f - k) * (1f - k);
-            // Grow from the ball's size with a small overshoot
-            float grow = Mathf.Lerp(0.15f, 1f, e) + Mathf.Sin(k * Mathf.PI) * 0.1f;
-            SetSquash(t, grow, grow);
-            float size = ballSize * (1f - e);
-            ball.transform.localScale = Vector3.one * size;
-            Disk(Mathf.Lerp(0.42f, 0.7f, e) * cell, 1f - k);
+            float k = time / morph;
+            float e = k * k * (3f - 2f * k);
+            // Jelly: overshoot past the final shape and settle
+            float jelly = Mathf.Sin(k * Mathf.PI * 2.5f) * (1f - k) * 0.12f;
+            float wide = Mathf.Lerp(roundWide, 1f, e) * (1f - jelly);
+            float tall = Mathf.Lerp(roundTall, 1f, e) * (1f + jelly);
+            shape.transform.localScale = new Vector3(restScale.x * wide, restScale.y * tall, restScale.z * wide);
+            // Its middle travels from the ball's centre down to where the piece stands
+            Vector3 centre = Vector3.Lerp(core, restPos + restCentreOffset, e);
+            shape.transform.position = centre - Vector3.Scale(restCentreOffset, new Vector3(wide, tall, wide));
+            Disk(Mathf.Lerp(0.42f, 0.6f, e) * cell, 1f - k * 0.6f);
             yield return null;
         }
-        Destroy(ball);
-        Destroy(disk.gameObject);
-        if (t != null)
+        shape.transform.SetPositionAndRotation(restPos, shape.transform.rotation);
+        shape.transform.localScale = restScale * 1.02f; // just over the real piece while it fades
+
+        // Light up and dissolve into the real piece
+        if (t != null) SetSquash(t, 1f, 1f);
+        GameObject flash = Solid("Black Hole Flash", sphere, color, rest.center, Vector3.one * 0.3f);
+        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 0.9f * cell));
+        const float reveal = 0.35f;
+        for (float time = 0; time < reveal; time += Time.deltaTime)
         {
-            SetSquash(t, 1f, 1f);
-            LandingRing(t.position, color);
+            float k = time / reveal;
+            Color c = k < 0.4f ? Color.Lerp(Color.black, Color.Lerp(color, Color.white, 0.3f), k / 0.4f) : Color.Lerp(color, Color.white, 0.3f);
+            c.a = k < 0.4f ? 1f : 1f - (k - 0.4f) / 0.6f;
+            foreach (Renderer r in shapeRenderers) if (r != null) SetColor(r, c);
+            Disk(0.6f * cell, 0.4f * (1f - k));
+            yield return null;
         }
+        Destroy(shape);
+        Destroy(disk.gameObject);
+        if (t != null) LandingRing(t.position, color);
     }
 
     /// <summary>A wide ring of light rippling out across the floor</summary>
