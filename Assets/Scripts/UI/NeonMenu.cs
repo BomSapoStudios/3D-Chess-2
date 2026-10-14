@@ -763,7 +763,8 @@ public partial class NeonMenu : MonoBehaviour
         {
             PromotionChip(PromotionStyle.Kind.GlitchRebuild),
             PromotionChip(PromotionStyle.Kind.SpinMorph),
-        }, NeonTheme.Lime, 16);
+            PromotionChip(PromotionStyle.Kind.Coronation),
+        }, NeonTheme.Lime, 14);
         promotionNote = NewText("Note", left, "", 14, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         promotionNote.fontStyle = FontStyles.Normal;
         promotionNote.enableWordWrapping = true;

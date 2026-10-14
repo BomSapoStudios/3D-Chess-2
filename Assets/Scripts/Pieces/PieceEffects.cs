@@ -427,6 +427,7 @@ public class PieceEffects : MonoBehaviour
         if (copy != null) copy.transform.SetPositionAndRotation(promoted.transform.position, copy.transform.rotation);
         Color color = GlowColor(promoted.pieceColor);
         if (PromotionStyle.Current == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
+        else if (PromotionStyle.Current == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
         else Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, color));
     }
 
@@ -639,6 +640,141 @@ public class PieceEffects : MonoBehaviour
             t.localRotation = restRotation;
             LandingRing(t.position, color);
         }
+    }
+
+    /// <summary>
+    /// Coronation (a choice in Customize): a glowing ring floats down around the pawn and
+    /// squeezes it into a point of light; the ring flashes, the new piece rises out of it, and a
+    /// shockwave ripples out across that floor of the board.
+    /// </summary>
+    private IEnumerator CoronationRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
+    {
+        Transform t = promoted.transform;
+        SetSquash(t, 0f, 0f);
+        yield return null;
+        if (t == null) { if (pawnCopy != null) Destroy(pawnCopy); yield break; }
+        Vector3 rest = RestScale(t);
+        SetSquash(t, 0f, 0f);
+        Transform container = PiecesContainer;
+        Vector3 up = container != null ? container.up : Vector3.up;
+        Quaternion flat = container != null ? container.rotation : Quaternion.identity;
+        float cell = Cell;
+        Vector3 floor = t.position;
+        Bounds pawnBounds = pawnCopy != null ? BoundsOf(pawnCopy) : new Bounds(floor + up * cell * 0.35f, Vector3.one * cell * 0.5f);
+        float top = Vector3.Dot(pawnBounds.max - floor, up);
+        Vector3 waist = floor + up * Mathf.Max(0.2f * cell, top * 0.55f);
+
+        LineRenderer ring = RingLine("Crown Ring", flat, 0.06f * cell);
+        void DrawRing(Vector3 centre, float radius, float width, Color c)
+        {
+            ring.transform.position = centre;
+            for (int i = 0; i < 48; i++)
+            {
+                float a = i / 48f * Mathf.PI * 2f;
+                ring.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0, Mathf.Sin(a) * radius));
+            }
+            ring.widthMultiplier = width;
+            ring.startColor = ring.endColor = c;
+        }
+
+        // 1. The ring floats down from above and settles round the pawn's waist
+        const float descend = 0.4f;
+        Vector3 high = floor + up * (top + cell * 0.9f);
+        for (float time = 0; time < descend; time += Time.deltaTime)
+        {
+            float k = time / descend;
+            float e = 1f - (1f - k) * (1f - k);
+            Color c = color; c.a = Mathf.Lerp(0.2f, 1f, k);
+            DrawRing(Vector3.Lerp(high, waist, e), cell * 0.42f, 0.07f * cell, c);
+            yield return null;
+        }
+
+        // 2. It tightens, squeezing the pawn into a growing point of light
+        Mesh sphere = PrimitiveMesh(PrimitiveType.Sphere, ref orbMesh);
+        GameObject spark = Solid("Crown Spark", sphere, Color.Lerp(color, Color.white, 0.5f), waist, Vector3.one * 0.01f);
+        Vector3 pawnScale = pawnCopy != null ? pawnCopy.transform.localScale : Vector3.one;
+        Vector3 pawnPos = pawnCopy != null ? pawnCopy.transform.position : floor;
+        const float squeeze = 0.35f;
+        for (float time = 0; time < squeeze; time += Time.deltaTime)
+        {
+            float k = time / squeeze;
+            float e = k * k;
+            if (pawnCopy != null)
+            {
+                pawnCopy.transform.localScale = pawnScale * Mathf.Lerp(1f, 0.02f, e);
+                pawnCopy.transform.position = Vector3.Lerp(pawnPos, waist, e);
+            }
+            spark.transform.localScale = Vector3.one * cell * Mathf.Lerp(0.02f, 0.22f, e);
+            Color c = color; c.a = 1f;
+            DrawRing(waist, cell * Mathf.Lerp(0.42f, 0.12f, e), Mathf.Lerp(0.07f, 0.11f, e) * cell, c);
+            yield return null;
+        }
+        if (pawnCopy != null) Destroy(pawnCopy);
+
+        // 3. Flash: the new piece rises out of the ring, which bursts outward as a shockwave
+        StartCoroutine(FadeOut(spark, 0.25f, 0.22f * cell, 0.9f * cell));
+        GameObject flash = Solid("Crown Flash", sphere, color, waist, Vector3.one * 0.3f);
+        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 1.3f * cell));
+        StartCoroutine(Shockwave(floor + up * 0.04f, flat, color, cell));
+
+        const float rise = 0.45f;
+        for (float time = 0; time < rise && t != null; time += Time.deltaTime)
+        {
+            float k = time / rise;
+            float e = 1f - (1f - k) * (1f - k);
+            // Up out of the floor with a small overshoot, stretched then settling
+            float lift = Mathf.Lerp(-0.45f, 0f, e) * cell + Mathf.Sin(k * Mathf.PI) * 0.08f * cell;
+            t.position = floor + up * lift;
+            SetSquash(t, Mathf.Lerp(0.6f, 1f, e), Mathf.Lerp(1.25f, 1f, e));
+            Color c = color; c.a = 1f - k;
+            DrawRing(waist + up * cell * 0.3f * e, cell * Mathf.Lerp(0.12f, 0.5f, e), 0.06f * cell * (1f - k), c);
+            yield return null;
+        }
+        Destroy(ring.gameObject);
+        if (t != null)
+        {
+            t.position = floor;
+            t.localScale = rest;
+            SetSquash(t, 1f, 1f);
+        }
+    }
+
+    /// <summary>A wide ring of light rippling out across the floor</summary>
+    private IEnumerator Shockwave(Vector3 centre, Quaternion flat, Color color, float cell)
+    {
+        LineRenderer wave = RingLine("Shockwave", flat, 0.1f * cell);
+        wave.transform.position = centre;
+        const float duration = 0.7f;
+        for (float time = 0; time < duration; time += Time.deltaTime)
+        {
+            float k = time / duration;
+            float radius = Mathf.Lerp(0.2f, 2.2f, 1f - (1f - k) * (1f - k)) * cell;
+            for (int i = 0; i < 64; i++)
+            {
+                float a = i / 64f * Mathf.PI * 2f;
+                wave.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0, Mathf.Sin(a) * radius));
+            }
+            wave.widthMultiplier = Mathf.Lerp(0.14f, 0.02f, k) * cell;
+            Color c = color; c.a = 0.9f * (1f - k);
+            wave.startColor = wave.endColor = c;
+            yield return null;
+        }
+        Destroy(wave.gameObject);
+    }
+
+    private static LineRenderer RingLine(string name, Quaternion rotation, float width)
+    {
+        var go = new GameObject(name);
+        go.transform.rotation = rotation;
+        var line = go.AddComponent<LineRenderer>();
+        line.sharedMaterial = Glow;
+        line.useWorldSpace = false;
+        line.loop = true;
+        line.positionCount = name == "Shockwave" ? 64 : 48;
+        line.widthMultiplier = width;
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        line.receiveShadows = false;
+        return line;
     }
 
     /// <summary>Points spread over a piece's meshes (world space)</summary>
