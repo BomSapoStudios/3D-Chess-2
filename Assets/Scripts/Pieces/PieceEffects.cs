@@ -766,7 +766,7 @@ public class PieceEffects : MonoBehaviour
 
     /// <summary>
     /// Black hole (a choice in Customize): the pawn twists and collapses into a black ball
-    /// circled by a glowing ring, light streaming in; the ball throbs, then morphs into the new
+    /// as light streams in; the ball throbs, then morphs into the new
     /// piece's black silhouette, which lights up and dissolves to reveal the piece.
     /// </summary>
     private IEnumerator BlackHoleRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
@@ -787,8 +787,6 @@ public class PieceEffects : MonoBehaviour
         Mesh sphere = PrimitiveMesh(PrimitiveType.Sphere, ref orbMesh);
 
         GameObject ball = Solid("Black Hole", sphere, new Color(0.02f, 0f, 0.05f, 1f), core, Vector3.one * 0.01f);
-        LineRenderer disk = RingLine("Black Hole Disk", flat * Quaternion.Euler(18f, 0f, 0f), 0.05f * cell);
-        disk.transform.position = core;
 
         // Light streaming in: motes that spiral from round the pawn into the ball
         var motes = new List<(Transform t, Renderer r, Vector3 from, float angle, float delay)>();
@@ -797,20 +795,6 @@ public class PieceEffects : MonoBehaviour
             Vector3 from = pawnBounds.center + Vector3.Scale(Random.insideUnitSphere, pawnBounds.extents) * 1.3f;
             GameObject m = Solid("Mote", sphere, Color.Lerp(color, Color.white, 0.4f), from, Vector3.one * cell * 0.05f);
             motes.Add((m.transform, m.GetComponent<Renderer>(), from, Random.Range(120f, 300f), Random.Range(0f, 0.35f)));
-        }
-
-        float spin = 0f;
-        void Disk(float radius, float alpha)
-        {
-            spin += Time.deltaTime * 4f;
-            for (int i = 0; i < 48; i++)
-            {
-                float a = i / 48f * Mathf.PI * 2f + spin;
-                float wobble = 1f + 0.06f * Mathf.Sin(a * 3f + spin * 2f);
-                disk.SetPosition(i, new Vector3(Mathf.Cos(a) * radius * wobble, 0, Mathf.Sin(a) * radius * wobble));
-            }
-            Color c = color; c.a = alpha;
-            disk.startColor = disk.endColor = c;
         }
 
         // 1. Collapse: the pawn twists and shrinks into the ball as it forms
@@ -831,7 +815,6 @@ public class PieceEffects : MonoBehaviour
             }
             float size = ballSize * Mathf.SmoothStep(0f, 1f, k);
             ball.transform.localScale = Vector3.one * size;
-            Disk(Mathf.Lerp(0.15f, 0.42f, k) * cell, k);
             foreach (var m in motes)
             {
                 if (m.t == null) continue;
@@ -853,7 +836,6 @@ public class PieceEffects : MonoBehaviour
             float k = time / throb;
             float pulse = 1f + 0.12f * Mathf.Sin(k * Mathf.PI * 3f);
             ball.transform.localScale = Vector3.one * ballSize * pulse;
-            Disk(0.42f * cell * pulse, 1f);
             yield return null;
         }
 
@@ -887,7 +869,6 @@ public class PieceEffects : MonoBehaviour
             // Its middle travels from the ball's centre down to where the piece stands
             Vector3 centre = Vector3.Lerp(core, restPos + restCentreOffset, e);
             shape.transform.position = centre - Vector3.Scale(restCentreOffset, new Vector3(wide, tall, wide));
-            Disk(Mathf.Lerp(0.42f, 0.6f, e) * cell, 1f - k * 0.6f);
             yield return null;
         }
         shape.transform.SetPositionAndRotation(restPos, shape.transform.rotation);
@@ -904,11 +885,9 @@ public class PieceEffects : MonoBehaviour
             Color c = k < 0.4f ? Color.Lerp(Color.black, Color.Lerp(color, Color.white, 0.3f), k / 0.4f) : Color.Lerp(color, Color.white, 0.3f);
             c.a = k < 0.4f ? 1f : 1f - (k - 0.4f) / 0.6f;
             foreach (Renderer r in shapeRenderers) if (r != null) SetColor(r, c);
-            Disk(0.6f * cell, 0.4f * (1f - k));
             yield return null;
         }
         Destroy(shape);
-        Destroy(disk.gameObject);
         if (t != null) LandingRing(t.position, color);
     }
 
