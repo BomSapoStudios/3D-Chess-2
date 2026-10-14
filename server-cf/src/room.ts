@@ -294,6 +294,17 @@ export class Room extends DurableObject<Env> {
         return this.broadcast({ type: 'game:stateUpdate', reason: 'placement', state: this.stateForClients() });
       }
 
+      case 'game:unplacePiece': {
+        // Setup: a piece taken back off the board onto its owner's bench
+        const result = engine.unplacePiece(me.color, msg.position as BoardPosition);
+        if (!result.success) return reply(false, result.error);
+        this.meta!.lastPlayAt = Date.now();
+        await this.persist();
+        reply(true);
+        await this.logEvent({ type: 'game:pieceUnplaced', color: me.color, pieceType: result.pieceType, position: msg.position });
+        return this.broadcast({ type: 'game:stateUpdate', reason: 'placement', state: this.stateForClients() });
+      }
+
       case 'game:ready': {
         if (engine.getState().phase !== 'placement') return reply(false, 'Not in placement phase');
         if (!engine.completePlacement(me.color)) return reply(false, `Place all your pieces first (${engine.piecesLeftToPlace(me.color)} left)`);

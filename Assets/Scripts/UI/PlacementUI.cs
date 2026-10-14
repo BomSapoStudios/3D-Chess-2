@@ -634,6 +634,22 @@ public class PlacementUI : MonoBehaviour
     /// <summary>
     /// Get instructions text based on current game state
     /// </summary>
+    /// <summary>A player on this device still setting up has pieces on the board</summary>
+    private static bool OwnPiecesOnBoard()
+    {
+        if (ChessBoard.Instance == null || BoardDimensionsManager.Instance == null || TurnManager.Instance == null) return false;
+        Vector3Int d = BoardDimensionsManager.Instance.GetDimensions();
+        for (int x = 0; x < d.x; x++)
+        for (int y = 0; y < d.y; y++)
+        for (int z = 0; z < d.z; z++)
+        {
+            ChessPiece p = ChessBoard.Instance.GetPieceAt(new BoardPosition(x, y, z));
+            if (p != null && !TurnManager.Instance.IsPlayerAI(p.pieceColor) && OnlineSession.CanControl(p.pieceColor)
+                && !PlacementManager.Instance.IsPlayerReady(p.pieceColor)) return true;
+        }
+        return false;
+    }
+
     private string GetInstructions()
     {
         if (GameStateManager.Instance == null) return "";
@@ -641,6 +657,9 @@ public class PlacementUI : MonoBehaviour
         switch (GameStateManager.Instance.currentState)
         {
             case GameState.PiecePlacement:
+                // Once some pieces are down, say how to change your mind
+                if (PlacementManager.Instance != null && !HasSelectedTrayPiece() && OwnPiecesOnBoard())
+                    return "Tap one of your placed pieces to move it, or send it back to the bench";
                 return "";
             
             case GameState.Playing:

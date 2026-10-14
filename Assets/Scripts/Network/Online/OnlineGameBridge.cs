@@ -158,6 +158,16 @@ public class OnlineGameBridge : MonoBehaviour
                     Remote(() => PlaceFromTray(color.Value, placedType, msg.position.ToBoard()));
                 break;
 
+            case "game:pieceUnplaced":
+                // Another device took a piece back to its bench
+                if (fromOpponent && ChessBoard.Instance != null)
+                {
+                    BoardPosition at = msg.position.ToBoard();
+                    ChessPiece taken = ChessBoard.Instance.GetPieceAt(at);
+                    if (taken != null && taken.pieceColor == color.Value) Remote(() => PlacementManager.Instance.ReturnToTray(taken, at));
+                }
+                break;
+
             case "game:playerReady":
                 if (fromOpponent) Remote(() => PlacementManager.Instance.SetPlayerReady(color.Value, true));
                 break;

@@ -685,15 +685,23 @@ public class PlacementManager : MonoBehaviour
     /// <summary>Take the picked-up board piece off the board and put it back on its bench</summary>
     public void ReturnSelectedToTray()
     {
-        if (!CanReturnSelectedToTray || OnlineSession.IsActive) return;
+        if (!CanReturnSelectedToTray) return;
         ChessPiece piece = selectedTrayPiece;
         BoardPosition pos = repositioningPieces[piece];
         repositioningPieces.Remove(piece);
-        if (ChessBoard.Instance != null && pos.IsValid() && ChessBoard.Instance.GetPieceAt(pos) == piece)
-            ChessBoard.Instance.SetPieceAt(pos, null);
         piece.OnDeselected();
         selectedTrayPiece = null;
         ClearPlacementIndicators();
+        if (OnlineSession.ShouldSend(piece.pieceColor)) OnlineClient.Instance.SendUnplacePiece(piece.pieceColor, pos);
+        ReturnToTray(piece, pos);
+    }
+
+    /// <summary>Take a piece off the board and back onto its bench (yours, or another device's in online setup)</summary>
+    public void ReturnToTray(ChessPiece piece, BoardPosition pos)
+    {
+        if (piece == null) return;
+        if (ChessBoard.Instance != null && pos.IsValid() && ChessBoard.Instance.GetPieceAt(pos) == piece)
+            ChessBoard.Instance.SetPieceAt(pos, null);
         piece.SetCurrentPosition(new BoardPosition(-1, -1, -1));
         PieceTray tray = PieceTray.GetTrayForColor(piece.pieceColor);
         if (tray != null) tray.ReturnPiece(piece);
@@ -732,12 +740,13 @@ public class PlacementManager : MonoBehaviour
     /// </summary>
     public void OnBoardPieceClickedForRepositioning(ChessPiece piece)
     {
-        if (OnlineSession.IsActive) return; // placements are final in online games
         if (piece == null)
         {
             Debug.LogError("PlacementManager: Cannot reposition null piece");
             return;
         }
+        // Online: only your own pieces, until you're ready (the server is told when they move)
+        if (OnlineSession.IsActive && (!OnlineSession.CanControl(piece.pieceColor) || IsPlayerReady(piece.pieceColor))) return;
         
         Debug.Log($"🔄 PlacementManager: Board piece clicked for repositioning - {piece.pieceColor} {piece.pieceType} at {piece.CurrentPosition}");
         
@@ -1493,10 +1502,14 @@ public class PlacementManager : MonoBehaviour
         }
         
         // Initialize or reposition the piece at the board position
+        bool moved = false;
+        BoardPosition movedFrom = default;
         if (repositioningPieces.ContainsKey(piece))
         {
             // This is a repositioning - update position directly without re-initializing
             BoardPosition originalPos = repositioningPieces[piece];
+            moved = true;
+            movedFrom = originalPos;
             Debug.Log($"🔄 PlacementManager: Completing repositioning from {originalPos} to {position}");
             
             // Update piece position and board registration
@@ -1533,9 +1546,10 @@ public class PlacementManager : MonoBehaviour
             PlacementVisibilityManager.Instance.OnPiecePlaced(piece);
         }
         
-        // Online: tell the server (it re-checks the placement)
+        // Online: tell the server (it re-checks the placement); a moved piece leaves its old square first
         if (OnlineSession.ShouldSend(piece.pieceColor))
         {
+            if (moved) OnlineClient.Instance.SendUnplacePiece(piece.pieceColor, movedFrom);
             OnlineClient.Instance.SendPlacePiece(piece.pieceColor, piece.pieceType, position);
         }
 

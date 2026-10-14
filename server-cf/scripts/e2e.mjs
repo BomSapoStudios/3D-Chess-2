@@ -105,6 +105,13 @@ check((await a.request({ type: 'game:placePiece', pieceType: 'Rook', position: {
 check((await b.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 3, y: 3, z: 3 } })).ok, 'Black places King');
 const badZone = await b.request({ type: 'game:placePiece', pieceType: 'Queen', position: { x: 0, y: 1, z: 1 } });
 check(!badZone.ok, `placement outside your zone is refused (${badZone.error})`);
+const unplaced = await a.request({ type: 'game:unplacePiece', position: { x: 0, y: 3, z: 3 } });
+check(unplaced.ok, `a placed piece can go back to the bench${unplaced.ok ? '' : ` (${unplaced.error})`}`);
+const unplaceEmpty = await a.request({ type: 'game:unplacePiece', position: { x: 0, y: 3, z: 3 } });
+check(!unplaceEmpty.ok, `nothing to take back from an empty square (${unplaceEmpty.error})`);
+const unplaceTheirs = await a.request({ type: 'game:unplacePiece', position: { x: 3, y: 3, z: 3 } });
+check(!unplaceTheirs.ok, `can't take back someone else's piece (${unplaceTheirs.error})`);
+check((await a.request({ type: 'game:placePiece', pieceType: 'Rook', position: { x: 0, y: 3, z: 3 } })).ok, 'and it can be placed again');
 const earlyReady = await a.request({ type: 'game:ready' });
 check(!earlyReady.ok, `Ready is refused until every piece is placed (${earlyReady.error})`);
 const extraKing = await a.request({ type: 'game:placePiece', pieceType: 'King', position: { x: 0, y: 2, z: 2 } });

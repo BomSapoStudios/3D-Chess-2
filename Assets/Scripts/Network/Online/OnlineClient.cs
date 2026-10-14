@@ -460,6 +460,10 @@ public class OnlineClient : MonoBehaviour
 
     // Each takes the side acting: the host also sends for its robot seats ("as")
 
+    /// <summary>Setup: a placed piece goes back to its bench</summary>
+    public void SendUnplacePiece(PieceColor color, BoardPosition position) =>
+        Send("{\"type\":\"game:unplacePiece\"," + As(color) + "\"position\":" + Pos(position) + "}");
+
     public void SendPlacePiece(PieceColor color, ChessPieceType type, BoardPosition position) =>
         Send("{\"type\":\"game:placePiece\"," + As(color) + "\"pieceType\":\"" + type + "\",\"position\":" + Pos(position) + "}");
 

@@ -158,6 +158,17 @@ export class GameEngine {
     return true;
   }
 
+  /** Setup: take one of this player's pieces back off the board (before they're ready) */
+  unplacePiece(color: PlayerColor, pos: BoardPosition): { success: boolean; error?: string; pieceType?: PieceType } {
+    if (this.phase !== 'placement') return { success: false, error: 'Not in placement phase' };
+    if (!this.board.isInBounds(pos)) return { success: false, error: 'Position out of bounds' };
+    if (this.players.find(p => p.color === color)?.placementComplete) return { success: false, error: 'You already said you are ready' };
+    const piece = this.board.getPiece(pos);
+    if (!piece || piece.color !== color) return { success: false, error: 'None of your pieces is there' };
+    this.board.removePiece(pos);
+    return { success: true, pieceType: piece.type };
+  }
+
   /** Pieces this player still has to put on the board */
   piecesLeftToPlace(color: PlayerColor): number {
     const total = Object.values(STARTING_SET).reduce((a, b) => a + b, 0);
