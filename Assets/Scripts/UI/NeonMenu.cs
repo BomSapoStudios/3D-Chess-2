@@ -98,10 +98,11 @@ public partial class NeonMenu : MonoBehaviour
         // Games still going (say the app was closed mid-game): show them on the Online Game button
         yield return RefreshGames();
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
-        // Simulator checks: `defaults write BomSapo.Chess3D DebugOpenStats -int 1` (your stats) or 2 (leaderboard)
+        // Simulator checks: `defaults write BomSapo.Chess3D DebugOpenStats -int 1` (your stats), 2 (leaderboard) or 3 (Customize)
         int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
         if (debugStats == 1) ShowProfile(null, ShowOnline);
         else if (debugStats == 2) ShowLeaderboard();
+        else if (debugStats == 3) ShowCustomize();
 #endif
     }
 
@@ -757,6 +758,17 @@ public partial class NeonMenu : MonoBehaviour
             swatches[i].rectTransform.sizeDelta = new Vector2(26, 26);
         }
 
+        SectionLabel(left, "Promotion animation", NeonTheme.Cyan);
+        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            PromotionChip(PromotionStyle.Kind.GlitchRebuild),
+            PromotionChip(PromotionStyle.Kind.SpinMorph),
+        }, NeonTheme.Lime, 16);
+        promotionNote = NewText("Note", left, "", 14, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
+        promotionNote.fontStyle = FontStyles.Normal;
+        promotionNote.enableWordWrapping = true;
+        promotionNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 36;
+
         SectionLabel(right, "Backdrop the board floats in", NeonTheme.PinkSoft);
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
@@ -784,6 +796,13 @@ public partial class NeonMenu : MonoBehaviour
         return (Backdrops.DisplayName(kind), () => Backdrops.Current = kind, () => Backdrops.Current == kind, () => true);
     }
 
+    private TextMeshProUGUI promotionNote;
+
+    private (string, System.Action, System.Func<bool>, System.Func<bool>) PromotionChip(PromotionStyle.Kind kind)
+    {
+        return (PromotionStyle.DisplayName(kind), () => PromotionStyle.Current = kind, () => PromotionStyle.Current == kind, () => true);
+    }
+
     private (string, System.Action, System.Func<bool>, System.Func<bool>) PieceSetChip(PieceSets.Kind kind)
     {
         return (PieceSets.DisplayName(kind), () => PieceSets.Current = kind, () => PieceSets.Current == kind, () => true);
@@ -796,6 +815,7 @@ public partial class NeonMenu : MonoBehaviour
         PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
         for (int i = 0; i < swatches.Length; i++) swatches[i].color = PieceSets.Tint(PieceSets.Current, sides[i]);
         backdropNote.text = Backdrops.Description(Backdrops.Current);
+        if (promotionNote != null) promotionNote.text = PromotionStyle.Description(PromotionStyle.Current);
     }
 
     // ───────────────────────── Online ─────────────────────────
