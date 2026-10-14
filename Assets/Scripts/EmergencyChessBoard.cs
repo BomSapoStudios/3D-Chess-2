@@ -103,18 +103,20 @@ public class EmergencyChessBoard : MonoBehaviour
 
         int lineCount = 0;
 
-        // 1. Outer boundary box (8 lines)
+        // 1. Outer boundary box (12 lines)
         float minPos = cellBoundaries[0];
         float maxPos = cellBoundaries[boardDimensions.x];
 
-        // Bottom face (4 lines). No top face: there's no floor up there, so an outline would frame nothing
-        for (int face = 0; face < 1; face++)
+        // Bottom and top faces (8 lines). The top one frames no floor, so it's named apart and only
+        // shown with the vertical lines, where it closes the cube (BoardLook)
+        for (int face = 0; face < 2; face++)
         {
             float yPos = (face == 0) ? minPos : maxPos;
-            CreateSimpleLine(wireframeContainer, new Vector3(minPos, yPos, minPos), new Vector3(maxPos, yPos, minPos));
-            CreateSimpleLine(wireframeContainer, new Vector3(maxPos, yPos, minPos), new Vector3(maxPos, yPos, maxPos));
-            CreateSimpleLine(wireframeContainer, new Vector3(maxPos, yPos, maxPos), new Vector3(minPos, yPos, maxPos));
-            CreateSimpleLine(wireframeContainer, new Vector3(minPos, yPos, maxPos), new Vector3(minPos, yPos, minPos));
+            string name = face == 0 ? null : "WireframeLine Top";
+            CreateSimpleLine(wireframeContainer, new Vector3(minPos, yPos, minPos), new Vector3(maxPos, yPos, minPos), name);
+            CreateSimpleLine(wireframeContainer, new Vector3(maxPos, yPos, minPos), new Vector3(maxPos, yPos, maxPos), name);
+            CreateSimpleLine(wireframeContainer, new Vector3(maxPos, yPos, maxPos), new Vector3(minPos, yPos, maxPos), name);
+            CreateSimpleLine(wireframeContainer, new Vector3(minPos, yPos, maxPos), new Vector3(minPos, yPos, minPos), name);
             lineCount += 4;
         }
 
@@ -159,10 +161,10 @@ public class EmergencyChessBoard : MonoBehaviour
         Debug.Log($"Essential 3D wireframe created with {lineCount} lines for {boardDimensions.x}x{boardDimensions.y}x{boardDimensions.z} board");
     }
     
-    void CreateSimpleLine(GameObject parent, Vector3 start, Vector3 end)
+    void CreateSimpleLine(GameObject parent, Vector3 start, Vector3 end, string name = null)
     {
         // Up-and-down lines are named apart so Customize can hide them (BoardLook)
-        GameObject lineObj = new GameObject(Mathf.Abs(start.y - end.y) > 0.01f ? "WireframeLine Vertical" : "WireframeLine");
+        GameObject lineObj = new GameObject(name ?? (Mathf.Abs(start.y - end.y) > 0.01f ? "WireframeLine Vertical" : "WireframeLine"));
         lineObj.transform.SetParent(parent.transform);
         
         LineRenderer line = lineObj.AddComponent<LineRenderer>();

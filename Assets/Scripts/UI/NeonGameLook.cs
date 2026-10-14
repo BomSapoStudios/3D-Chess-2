@@ -6,6 +6,19 @@ using UnityEngine;
 /// </summary>
 public class NeonGameLook : MonoBehaviour
 {
+    private static Material clearFloor;
+    private static Material ClearFloor
+    {
+        get
+        {
+            if (clearFloor != null) return clearFloor;
+            Shader shader = Resources.Load<Shader>("Shaders/ClearFloor");
+            if (shader == null || !shader.isSupported) shader = Shader.Find("Sprites/Default");
+            clearFloor = new Material(shader) { name = "See-through Floor" };
+            return clearFloor;
+        }
+    }
+
     private static Material solidFloor;
     /// <summary>A fresh solid-floor material (each square gets its own copy when its colour is set)</summary>
     private static Material SolidFloor
@@ -76,7 +89,13 @@ public class NeonGameLook : MonoBehaviour
                 // Unlit, two-sided (squares above the camera show from underneath too) and solid
                 r.material = SolidFloor;
             }
-            else c.a = light ? 0.22f : 0.14f;
+            else
+            {
+                c.a = light ? 0.22f : 0.14f;
+                // Two-sided, so squares above the camera show from underneath too (the plain floor
+                // material only draws its top face, which hid most of the board from Black's side)
+                r.material = ClearFloor;
+            }
             r.material.color = c;
         }
 
@@ -86,7 +105,7 @@ public class NeonGameLook : MonoBehaviour
             line.material.color = NeonTheme.Cyan;
             line.startColor = NeonTheme.Cyan;
             line.endColor = NeonTheme.Cyan;
-            if (line.name.EndsWith("Vertical")) line.enabled = !BoardLook.HideVerticalLines;
+            if (line.name.EndsWith("Vertical") || line.name.EndsWith("Top")) line.enabled = !BoardLook.HideVerticalLines;
         }
     }
 }
