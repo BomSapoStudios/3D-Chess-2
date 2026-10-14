@@ -13,8 +13,8 @@ public class RematchDemo : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Boot()
     {
-        // The AI self-test needs a Quick Play game too: this starts one for it
-        bool demo = PlayerPrefs.GetInt("DebugRematchDemo", 0) == 1, aiTest = PlayerPrefs.GetInt("DebugAISelfTest", 0) == 1;
+        // The AI self-test and effects demo need a Quick Play game too: this starts one for them
+        bool demo = PlayerPrefs.GetInt("DebugRematchDemo", 0) == 1, aiTest = PlayerPrefs.GetInt("DebugAISelfTest", 0) == 1 || PlayerPrefs.GetInt("DebugEffectsDemo", 0) == 1;
         if (!(demo || aiTest) || FindFirstObjectByType<RematchDemo>() != null) return;
         var go = new GameObject("Rematch Demo");
         DontDestroyOnLoad(go);

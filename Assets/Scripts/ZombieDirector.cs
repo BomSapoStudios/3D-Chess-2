@@ -256,8 +256,9 @@ public class ZombieDirector : MonoBehaviour
             board.RemovePieceFromBoard(victim, to);
         }
         board.SetPieceAt(from, null);
+        ChessPiece risen = Create(ZombieMode.PromotesTo, to);
+        if (risen != null) PieceEffects.Promote(pawn, risen); // the same glitch rebuild as any promotion
         Destroy(pawn.gameObject);
-        Create(ZombieMode.PromotesTo, to);
         if (victim != null && ZombieMode.BittenTurn) Create(ChessPieceType.Pawn, from);
         return true;
     }
@@ -279,22 +280,23 @@ public class ZombieDirector : MonoBehaviour
         Create(ChessPieceType.Pawn, empty[Random.Range(0, empty.Count)]);
     }
 
-    private static void Create(ChessPieceType type, BoardPosition at)
+    private static ChessPiece Create(ChessPieceType type, BoardPosition at)
     {
         GameManager gm = FindFirstObjectByType<GameManager>();
-        if (gm == null) return;
+        if (gm == null) return null;
         GameObject prefab = type == ChessPieceType.Pawn ? gm.pawnPiecePrefab : type == ChessPieceType.Knight ? gm.knightPiecePrefab : gm.queenPiecePrefab;
-        if (prefab == null) return;
+        if (prefab == null) return null;
         GameObject go = Instantiate(prefab);
         go.name = $"Zombie {type}";
         GameObject container = GameObject.Find("Pieces Container");
         if (container != null) go.transform.SetParent(container.transform);
         ChessPiece piece = go.GetComponent<ChessPiece>();
-        if (piece == null) { Destroy(go); return; }
+        if (piece == null) { Destroy(go); return null; }
         piece.pieceType = type;
         piece.Initialize(at, ZombieMode.ZombieColor);
         ChessBoard.Instance.SetPieceAt(at, piece);
         go.SetActive(true);
+        return piece;
     }
 
     // ───────────────────────── The end ─────────────────────────

@@ -14,7 +14,7 @@ public class PieceEffects : MonoBehaviour
 {
     private static PieceEffects runner;
     private static Material glowMaterial;
-    private static Mesh orbMesh, shardMesh, columnMesh;
+    private static Mesh orbMesh, shardMesh;
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
     private static PieceEffects Runner
@@ -414,9 +414,10 @@ public class PieceEffects : MonoBehaviour
     // ───────────────────────── Promotion: morph ─────────────────────────
 
     /// <summary>
-    /// The pawn spins up and stretches into a thin column of light, and the new piece spins
-    /// out of the column into its own shape. Call before the pawn is destroyed; the new piece
-    /// must already be on its square.
+    /// Glitch rebuild: the pawn flickers and jitters like a corrupted hologram, its colours
+    /// splitting apart, then breaks into small glowing cubes that swirl and snap together into
+    /// the new piece's shape. Call before the pawn is destroyed; the new piece must already be
+    /// on its square.
     /// </summary>
     public static void Promote(ChessPiece pawn, ChessPiece promoted)
     {
@@ -429,77 +430,158 @@ public class PieceEffects : MonoBehaviour
     private IEnumerator PromoteRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
     {
         Transform t = promoted.transform;
-        // Let the new piece finish setting itself up (model, facing) before reading its pose
+        // Let the new piece finish setting itself up (model, facing) before reading its shape
         SetSquash(t, 0f, 0f);
         yield return null;
         if (t == null) { if (pawnCopy != null) Destroy(pawnCopy); yield break; }
+        RestScale(t);
         Transform container = PiecesContainer;
         Vector3 up = container != null ? container.up : Vector3.up;
-        Quaternion restRotation = t.localRotation;
-        RestScale(t);
-        SetSquash(t, 0f, 0f); // hidden until the column opens
+        Camera cam = Camera.main;
+        Vector3 side = cam != null ? cam.transform.right : Vector3.right;
         float cell = Cell;
-        Mesh cylinder = PrimitiveMesh(PrimitiveType.Cylinder, ref columnMesh);
 
-        // A column of light rises around the pawn
-        Vector3 floor = t.position;
-        GameObject column = Solid("Promotion Column", cylinder, color, floor, new Vector3(0.05f, 0.01f, 0.05f) * cell);
-        column.transform.rotation = Quaternion.FromToRotation(Vector3.up, up);
+        // Where the cubes will land: points on the new piece's surface
+        SetSquash(t, 1f, 1f);
+        var targets = SurfacePoints(promoted, 46);
+        SetSquash(t, 0f, 0f);
 
-        // 1. The pawn spins faster and faster and stretches into a thin streak
-        const float windUp = 0.55f;
-        Quaternion pawnRest = pawnCopy != null ? pawnCopy.transform.rotation : Quaternion.identity;
-        Vector3 pawnScale = pawnCopy != null ? pawnCopy.transform.localScale : Vector3.one;
-        float angle = 0f;
-        for (float time = 0; time < windUp; time += Time.deltaTime)
+        // 1. Glitch: jitter, flicker, and a cyan / pink colour split
+        Bounds pawnBounds = pawnCopy != null ? BoundsOf(pawnCopy) : new Bounds(t.position + up * cell * 0.35f, Vector3.one * cell * 0.5f);
+        var ghosts = new List<GameObject>();
+        if (pawnCopy != null)
         {
-            float k = time / windUp;
-            angle += Mathf.Lerp(200f, 1400f, k * k) * Time.deltaTime;
-            if (pawnCopy != null)
+            foreach (Color tint in new[] { NeonTheme.Cyan, NeonTheme.Pink })
             {
-                pawnCopy.transform.rotation = Quaternion.AngleAxis(angle, up) * pawnRest;
-                pawnCopy.transform.localScale = new Vector3(pawnScale.x * Mathf.Lerp(1f, 0.15f, k * k), pawnScale.y * Mathf.Lerp(1f, 1.7f, k), pawnScale.z * Mathf.Lerp(1f, 0.15f, k * k));
+                GameObject ghost = Instantiate(pawnCopy);
+                foreach (Renderer r in ghost.GetComponentsInChildren<Renderer>())
+                {
+                    r.sharedMaterial = Glow;
+                    SetColor(r, new Color(tint.r, tint.g, tint.b, 0.55f));
+                }
+                ghosts.Add(ghost);
             }
-            float h = Mathf.Lerp(0.01f, 1.4f, k) * cell;
-            column.transform.localScale = new Vector3(0.22f * cell, h, 0.22f * cell);
-            column.transform.position = floor + up * h; // a cylinder is 2 units tall around its middle
-            Color c = color; c.a = Mathf.Lerp(0.15f, 0.6f, k);
-            SetColor(column.GetComponent<Renderer>(), c);
+        }
+        Vector3 pawnHome = pawnCopy != null ? pawnCopy.transform.position : t.position;
+        const float glitch = 0.5f;
+        float nextJump = 0f;
+        Vector3 jitter = Vector3.zero;
+        for (float time = 0; time < glitch; time += Time.deltaTime)
+        {
+            float k = time / glitch;
+            if (time >= nextJump)
+            {
+                // Snap to a new wrong position every few frames, more violently as it goes
+                nextJump = time + Random.Range(0.03f, 0.07f);
+                jitter = (side * Random.Range(-1f, 1f) + up * Random.Range(-0.4f, 0.4f)) * cell * Mathf.Lerp(0.02f, 0.09f, k);
+                if (pawnCopy != null)
+                {
+                    bool show = Random.value > Mathf.Lerp(0.05f, 0.4f, k);
+                    foreach (Renderer r in pawnCopy.GetComponentsInChildren<Renderer>()) r.enabled = show;
+                }
+            }
+            if (pawnCopy != null) pawnCopy.transform.position = pawnHome + jitter;
+            float split = cell * Mathf.Lerp(0.03f, 0.11f, k) * (0.6f + 0.4f * Mathf.Sin(time * 60f));
+            for (int i = 0; i < ghosts.Count; i++)
+                ghosts[i].transform.position = pawnHome + jitter * 0.5f + side * split * (i == 0 ? -1f : 1f);
             yield return null;
         }
         if (pawnCopy != null) Destroy(pawnCopy);
+        foreach (GameObject g in ghosts) Destroy(g);
 
-        // A flash at the swap
-        GameObject flash = Solid("Promotion Flash", PrimitiveMesh(PrimitiveType.Sphere, ref orbMesh), color, floor + up * cell * 0.45f, Vector3.one * 0.3f);
-        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 1.1f * cell));
-
-        // 2. The new piece spins out of the streak, slowing down, and settles with a bounce
-        const float reveal = 0.6f;
-        for (float time = 0; time < reveal && t != null; time += Time.deltaTime)
+        // 2. Break into cubes that burst, swirl round, and snap into the new shape
+        Mesh cube = PrimitiveMesh(PrimitiveType.Cube, ref shardMesh);
+        var bits = new List<(Transform t, Renderer r, Vector3 start, Vector3 burst, Vector3 target, float size, float delay, Color c)>();
+        for (int i = 0; i < targets.Count; i++)
         {
-            float k = time / reveal;
-            angle += Mathf.Lerp(1400f, 0f, Mathf.Sqrt(k)) * Time.deltaTime;
-            // Wide: thin streak to full width with a little overshoot; tall: stretched, then settles
-            float wide = Mathf.Clamp01(k * 1.6f);
-            wide = wide * wide * (3f - 2f * wide) + Mathf.Sin(k * Mathf.PI) * 0.12f;
-            float tall = Mathf.Lerp(1.6f, 1f, Mathf.Clamp01(k * 1.4f)) - Mathf.Sin(Mathf.Clamp01((k - 0.7f) / 0.3f) * Mathf.PI) * 0.12f;
-            SetSquash(t, Mathf.Max(0.05f, wide), tall);
-            t.localRotation = Quaternion.AngleAxis(angle, Vector3.up) * restRotation;
+            Vector3 p = pawnBounds.center + Vector3.Scale(Random.insideUnitSphere, pawnBounds.extents * 0.8f);
+            Vector3 outward = (p - pawnBounds.center); if (outward.sqrMagnitude < 0.0001f) outward = Random.onUnitSphere;
+            Vector3 burst = p + outward.normalized * cell * Random.Range(0.25f, 0.45f) + up * cell * Random.Range(0.05f, 0.3f);
+            float s = cell * Random.Range(0.045f, 0.075f);
+            Color c = Random.value < 0.25f ? Color.Lerp(color, Color.white, 0.6f) : color;
+            GameObject bit = Solid("Glitch Cube", cube, c, p, Vector3.one * s);
+            bit.transform.rotation = Random.rotation;
+            bits.Add((bit.transform, bit.GetComponent<Renderer>(), p, burst, targets[i], s, Random.Range(0f, 0.12f), c));
+        }
 
-            float h = Mathf.Lerp(1.4f, 0.01f, k) * cell;
-            column.transform.localScale = new Vector3(0.22f * cell * (1f - k * 0.5f), h, 0.22f * cell * (1f - k * 0.5f));
-            column.transform.position = floor + up * h;
-            Color c = color; c.a = 0.6f * (1f - k);
-            SetColor(column.GetComponent<Renderer>(), c);
+        const float swirl = 0.65f;
+        for (float time = 0; time < swirl; time += Time.deltaTime)
+        {
+            float k = time / swirl;
+            foreach (var b in bits)
+            {
+                if (b.t == null) continue;
+                float local = Mathf.Clamp01((k - b.delay) / (1f - b.delay));
+                Vector3 pos;
+                if (local < 0.35f)
+                {
+                    // Burst outward
+                    float e = local / 0.35f;
+                    pos = Vector3.Lerp(b.start, b.burst, 1f - (1f - e) * (1f - e));
+                }
+                else
+                {
+                    // Swirl round the piece's axis while closing in, then snap
+                    float e = (local - 0.35f) / 0.65f;
+                    float ease = e * e * (3f - 2f * e);
+                    pos = Vector3.Lerp(b.burst, b.target, ease);
+                    Vector3 axisPoint = t.position + Vector3.Project(pos - t.position, up);
+                    pos = axisPoint + Quaternion.AngleAxis((1f - ease) * 220f, up) * (pos - axisPoint);
+                }
+                b.t.position = pos;
+                b.t.rotation = Quaternion.Slerp(b.t.rotation, Quaternion.LookRotation(Vector3.Cross(up, side), up), local * 0.3f);
+            }
             yield return null;
         }
-        Destroy(column);
-        if (t != null)
+
+        // 3. The piece blinks into being over its cubes, with one last glitch
+        for (int i = 0; i < 4 && t != null; i++)
         {
-            SetSquash(t, 1f, 1f);
-            t.localRotation = restRotation;
-            LandingRing(t.position, color);
+            SetSquash(t, i % 2 == 0 ? 1f : 0f, i % 2 == 0 ? 1f : 0f);
+            yield return new WaitForSeconds(0.04f);
         }
+        if (t != null) SetSquash(t, 1f, 1f);
+        const float fade = 0.25f;
+        for (float time = 0; time < fade; time += Time.deltaTime)
+        {
+            float k = time / fade;
+            foreach (var b in bits)
+            {
+                if (b.t == null) continue;
+                b.t.localScale = Vector3.one * b.size * (1f - k);
+                Color c = b.c; c.a = 1f - k;
+                SetColor(b.r, c);
+            }
+            yield return null;
+        }
+        foreach (var b in bits) if (b.t != null) Destroy(b.t.gameObject);
+        if (t != null) LandingRing(t.position, color);
+    }
+
+    /// <summary>Points spread over a piece's meshes (world space)</summary>
+    private static List<Vector3> SurfacePoints(ChessPiece piece, int count)
+    {
+        var verts = new List<Vector3>();
+        foreach (MeshFilter f in piece.GetComponentsInChildren<MeshFilter>())
+        {
+            if (f.sharedMesh == null || !f.sharedMesh.isReadable) continue;
+            string n = f.gameObject.name.ToLowerInvariant();
+            if (n.Contains("glow") || n.Contains("indicator") || n.Contains("highlight")) continue;
+            Vector3[] v = f.sharedMesh.vertices;
+            Matrix4x4 m = f.transform.localToWorldMatrix;
+            int step = Mathf.Max(1, v.Length / 400);
+            for (int i = 0; i < v.Length; i += step) verts.Add(m.MultiplyPoint3x4(v[i]));
+        }
+        var points = new List<Vector3>(count);
+        if (verts.Count == 0)
+        {
+            // Unreadable meshes: fill the piece's box instead
+            Bounds b = BoundsOf(piece.gameObject);
+            for (int i = 0; i < count; i++) points.Add(b.center + Vector3.Scale(Random.insideUnitSphere, b.extents * 0.8f));
+            return points;
+        }
+        for (int i = 0; i < count; i++) points.Add(verts[Random.Range(0, verts.Count)]);
+        return points;
     }
 
     // ───────────────────────── Squash and pulse ─────────────────────────
