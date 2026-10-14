@@ -585,7 +585,12 @@ public class InputManager : MonoBehaviour
         {
             ChessPiece piece = h.collider.GetComponent<ChessPiece>();
             bool isTarget = h.collider.GetComponent<PlacementTargetData>() != null || h.collider.GetComponent<MoveTargetData>() != null;
-            bool isOwnPiece = piece != null && toMove.HasValue && piece.pieceColor == toMove.Value && !piece.IsInTray();
+            // Setup: any placed piece of a person on this device can be picked up again, so it has to
+            // win over the placement dots behind it (the nearest of the two is taken)
+            bool placing = GameStateManager.Instance != null && GameStateManager.Instance.CanPlacePieces();
+            bool ownPlaced = placing && piece != null && !piece.IsInTray() && piece.CurrentPosition.IsValid()
+                && OnlineSession.CanControl(piece.pieceColor) && (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(piece.pieceColor));
+            bool isOwnPiece = ownPlaced || (piece != null && toMove.HasValue && piece.pieceColor == toMove.Value && !piece.IsInTray());
             if (isTarget || isOwnPiece)
             {
                 result = h;

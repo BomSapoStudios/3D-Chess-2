@@ -638,14 +638,19 @@ public class PlacementUI : MonoBehaviour
     private static bool OwnPiecesOnBoard()
     {
         if (ChessBoard.Instance == null || BoardDimensionsManager.Instance == null || TurnManager.Instance == null) return false;
+        // Which colours count, worked out once (IsPlayerAI is slow and chatty)
+        var mine = new System.Collections.Generic.HashSet<PieceColor>();
+        if (PlayerManager.Instance != null)
+            foreach (PieceColor c in PlayerManager.Instance.GetActivePlayers())
+                if (!TurnManager.Instance.IsPlayerAI(c) && OnlineSession.CanControl(c) && !PlacementManager.Instance.IsPlayerReady(c)) mine.Add(c);
+        if (mine.Count == 0) return false;
         Vector3Int d = BoardDimensionsManager.Instance.GetDimensions();
         for (int x = 0; x < d.x; x++)
         for (int y = 0; y < d.y; y++)
         for (int z = 0; z < d.z; z++)
         {
             ChessPiece p = ChessBoard.Instance.GetPieceAt(new BoardPosition(x, y, z));
-            if (p != null && !TurnManager.Instance.IsPlayerAI(p.pieceColor) && OnlineSession.CanControl(p.pieceColor)
-                && !PlacementManager.Instance.IsPlayerReady(p.pieceColor)) return true;
+            if (p != null && mine.Contains(p.pieceColor)) return true;
         }
         return false;
     }

@@ -67,8 +67,10 @@ public class PlacementFocus : MonoBehaviour
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
         {
             if (piece.GetComponentInParent<PieceTray>() != null) continue; // benches are handled below
-            // Pieces on the board always show (including ones just moved off a hidden bench)
+            // Pieces on the board always show and can be tapped (including ones just moved off a
+            // hidden bench, whose colliders were switched off with it)
             foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, true);
+            foreach (Collider c in piece.GetComponentsInChildren<Collider>(true)) SetEnabled(c, true);
         }
 
         // The in-view player's 3D bench goes away (they pick from the on-screen bench), so it never
