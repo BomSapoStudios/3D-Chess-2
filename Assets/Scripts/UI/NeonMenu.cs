@@ -772,12 +772,13 @@ public partial class NeonMenu : MonoBehaviour
         {
             PromotionChip(PromotionStyle.Kind.GlitchRebuild),
             PromotionChip(PromotionStyle.Kind.SpinMorph),
+        }, NeonTheme.Lime, 15);
+        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
             PromotionChip(PromotionStyle.Kind.Coronation),
-        }, NeonTheme.Lime, 14);
-        promotionNote = NewText("Note", left, "", 14, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
-        promotionNote.fontStyle = FontStyles.Normal;
-        promotionNote.enableWordWrapping = true;
-        promotionNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 36;
+            PromotionChip(PromotionStyle.Kind.BlackHole),
+        }, NeonTheme.Lime, 15);
+        // (tapping one shows it playing, with its description, so there's no note here)
 
         SectionLabel(right, "Backdrop the board floats in", NeonTheme.PinkSoft);
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]

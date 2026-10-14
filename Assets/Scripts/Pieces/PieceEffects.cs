@@ -452,6 +452,7 @@ public class PieceEffects : MonoBehaviour
         PromotionStyle.Kind kind = style ?? PromotionStyle.Current;
         if (kind == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
+        else if (kind == PromotionStyle.Kind.BlackHole) Runner.StartCoroutine(Runner.BlackHoleRoutine(copy, promoted, color));
         else Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, color));
     }
 
@@ -760,6 +761,124 @@ public class PieceEffects : MonoBehaviour
             t.position = floor;
             t.localScale = rest;
             SetSquash(t, 1f, 1f);
+        }
+    }
+
+    /// <summary>
+    /// Black hole (a choice in Customize): the pawn twists and collapses into a black ball
+    /// circled by a glowing ring, light streaming in; the ball throbs, then the new piece
+    /// forms out of it as the ball shrinks away.
+    /// </summary>
+    private IEnumerator BlackHoleRoutine(GameObject pawnCopy, ChessPiece promoted, Color color)
+    {
+        Transform t = promoted.transform;
+        SetSquash(t, 0f, 0f);
+        yield return null;
+        if (t == null) { if (pawnCopy != null) Destroy(pawnCopy); yield break; }
+        RestScale(t);
+        SetSquash(t, 0f, 0f);
+        Transform container = PiecesContainer;
+        Vector3 up = container != null ? container.up : Vector3.up;
+        Quaternion flat = container != null ? container.rotation : Quaternion.identity;
+        float cell = Cell;
+        Vector3 floor = t.position;
+        Bounds pawnBounds = pawnCopy != null ? BoundsOf(pawnCopy) : new Bounds(floor + up * cell * 0.35f, Vector3.one * cell * 0.5f);
+        Vector3 core = floor + up * Mathf.Max(0.25f * cell, Vector3.Dot(pawnBounds.center - floor, up));
+        Mesh sphere = PrimitiveMesh(PrimitiveType.Sphere, ref orbMesh);
+
+        GameObject ball = Solid("Black Hole", sphere, new Color(0.02f, 0f, 0.05f, 1f), core, Vector3.one * 0.01f);
+        LineRenderer disk = RingLine("Black Hole Disk", flat * Quaternion.Euler(18f, 0f, 0f), 0.05f * cell);
+        disk.transform.position = core;
+
+        // Light streaming in: motes that spiral from round the pawn into the ball
+        var motes = new List<(Transform t, Renderer r, Vector3 from, float angle, float delay)>();
+        for (int i = 0; i < 18; i++)
+        {
+            Vector3 from = pawnBounds.center + Vector3.Scale(Random.insideUnitSphere, pawnBounds.extents) * 1.3f;
+            GameObject m = Solid("Mote", sphere, Color.Lerp(color, Color.white, 0.4f), from, Vector3.one * cell * 0.05f);
+            motes.Add((m.transform, m.GetComponent<Renderer>(), from, Random.Range(120f, 300f), Random.Range(0f, 0.35f)));
+        }
+
+        float spin = 0f;
+        void Disk(float radius, float alpha)
+        {
+            spin += Time.deltaTime * 4f;
+            for (int i = 0; i < 48; i++)
+            {
+                float a = i / 48f * Mathf.PI * 2f + spin;
+                float wobble = 1f + 0.06f * Mathf.Sin(a * 3f + spin * 2f);
+                disk.SetPosition(i, new Vector3(Mathf.Cos(a) * radius * wobble, 0, Mathf.Sin(a) * radius * wobble));
+            }
+            Color c = color; c.a = alpha;
+            disk.startColor = disk.endColor = c;
+        }
+
+        // 1. Collapse: the pawn twists and shrinks into the ball as it forms
+        const float collapse = 0.55f;
+        Vector3 pawnScale = pawnCopy != null ? pawnCopy.transform.localScale : Vector3.one;
+        Vector3 pawnPos = pawnCopy != null ? pawnCopy.transform.position : floor;
+        Quaternion pawnRot = pawnCopy != null ? pawnCopy.transform.rotation : Quaternion.identity;
+        float ballSize = 0.34f * cell;
+        for (float time = 0; time < collapse; time += Time.deltaTime)
+        {
+            float k = time / collapse;
+            float e = k * k;
+            if (pawnCopy != null)
+            {
+                pawnCopy.transform.localScale = pawnScale * Mathf.Lerp(1f, 0.01f, e);
+                pawnCopy.transform.position = Vector3.Lerp(pawnPos, core, e);
+                pawnCopy.transform.rotation = Quaternion.AngleAxis(e * 540f, up) * pawnRot;
+            }
+            float size = ballSize * Mathf.SmoothStep(0f, 1f, k);
+            ball.transform.localScale = Vector3.one * size;
+            Disk(Mathf.Lerp(0.15f, 0.42f, k) * cell, k);
+            foreach (var m in motes)
+            {
+                if (m.t == null) continue;
+                float local = Mathf.Clamp01((k - m.delay) / (1f - m.delay));
+                Vector3 p = Vector3.Lerp(m.from, core, local * local);
+                Vector3 axis = core + Vector3.Project(p - core, up);
+                m.t.position = axis + Quaternion.AngleAxis(local * m.angle, up) * (p - axis);
+                m.t.localScale = Vector3.one * cell * 0.05f * (1f - local * 0.8f);
+            }
+            yield return null;
+        }
+        if (pawnCopy != null) Destroy(pawnCopy);
+        foreach (var m in motes) if (m.t != null) Destroy(m.t.gameObject);
+
+        // 2. The ball throbs
+        const float throb = 0.3f;
+        for (float time = 0; time < throb; time += Time.deltaTime)
+        {
+            float k = time / throb;
+            float pulse = 1f + 0.12f * Mathf.Sin(k * Mathf.PI * 3f);
+            ball.transform.localScale = Vector3.one * ballSize * pulse;
+            Disk(0.42f * cell * pulse, 1f);
+            yield return null;
+        }
+
+        // 3. The new piece forms out of the ball, which shrinks away to nothing
+        GameObject flash = Solid("Black Hole Flash", sphere, color, core, Vector3.one * 0.3f);
+        StartCoroutine(FadeOut(flash, 0.3f, 0.3f * cell, 1.0f * cell));
+        const float form = 0.5f;
+        for (float time = 0; time < form && t != null; time += Time.deltaTime)
+        {
+            float k = time / form;
+            float e = 1f - (1f - k) * (1f - k);
+            // Grow from the ball's size with a small overshoot
+            float grow = Mathf.Lerp(0.15f, 1f, e) + Mathf.Sin(k * Mathf.PI) * 0.1f;
+            SetSquash(t, grow, grow);
+            float size = ballSize * (1f - e);
+            ball.transform.localScale = Vector3.one * size;
+            Disk(Mathf.Lerp(0.42f, 0.7f, e) * cell, 1f - k);
+            yield return null;
+        }
+        Destroy(ball);
+        Destroy(disk.gameObject);
+        if (t != null)
+        {
+            SetSquash(t, 1f, 1f);
+            LandingRing(t.position, color);
         }
     }
 

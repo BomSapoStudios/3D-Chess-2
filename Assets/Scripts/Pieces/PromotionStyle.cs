@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>Which animation plays when a pawn is promoted (picked in Customize, kept on this phone)</summary>
 public static class PromotionStyle
 {
-    public enum Kind { GlitchRebuild, SpinMorph, Coronation }
+    public enum Kind { GlitchRebuild, SpinMorph, Coronation, BlackHole }
 
     private const string PrefKey = "PromotionStyle";
 
@@ -17,11 +17,13 @@ public static class PromotionStyle
         }
     }
 
-    public static string DisplayName(Kind kind) => kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : "Glitch rebuild";
+    public static string DisplayName(Kind kind) => kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : kind == Kind.BlackHole ? "Black hole" : "Glitch rebuild";
 
     public static string Description(Kind kind) => kind == Kind.SpinMorph
         ? "The pawn spins into a column of light and the new piece spins out of it."
         : kind == Kind.Coronation
         ? "A glowing ring crowns the pawn, squeezes it to a spark, and the new piece rises in a shockwave."
+        : kind == Kind.BlackHole
+        ? "The pawn collapses into a black ball, and the new piece forms out of it."
         : "The pawn glitches like a broken hologram, then rebuilds from glowing cubes.";
 }
