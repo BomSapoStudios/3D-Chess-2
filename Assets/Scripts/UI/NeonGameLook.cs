@@ -6,18 +6,9 @@ using UnityEngine;
 /// </summary>
 public class NeonGameLook : MonoBehaviour
 {
-    /// <summary>Switch a floor's see-through material to a solid one</summary>
-    private static void MakeOpaque(Material m)
-    {
-        m.SetFloat("_Surface", 0);
-        m.SetFloat("_Mode", 0);
-        m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-        m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
-        m.SetInt("_ZWrite", 1);
-        m.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        m.DisableKeyword("_ALPHABLEND_ON");
-        m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
-    }
+    private static Material solidFloor;
+    /// <summary>A fresh solid-floor material (each square gets its own copy when its colour is set)</summary>
+    private static Material SolidFloor => solidFloor != null ? solidFloor : (solidFloor = new Material(Shader.Find("Sprites/Default")) { name = "Solid Floor" });
 
     private EmergencyChessBoard board;
     private int styledFloors;
@@ -70,7 +61,9 @@ public class NeonGameLook : MonoBehaviour
                 // Solid: deep versions of the neon colours, so the pieces still stand out
                 c = Color.Lerp(NeonTheme.Ground, c, light ? 0.45f : 0.32f);
                 c.a = 1f;
-                MakeOpaque(r.material);
+                // Unlit and two-sided, so squares above the camera show from underneath too
+                // (the plain floor material only draws its top face)
+                r.material = SolidFloor;
             }
             else c.a = light ? 0.22f : 0.14f;
             r.material.color = c;

@@ -103,12 +103,12 @@ public class EmergencyChessBoard : MonoBehaviour
 
         int lineCount = 0;
 
-        // 1. Outer boundary box (12 lines)
+        // 1. Outer boundary box (8 lines)
         float minPos = cellBoundaries[0];
         float maxPos = cellBoundaries[boardDimensions.x];
 
-        // Bottom and top faces (8 lines)
-        for (int face = 0; face < 2; face++)
+        // Bottom face (4 lines). No top face: there's no floor up there, so an outline would frame nothing
+        for (int face = 0; face < 1; face++)
         {
             float yPos = (face == 0) ? minPos : maxPos;
             CreateSimpleLine(wireframeContainer, new Vector3(minPos, yPos, minPos), new Vector3(maxPos, yPos, minPos));
