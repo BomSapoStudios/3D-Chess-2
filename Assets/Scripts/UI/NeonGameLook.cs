@@ -8,7 +8,19 @@ public class NeonGameLook : MonoBehaviour
 {
     private static Material solidFloor;
     /// <summary>A fresh solid-floor material (each square gets its own copy when its colour is set)</summary>
-    private static Material SolidFloor => solidFloor != null ? solidFloor : (solidFloor = new Material(Shader.Find("Sprites/Default")) { name = "Solid Floor" });
+    private static Material SolidFloor
+    {
+        get
+        {
+            if (solidFloor != null) return solidFloor;
+            // Our own shader (Resources/Shaders/SolidFloor): two-sided and writing depth, so see-through
+            // things around the board (backdrop fog, glows) can't sort in front of the squares
+            Shader shader = Resources.Load<Shader>("Shaders/SolidFloor");
+            if (shader == null || !shader.isSupported) shader = Shader.Find("Sprites/Default");
+            solidFloor = new Material(shader) { name = "Solid Floor" };
+            return solidFloor;
+        }
+    }
 
     private EmergencyChessBoard board;
     private int styledFloors;
@@ -61,8 +73,7 @@ public class NeonGameLook : MonoBehaviour
                 // Solid: deep versions of the neon colours, so the pieces still stand out
                 c = Color.Lerp(NeonTheme.Ground, c, light ? 0.45f : 0.32f);
                 c.a = 1f;
-                // Unlit and two-sided, so squares above the camera show from underneath too
-                // (the plain floor material only draws its top face)
+                // Unlit, two-sided (squares above the camera show from underneath too) and solid
                 r.material = SolidFloor;
             }
             else c.a = light ? 0.22f : 0.14f;
