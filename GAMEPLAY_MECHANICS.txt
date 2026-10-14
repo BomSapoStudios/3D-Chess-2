@@ -3,40 +3,66 @@
                          Complete Feature & Rules Reference
 ================================================================================
 
-Last Updated: March 2026
+Last Updated: October 2026
+
+
+CONTENTS
+   1. Overview
+   2. The 3D Board
+   3. Pieces & Movement
+   4. Setup: Placing Your Pieces
+   5. Check, Checkmate & How Games End
+   6. Multi-Player Rules (4 and 6 Players)
+   7. Chaos Mode
+   8. Clocks & Pace
+   9. The Computer Opponent
+  10. Zombie Survival
+  11. In-Game Tools
+  12. Online Play
+  13. Rematch
+  14. Rankings & Stats
+  15. Notifications
+  16. Customize
+  17. Game Modes Summary
+  18. Game Setup Flow
+  19. Configuration Reference
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. OVERVIEW
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-3D Chess 2 extends traditional chess into a fully three-dimensional cubic
-playing field. Instead of an 8x8 flat board, pieces occupy a 3D grid where
-movement occurs along X, Y, and Z axes simultaneously. The game supports
-2 to 6 players, multiple board sizes, AI opponents, timed play, and an
-optional Chaos Mode that introduces random board rotations mid-game.
+3D Chess 2 plays chess inside a cube. Pieces move along X, Y and Z at once,
+each player starts on their own face of the cube, and armies meet in the
+middle. Games are 2, 4 or 6 players, on the phone (against the computer or
+pass-and-play) or online, with optional Chaos Mode spins and chess clocks.
+There is also a single-player Zombie Survival mode.
 
-Board Sizes:
-  • 4x4x4  — 64 cells  — 2 players
-  • 6x6x6  — 216 cells — 2–4 players
-  • 8x8x8  — 512 cells — 2–6 players
+Board Sizes (shown in the menu as meal sizes):
+  • Snack 4³  — 4x4x4 —  64 cells — 2 players
+  • Meal 6³   — 6x6x6 — 216 cells — 2 or 4 players
+  • Feast 8³  — 8x8x8 — 512 cells — 2, 4 or 6 players (6 players always 8³)
 
-Player Colors:
+Player Colors (in turn order):
   White, Black, Green, Purple, Yellow, Orange
+  2 players: White, Black
+  4 players: White, Black, Green, Purple
+  6 players: all six
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2. THE 3D BOARD
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Each cell on the board is identified by a 3-coordinate position (X, Y, Z).
+Each cell has a 3-coordinate position (X, Y, Z).
 
-  • X-axis — runs left to right
-  • Y-axis — runs bottom to top
-  • Z-axis — runs front to back
+  • X-axis — left to right
+  • Y-axis — bottom to top (the floors / levels)
+  • Z-axis — front to back
 
-Each player "owns" one face of the cube and advances their pawns inward
-toward the opposite face. The axis of advance depends on the player's color:
+Squares are named A1a-style: file letter, floor number, rank letter.
+
+Each player owns one face of the cube and advances toward the opposite face:
 
   Color          Advance Axis   Starting Face
   ─────────────────────────────────────────────
@@ -44,413 +70,501 @@ toward the opposite face. The axis of advance depends on the player's color:
   Black          -X             X = max
   Green          +Z             Z = 0
   Purple         -Z             Z = max
-  Yellow         +Y             Y = 0
-  Orange         -Y             Y = max
+  Yellow         +Y             Y = 0   (bottom)
+  Orange         -Y             Y = max (top)
 
-The board can be freely rotated by the player in 3D space for better
-viewing angles using the board rotation controls.
+Drag to orbit the cube, pinch to zoom. The game opens looking from your own
+side. View buttons and Level buttons are covered in section 11.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-3. PIECE TYPES & MOVEMENT RULES
+3. PIECES & MOVEMENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-All pieces may not jump over other pieces unless noted (Knights are the
-exception). Captures happen by landing on an occupied enemy cell.
+Pieces capture by landing on an enemy piece. Only Knights jump; every other
+piece is blocked by anything in its path. No move may leave your own King
+in check.
 
-────────────────────────────────────────────
 KING
-────────────────────────────────────────────
-Moves exactly 1 cell in any direction, including diagonals.
-In 3D this means up to 26 possible adjacent cells.
-The King may never move into check.
-Loss of the King = elimination from the game.
+  1 cell in any direction: up to 26 neighbouring cells in 3D.
 
-────────────────────────────────────────────
 QUEEN
-────────────────────────────────────────────
-Moves any number of cells in a straight line in any direction:
-  • Along any axis (X, Y, Z) — same as a Rook
-  • Along any diagonal — same as a Bishop (including 3D space diagonals)
-Most powerful piece on the board.
+  Any distance in a straight line along an axis (like a Rook) or any
+  diagonal, including the 3D corner-to-corner diagonals (like a Bishop).
 
-────────────────────────────────────────────
 ROOK
-────────────────────────────────────────────
-Moves any number of cells along a single axis:
-  • Straight left/right (X-axis)
-  • Straight up/down (Y-axis)
-  • Straight forward/backward (Z-axis)
-Cannot move diagonally.
+  Any distance along one axis: left/right, up/down, forward/back.
 
-────────────────────────────────────────────
 BISHOP
-────────────────────────────────────────────
-Moves any number of cells diagonally. In 3D space there are multiple
-diagonal directions, including "true" 3D diagonals (moving along two
-or three axes simultaneously at equal step sizes).
+  Any distance diagonally: 2-axis diagonals within a plane and true 3D
+  diagonals moving along all three axes at once.
 
-────────────────────────────────────────────
 KNIGHT
-────────────────────────────────────────────
-Moves in an L-shape adapted for 3D space:
-  2 cells along one axis + 1 cell along a perpendicular axis
-The Knight is the only piece that can jump over other pieces.
-Many more L-shape combinations exist in 3D than in 2D.
+  An L-shape: 2 cells along one axis, then 1 along a perpendicular axis.
+  Jumps over pieces. Up to 24 targets in 3D.
 
-────────────────────────────────────────────
 PAWN
-────────────────────────────────────────────
-Movement:
-  • Advances 1 cell forward along the player's advance axis
-  • Cannot retreat
+  Move:     1 cell forward along your advance axis, onto an empty cell.
+            No double step, no moving backward, no capturing straight ahead.
+  Capture:  any of the 8 cells one step forward and one step sideways
+            (the ring of cells around the cell straight ahead).
+  Promote:  on reaching the far face of the cube, choose Queen, Rook,
+            Bishop or Knight. The computer picks for itself.
+  No en passant and no castling.
 
-Capture:
-  • Captures diagonally — any of the 8 cells perpendicular to the
-    advance axis that are 1 step diagonally forward
-  • Cannot capture straight ahead
-
-Promotion:
-  • When a Pawn reaches the far face of the board (opposite starting
-    face), it promotes to: Queen, Rook, Bishop, or Knight
-  • AI promotion: selected automatically based on game state and difficulty
+Piece values used by the computer and the Turn Planner:
+  Pawn 1, Knight 3, Bishop 3.2, Rook 5, Queen 9.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4. CHECK, CHECKMATE & DRAW CONDITIONS
+4. SETUP: PLACING YOUR PIECES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every game starts with a placement phase. You design your own opening.
+
+Your bench (every board size):
+  1 King, 1 Queen, 2 Rooks, 2 Bishops, 2 Knights   (8 pieces)
+
+Rules:
+  • Every piece must be placed before Ready can be pressed.
+  • Pieces go on your own starting face, within your placement zone:
+      4³  — your whole face
+      6³  — part of your face (White/Black: Y 3–5, Z 1–4;
+                               Green/Purple: Y 0–2, X 1–4)
+      8³  — the middle 4x4 of your face
+    so nobody starts within reach of anyone else.
+  • Everyone places at the same time. Robots place automatically.
+  • When play starts, a Pawn appears directly in front of each placed piece
+    (one step along your advance axis), giving every player 8 Pawns.
+  • Play starts once every player is Ready.
+
+Changing your mind:
+  • Tap a placed piece, then tap another square in your zone to move it.
+  • Or tap it and press "Back to bench" to take it off the board.
+  • Both work online too. Once you press Ready your setup is locked.
+  • Floors outside your zone are dimmed while you place.
+
+Who moves first:
+  • Normally White.
+  • If anyone starts the game in check (possible with 4 or 6 players), the
+    first player in check moves first, and no King may be captured until
+    everyone who started in check has had a turn to get out of it.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. CHECK, CHECKMATE & HOW GAMES END
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CHECK
-  A King is in check when it is threatened by at least one enemy piece.
-  The player must resolve check on their next move (move the King, block
-  the threat, or capture the threatening piece).
-  In multi-player games, a player may be simultaneously threatened by
-  multiple opponents.
+  Your King is attacked by at least one enemy piece. You must get out of it
+  on your move (move the King, block, or capture the attacker). With several
+  players you can be checked by more than one opponent at once.
 
-CHECKMATE (Loss Condition)
-  A player is checkmated when their King is in check AND there are no
-  legal moves that resolve the check.
-  In a 2-player game, checkmate immediately ends the game.
-  In multi-player games (3+), the checkmated player is eliminated and
-  the game continues.
+CHECKMATE
+  In check with no legal move that escapes it.
+    2 players: the game ends; the checkmating player wins.
+    4/6 players: the checkmated player is out (see Conquest, section 6).
 
-STALEMATE (Draw Condition)
-  A player is not in check but has no legal moves. The game is drawn.
+STALEMATE
+  Not in check but no legal move.
+    2 players: draw.
+    4/6 players: that player just sits out the turn. If nobody can move at
+    all, the game is a draw.
 
-DRAW CONDITIONS
-  1. Stalemate — no legal moves, not in check
-  2. Insufficient Material — neither side has enough pieces to checkmate
-  3. Threefold Repetition — the exact same board position has occurred
-     three times during the game
-  4. Draw Offer — one player offers a draw and the opponent accepts
-  5. Time Expiration — if timed play is enabled and a player's clock
-     reaches zero without triggering checkmate, outcome is configurable
+OTHER DRAWS
+  • Insufficient material — nobody has enough left to checkmate.
+  • Threefold repetition — the same position occurs three times.
+  • Draw by agreement — see Offer Draw below.
 
+OTHER WAYS TO LOSE
+  • Forfeit — you resign; you lose immediately.
+  • Clock — your chess clock or 24-hour move window runs out (section 8).
+  • Walking out of an online game — counts as a loss for rankings.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5. MULTI-PLAYER RULES (3–6 PLAYERS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OFFER DRAW
+  • Only on your own turn. Your opponent can accept or decline.
+  • Works online and on the phone (the computer decides for itself).
+  • Not available in Zombie Survival.
 
-Player Count → Board Size:
-  2 players → 4x4x4 or larger
-  3–4 players → 6x6x6 or larger
-  5–6 players → 8x8x8
-
-Turn Order:
-  Players take turns in a fixed rotation: White → Black → Green →
-  Purple → Yellow → Orange. Eliminated players are skipped automatically.
-
-Elimination:
-  When a player is checkmated, they are eliminated from the game.
-  Their remaining pieces are removed from the board.
-
-CONQUEST SYSTEM (4+ Player Games)
-  When Player A checkmates Player B, Player B's pieces are NOT simply
-  removed. Instead, all of Player B's surviving pieces transfer to
-  Player A's army. This dramatically shifts the balance of power and
-  rewards aggressive play.
-
-Victory:
-  The last player with a King remaining wins the game.
+The result appears in a neon banner, followed by the Rematch screen.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-6. PIECE PLACEMENT PHASE
+6. MULTI-PLAYER RULES (4 AND 6 PLAYERS)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Before gameplay begins, each player places their pieces from a piece tray
-onto their starting face of the board.
+Board size: 4 players need Meal 6³ or Feast 8³; 6 players always Feast 8³.
 
-  • Each player has a tray of pieces to place: King, Queen, Rooks, Bishops,
-    Knights, and Pawns
-  • Placement is restricted to the player's starting face (a single-cell-
-    deep slice of the board)
-  • All players place simultaneously (not turn-based)
-  • A "Ready" button must be pressed once a player has placed all pieces
-  • AI players place automatically
-  • The game proceeds to the Playing phase once ALL players are ready
+Turn order: White → Black → Green → Purple → Yellow → Orange, skipping
+anyone who is out (or stalemated that turn).
 
-Piece Inventory per Player (on 4x4x4 board):
-  1 King, 1 Queen, 2 Rooks, 2 Bishops, 2 Knights, 4 Pawns
+CONQUEST
+  When you checkmate a player, their King is removed and all of their other
+  surviving pieces become yours, where they stand.
 
-Piece counts scale with board size for larger boards.
+FORFEITING WITH SEVERAL PLAYERS
+  • If you forfeit while in check, it counts as being checkmated by the
+    player who checked you first: they win your pieces.
+  • Otherwise your pieces are simply removed and the game goes on.
 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-7. OPTIONAL FEATURES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-────────────────────────────────────────────
-TIMED PLAY
-────────────────────────────────────────────
-  • Each player has a configurable countdown clock (3–30 minutes)
-  • The timer counts down only during the player's turn
-  • Timer pauses during animations, Chaos rotations, and pawn promotion
-  • A warning is displayed when under 1 minute remains
-  • If a player's timer reaches zero, they forfeit the game
-
-────────────────────────────────────────────
-CHAOS MODE
-────────────────────────────────────────────
-  Chaos Mode introduces random Rubik's cube-style rotations of the board
-  at a configurable interval (every 3–25 turns).
-
-  Rotation Types:
-    Face Rotation    — Rotate one outer face of the cube
-    Layer Rotation   — Rotate one internal slice of the cube
-    Diagonal Rotation — Rotate around a diagonal axis
-
-  Effects:
-    • All pieces on the affected cells are physically repositioned
-    • The board state updates accordingly — pieces move with the rotation
-    • Timers pause during rotation animations
-    • Strategic planning must account for upcoming board disruptions
-
-  Configuration:
-    • Enable/disable in game setup
-    • Set rotation interval (every N turns)
+VICTORY
+  The last player with a King wins.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-8. AI OPPONENT
+7. CHAOS MODE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Difficulty Levels:
-  Easy   — Search depth 1 (evaluates 1 move ahead)
-  Medium — Search depth 2
-  Hard   — Search depth 3
+"Up, down, sideways. Go wild." Every few turns part of the cube spins like
+a Rubik's cube, carrying the pieces on it.
 
-Algorithm:
-  Minimax with alpha-beta pruning
+  Interval: Every 5, Every 9 or Every 15 turns.
 
-Position Evaluation Criteria:
-  • Material score (piece values)
-  • Center control (cells closer to center score higher)
-  • Piece coordination
-  • Layer control
-  • Game phase detection (opening, midgame, endgame)
-  • Territory evaluation
+  Spin types:
+    Face      — an outer face of the cube turns
+    Layer     — an inner slice turns
+    Diagonal  — a turn around a diagonal axis
 
-AI also plays the placement phase, placing pieces strategically based on
-the selected difficulty level.
+  • The spin is animated; clocks pause while it plays.
+  • Undo can't go back past a spin.
+  • Plan ahead: a safe square may not stay safe.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-9. IN-GAME ACTIONS & UI
+8. CLOCKS & PACE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-During the game, players have access to the following actions and displays:
+CHESS CLOCK (any game; "No clock" by default)
+  • 3, 5, 10, 15 or 30 minutes per player.
+  • Only the player on turn's clock runs; it pauses for animations,
+    Chaos spins and promotion.
+  • A warning shows under 1 minute.
+  • Running out loses the game. With more than two players left, the game
+    ends with no winner.
 
-  Offer Draw        — Propose a draw to all remaining opponents
-  Resign / Forfeit  — Voluntarily concede the game
-  Undo Move         — Take back the last move (if enabled in settings)
-  Pause             — Pause the game and open the in-game menu
-
-UI Elements:
-  Check Indicators   — Visual and audio alerts when a King is in check
-  Move History       — A scrollable log of all moves made this game
-  Timer Display      — Countdown clocks for each player (when timed)
-  Piece Trays        — Shows captured pieces and pieces remaining
-  Coordinate Labels  — Reference labels on board axes
-  Board Rotation     — Drag or use controls to orbit the 3D board
-  Promotion Dialog   — Appears when a Pawn reaches the promotion rank
-
-Visual Feedback:
-  • Valid move destinations are highlighted when a piece is selected
-  • Threatening pieces are highlighted when a King is in check
-  • Smooth 3D animations play for all piece movements
-  • Chaos rotation is animated with the board visually rotating
+ONLINE PACE
+  Speed round (live)
+    • Everyone plays now. Optional chess clock as above.
+    • A player who drops has 5 minutes to come back before their seat is
+      given up.
+    • If nobody places or moves for 30 minutes, the game ends.
+  Take your time ("Up to a day per move")
+    • No chess clock; each move (and the placement phase) may take up to
+      24 hours. Running out of time loses.
+    • You can leave the app between moves; a push tells you when it's your
+      turn, and another about 2 hours before your time runs out.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-10. ONLINE MULTIPLAYER
+9. THE COMPUTER OPPONENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  • Players connect to a shared game server via Socket.IO
-  • One player creates a room and receives a Room Code
-  • Other players join using that Room Code
-  • All game state is synchronized in real-time across all clients
-  • Supports 2–6 human players across any combination of platforms
-    (PC, Mac, iOS, Android, WebGL/browser)
-  • Connection drops are handled with reconnection attempts
+"Robot brain size" — three difficulties:
 
+  Pea      (Easy)    Looks 1 move ahead, with random noise and the occasional
+                     deliberate blunder.
+  Walnut   (Medium)  Searches 4 moves deep, about 1.2 seconds per move.
+  Galaxy   (Hard)    Searches up to 8 moves deep, about 3 seconds per move.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-11. GAME MODES SUMMARY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Mode               Players   Board Size   Notes
-  ─────────────────────────────────────────────────────────────
-  Human vs Human     2         4x4x4+       Local or Online
-  Human vs AI        1+1       4x4x4+       Select AI difficulty
-  AI vs AI           0+2       4x4x4+       Watch mode
-  Multi-Player       3–6       6x6x6+       With Conquest System
-  Timed Play         Any       Any          Add timer to any mode
-  Chaos Mode         Any       Any          Add chaos to any mode
+How it thinks:
+  • Alpha-beta search on a fast internal board, run on a background thread
+    so the game never freezes.
+  • Iterative deepening, a transposition table and killer moves.
+  • Weighs material, central pieces, pieces attacked and defended,
+    mobility, and the pieces around each King.
+  • Chooses its own promotions, places its own pieces in setup and answers
+    draw offers.
+  • Any seat in a local game can be swapped between You and Robot. Online,
+    any seat but the host's can be a Robot, as long as one is left for a
+    human opponent.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-12. GAME SETUP FLOW DIAGRAM
+10. ZOMBIE SURVIVAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                         ┌─────────────────────┐
-                         │     MAIN MENU        │
-                         └─────────┬───────────┘
-                                   │
-                         ┌─────────▼───────────┐
-                         │   SELECT GAME MODE   │
-                         │                      │
-                         │  • Human vs Human    │
-                         │  • Human vs AI       │
-                         │  • AI vs AI          │
-                         │  • Multi-Player      │
-                         │  • Online Multiplayer│
-                         └─────────┬───────────┘
-                                   │
-                         ┌─────────▼───────────┐
-                         │  CONFIGURE SETTINGS  │
-                         │                      │
-                         │  Board Size:         │
-                         │    4x4x4 / 6x6x6 /  │
-                         │    8x8x8             │
-                         │                      │
-                         │  Players: 2–6        │
-                         │  Human/AI per seat   │
-                         │                      │
-                         │  AI Difficulty:      │
-                         │    Easy/Medium/Hard  │
-                         │                      │
-                         │  [Optional]          │
-                         │  □ Timed Play (3-30m)│
-                         │  □ Chaos Mode (3-25t)│
-                         └─────────┬───────────┘
-                                   │
-                    ┌──────────────▼──────────────────┐
-                    │ ONLINE? → Create/Join Room Code  │
-                    │ LOCAL?  → Skip to next step      │
-                    └──────────────┬──────────────────┘
-                                   │
-                         ┌─────────▼───────────┐
-                         │   PIECE PLACEMENT    │◄──────────────────┐
-                         │                      │                   │
-                         │  Each player gets a  │                   │
-                         │  piece tray. Drag    │  (All players     │
-                         │  pieces onto your    │   place at the    │
-                         │  starting face.      │   same time)      │
-                         │                      │                   │
-                         │  AI places           │                   │
-                         │  automatically.      │                   │
-                         │                      │                   │
-                         │  Press [READY] when  │                   │
-                         │  all pieces placed.  │                   │
-                         └─────────┬───────────┘                   │
-                                   │                               │
-                    ┌──────────────▼──────────────────┐           │
-                    │  Are ALL players Ready?          │           │
-                    │  NO ──────────────────────────────────────►─┘
-                    │  YES ▼                           │
-                    └──────────────┬──────────────────┘
-                                   │
-                         ┌─────────▼───────────┐
-                         │   GAME STARTS        │
-                         │   White moves first  │
-                         └─────────┬───────────┘
-                                   │
-          ┌────────────────────────▼────────────────────────┐
-          │                  MAIN GAME LOOP                  │
-          │                                                  │
-          │  ┌────────────────────────────────────────────┐ │
-          │  │           CURRENT PLAYER'S TURN            │ │
-          │  │                                            │ │
-          │  │  Human: Select piece → Choose destination  │ │
-          │  │  AI:    Think (up to depth 3) → Move       │ │
-          │  └─────────────────────┬──────────────────────┘ │
-          │                        │                         │
-          │  ┌─────────────────────▼──────────────────────┐ │
-          │  │          EXECUTE MOVE (with animation)      │ │
-          │  └─────────────────────┬──────────────────────┘ │
-          │                        │                         │
-          │  ┌─────────────────────▼──────────────────────┐ │
-          │  │  Chaos Mode? Is it rotation turn?           │ │
-          │  │  YES → Perform random board rotation        │ │
-          │  │  NO  → Continue                             │ │
-          │  └─────────────────────┬──────────────────────┘ │
-          │                        │                         │
-          │  ┌─────────────────────▼──────────────────────┐ │
-          │  │          CHECK DETECTION                    │ │
-          │  │  • Update threat visualization              │ │
-          │  │  • Notify players in check                  │ │
-          │  └─────────────────────┬──────────────────────┘ │
-          │                        │                         │
-          │  ┌─────────────────────▼──────────────────────┐ │
-          │  │         GAME END DETECTION                  │ │
-          │  │                                             │ │
-          │  │  Checkmate? ──────────────────────────────► ELIMINATE PLAYER │
-          │  │  Stalemate? ──────────────────────────────► DRAW / END       │
-          │  │  Insuf. Material? ────────────────────────► DRAW / END       │
-          │  │  Threefold Repetition? ───────────────────► DRAW / END       │
-          │  │  Timer Expired? ──────────────────────────► FORFEIT          │
-          │  │  Resign? ─────────────────────────────────► ELIMINATE PLAYER │
-          │  │  Draw Accepted? ──────────────────────────► DRAW / END       │
-          │  │  None of the above → ADVANCE TURN          │                 │
-          │  └─────────────────────┬──────────────────────┘                 │
-          │                        │                                         │
-          │  ┌─────────────────────▼──────────────────────┐                 │
-          │  │   Multi-Player: Was anyone eliminated?      │                 │
-          │  │   YES (Conquest) → Transfer pieces to       │                 │
-          │  │                    conquering player        │                 │
-          │  │   Only 1 player left? → GAME OVER          │                 │
-          │  │   NO → ADVANCE TURN to next active player  │                 │
-          │  └─────────────────────┬──────────────────────┘                 │
-          │                        │                                         │
-          └────────────────────────┘  (loop back to top)                    │
-                                                                             │
-                              ┌──────────────▼──────────────────┐           │
-                              │           GAME OVER              │           │
-                              │                                  │           │
-                              │  Show winner / draw result       │           │
-                              │  Display final move history      │           │
-                              │                                  │           │
-                              │  [Play Again]  [Main Menu]       │           │
-                              └──────────────────────────────────┘           │
+A single-player survival mode on the "Zombies!" button. Hold off a horde of
+zombie pawns for as long as you can.
+
+Setup:
+  • Feast 8³ board. You are White: King, Queen, 2 Rooks, 2 Bishops,
+    2 Knights and no pawns.
+  • You may place anywhere on your whole first plane (X = 0).
+  • Choose Pea, Walnut or Galaxy.
+
+The horde:
+  • One zombie appears at the start, then one more each round on the far
+    face. From round 25 (Pea), 15 (Walnut) or 10 (Galaxy), two a round.
+  • Zombies march toward you (along −X), one step a round, front-most first.
+  • A zombie bites any of your pieces on its forward diagonals; if it
+    can't move forward it waits.
+  • A zombie that reaches your side promotes: to a Knight on Pea, a Queen
+    on Walnut and Galaxy. Promoted zombies hunt your pieces.
+  • Galaxy only: a piece that gets bitten rises again as a zombie.
+
+Rules that differ from chess:
+  • There is no check. Your King is just another piece.
+  • The run ends when your last piece falls.
+  • No draw offers.
+
+Score:
+  10 per round survived, 5 per zombie pawn destroyed, 20 per promoted zombie
+  destroyed. Your best score is kept separately for each difficulty.
+
+Zombie Hunt (the Turn Planner in this mode):
+  For each zombie, the fastest way one of your pieces can destroy it within
+  4 moves, aiming at where the zombie will be rather than where it is.
+  The hunter's route shows in cyan, the zombie's predicted path in pink and
+  the kill square in lime. Routes that never stop where a zombie could bite
+  are preferred, and the cheaper piece is sent when two are equally fast.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-13. CONFIGURATION OPTIONS REFERENCE
+11. IN-GAME TOOLS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Setting               Options              Default
-  ─────────────────────────────────────────────────────
-  Board Size            4x4x4, 6x6x6, 8x8x8   4x4x4
-  Player Count          2–6                    2
-  Player Type           Human, Computer        Human
-  AI Difficulty         Easy, Medium, Hard     Medium
-  Timed Play            On / Off               Off
-  Time Per Player       3–30 minutes           10 min
-  Chaos Mode            On / Off               Off
-  Chaos Interval        3–25 turns             10 turns
-  Sound Effects         On / Off               On
-  Move Hints            On / Off               On
-  Undo Move             On / Off               On
+TURN PLANNER
+  Steps through each of your pieces and each of its moves, best first, with
+  squares named A1a-style. For the chosen move it shows what it captures,
+  what could take the piece on its new square, which of your pieces it
+  leaves open, and what it threatens. While open, the board is stripped down
+  to the pieces involved with coloured markers and lines. Tapping one of
+  your pieces on the board plans that piece.
+
+UNDO
+  • Puts the board back to the start of your previous turn (against the
+    computer, that takes back your move and its reply). Up to 30 turns.
+  • Available in local games, Quick Play and Zombie Survival.
+  • Not available online, with a chess clock running, or past a Chaos spin
+    or a player being knocked out.
+
+VIEW BUTTONS (bottom of the screen)
+  Swing the camera behind any player's pieces, about 25° up, framing the
+  whole cube. Yellow looks up from underneath; Orange looks down from above.
+
+LEVEL BUTTONS (right edge)
+  Show a single floor of the cube, hiding the others so the inside can be
+  seen and tapped. "All" shows everything again.
+
+OFFER DRAW / FORFEIT / HOME
+  Offer Draw and Forfeit ask for confirmation first (see section 5).
+
+ON-BOARD FEEDBACK
+  • Legal destinations light up when a piece is selected.
+  • A King in check, and the pieces checking it, are highlighted with a
+    check status message.
+  • Moves, captures and Chaos spins are animated, with haptics.
+  • Promotions play the animation chosen in Customize.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. ONLINE PLAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The server runs on Cloudflare (Workers + Durable Objects) and checks every
+rule itself: placement zones, the full bench, legal moves, turn order,
+promotion, draws and clocks.
+
+ACCOUNT
+  Sign in with Apple. You get a random online name (e.g. shinyrook359),
+  which you can change, and a friend code.
+
+PLAY ANYONE — Find Match
+  • Choose board size and player count; you're matched with others who
+    asked for the same. Nobody waits in the queue more than 5 minutes.
+  • Paused for a while if you keep walking out of games (section 14).
+
+PLAY A FRIEND
+  • Create a room and share its code, or challenge a friend directly
+    (they get a push and an Accept / Decline).
+  • Friends: find people by name or code, send and accept requests.
+  • Room seats can be filled with Robots.
+
+ROOMS
+  • A live lobby closes after 10 minutes if nobody joins; "Extend" adds
+    10 minutes, up to an hour. A Take your time lobby stays open a day.
+  • A lobby closes 2 minutes after its host leaves.
+  • Finished games close a few minutes after they end.
+  • "Your games" lists games in progress to resume.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. REMATCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ONLINE
+  • After the result, a 15-second countdown asks everyone for a rematch.
+  • It happens only if every human still there says yes, and at least two
+    humans are left.
+  • The rematch is a new private room with everyone's seats reserved. Human
+    seats rotate so someone else plays White. Anyone who left is replaced
+    by a Robot.
+  • Otherwise everyone goes home.
+
+ON THE PHONE
+  Rematch restarts the same game with the same settings, no countdown.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. RANKINGS & STATS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Online games against other people are rated (Elo, starting at 1000).
+
+Two ladders:
+  Duel   — 2-player games.
+  Melee  — 4- and 6-player games, scored pairwise by finishing order
+           (each player is compared with every other player).
+
+Rating changes:
+  • K = 40 for your first 10 games, then 20.
+  • The same two players only move each other's ratings in their first
+    5 games together each day.
+
+Tiers:
+  Pawn    under 950, or fewer than 5 games played
+  Knight  950+
+  Bishop  1100+
+  Rook    1250+
+  Queen   1400+
+  King    1600+
+
+Walking out:
+  • Leaving a game early counts as a loss.
+  • A third walk-out within 24 hours pauses Find Match for 15 minutes; each
+    further one doubles the pause, up to 4 hours. Resets after 7 days.
+    Games with friends still work.
+
+My stats (Stats screen):
+  Rating and tier for each ladder, wins / losses / draws, pieces taken and
+  lost, recent games, and a leaderboard (friends or everyone, Duel or
+  Melee). Games against the computer are tracked separately on the phone,
+  by difficulty, along with Zombie Survival best scores.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15. NOTIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Push notifications, each switchable on the Notifications screen:
+  • It's my move
+  • Someone joins my game
+  • My game is ready (it started)
+  • A friend challenges me
+  • Friend requests (new and accepted)
+  • Take your time games: a warning about 2 hours before your 24 hours run out
+
+Pushes go only to players who aren't currently in the game.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16. CUSTOMIZE ("MAKE IT YOURS")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Piece set            — the look of the pieces.
+  Backdrop             — the scene the board floats in.
+  Promotion animation  — tap any card to preview it on a pawn becoming
+                         a Queen:
+                           Glitch rebuild (default)
+                           Spin morph
+                           Coronation
+                           Black hole
+  Board
+    Solid floors       — opaque floors instead of see-through ones.
+    No vertical lines  — hides the upright grid lines (and the top outline).
+
+These are cosmetic only and never change the rules.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+17. GAME MODES SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Mode                  Players   Board         Notes
+  ─────────────────────────────────────────────────────────────────────
+  Quick Play vs Comp.   You+Robot 4³            Pick White, Black or
+                                                Surprise me; Walnut; no
+                                                Chaos, no clock
+  On this iPhone        2, 4, 6   4³ / 6³ / 8³  Any mix of You and Robot
+                                                seats (pass-and-play)
+  Play anyone (online)  2, 4, 6   4³ / 6³ / 8³  Find Match; rated
+  Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
+                                                Robots allowed; rated
+  Zombie Survival       1         8³            Pea / Walnut / Galaxy
+  Chaos Mode            any       any           Add to any chess game
+  Chess clock           any       any           Not with Take your time
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+18. GAME SETUP FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                          ┌──────────────────────┐
+                          │      HOME SCREEN     │
+                          └──────────┬───────────┘
+        ┌──────────────┬─────────────┼──────────────┬───────────────┐
+        ▼              ▼             ▼              ▼               ▼
+  ┌───────────┐  ┌───────────┐ ┌───────────┐ ┌─────────────┐ ┌─────────────┐
+  │Quick Play │  │ Zombies!  │ │On this    │ │ Online      │ │ Stats /     │
+  │vs Computer│  │           │ │iPhone     │ │             │ │ Customize / │
+  │           │  │           │ │           │ │             │ │ Friends /   │
+  │Pick side  │  │Pick brain │ │PICK YOUR  │ │Play anyone  │ │ Notifs      │
+  └─────┬─────┘  └─────┬─────┘ │CHAOS:     │ │Play a friend│ └─────────────┘
+        │              │       │ players,  │ │ONLINE GAME: │
+        │              │       │ size,     │ │ same choices│
+        │              │       │ seats,    │ │ + pace      │
+        │              │       │ brain,    │ └──────┬──────┘
+        │              │       │ chaos,    │        │
+        │              │       │ clock     │   Lobby / queue
+        │              │       └─────┬─────┘        │
+        └──────────────┴──────┬──────┴──────────────┘
+                              ▼
+                   ┌──────────────────────┐
+                   │  PLACEMENT PHASE     │
+                   │  place all, Ready    │
+                   └──────────┬───────────┘
+                              ▼
+                   ┌──────────────────────┐
+                   │  PLAY                │
+                   │  pawns appear, turns │
+                   └──────────┬───────────┘
+                              ▼
+                   ┌──────────────────────┐
+                   │  RESULT BANNER       │
+                   └──────────┬───────────┘
+                              ▼
+                   ┌──────────────────────┐
+                   │  REMATCH or HOME     │
+                   └──────────────────────┘
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+19. CONFIGURATION REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Setting             Options                         Default
+  ─────────────────────────────────────────────────────────────────────
+  Players             2, 4, 6                         2
+  Board               Snack 4³, Meal 6³, Feast 8³     Snack 4³
+                      (4 players: 6³+, 6 players: 8³)
+  Seats               You / Robot per seat            You vs Robot
+  Robot brain size    Pea, Walnut, Galaxy             Walnut
+  Chaos Mode          Off, Every 5 / 9 / 15 turns     Off (Every 9 when on)
+  Chess clock         No clock, 3, 5, 10, 15, 30 min  No clock (10 when on)
+  Pace (online)       Speed round, Take your time     Speed round
+  Zombie brain size   Pea, Walnut, Galaxy             —
+
+  Server timings
+  ─────────────────────────────────────────────────────────────────────
+  Disconnect grace (Speed round)        5 minutes
+  Idle game ends (Speed round)          30 minutes with no placement or move
+  Move window (Take your time)          24 hours (warning push at 2 hours left)
+  Lobby (Speed round)                   10 minutes, extendable to 1 hour
+  Lobby (Take your time)                24 hours
+  Lobby after host leaves               2 minutes
+  Find Match queue limit                5 minutes
+  Rematch countdown                     15 seconds
+  Finished game closes                  5 minutes after it ends
+  Untouched room cleared                7 days
 
 ================================================================================
