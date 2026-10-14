@@ -785,20 +785,25 @@ public partial class NeonMenu : MonoBehaviour
         {
             BackdropChip(Backdrops.Kind.DeepSpace),
             BackdropChip(Backdrops.Kind.NeonDesert),
-        }, NeonTheme.Cyan, 16);
-        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
             BackdropChip(Backdrops.Kind.CyberCity),
-            BackdropChip(Backdrops.Kind.NeonJungle),
-        }, NeonTheme.Cyan, 16);
+        }, NeonTheme.Cyan, 14);
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
+            BackdropChip(Backdrops.Kind.NeonJungle),
             BackdropChip(Backdrops.Kind.NeonGlow),
-        }, NeonTheme.Cyan, 16);
+        }, NeonTheme.Cyan, 14);
         backdropNote = NewText("Note", right, "", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         backdropNote.fontStyle = FontStyles.Normal;
         backdropNote.enableWordWrapping = true;
         backdropNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
+
+        // Board: switches, each on or off
+        SectionLabel(right, "Board", NeonTheme.PinkSoft);
+        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            ("Solid floors", () => BoardLook.SolidFloors = !BoardLook.SolidFloors, () => BoardLook.SolidFloors, () => true),
+            ("No vertical lines", () => BoardLook.HideVerticalLines = !BoardLook.HideVerticalLines, () => BoardLook.HideVerticalLines, () => true),
+        }, NeonTheme.Yellow, 14);
 
     }
 

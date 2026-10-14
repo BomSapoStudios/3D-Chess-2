@@ -6,6 +6,19 @@ using UnityEngine;
 /// </summary>
 public class NeonGameLook : MonoBehaviour
 {
+    /// <summary>Switch a floor's see-through material to a solid one</summary>
+    private static void MakeOpaque(Material m)
+    {
+        m.SetFloat("_Surface", 0);
+        m.SetFloat("_Mode", 0);
+        m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+        m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
+        m.SetInt("_ZWrite", 1);
+        m.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        m.DisableKeyword("_ALPHABLEND_ON");
+        m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+    }
+
     private EmergencyChessBoard board;
     private int styledFloors;
     private bool backdropApplied;
@@ -52,15 +65,24 @@ public class NeonGameLook : MonoBehaviour
             int.TryParse(parts[3], out int z);
             bool light = (x + y + z) % 2 == 0;
             Color c = light ? NeonTheme.Cyan : NeonTheme.Pink;
-            c.a = light ? 0.22f : 0.14f;
+            if (BoardLook.SolidFloors)
+            {
+                // Solid: deep versions of the neon colours, so the pieces still stand out
+                c = Color.Lerp(NeonTheme.Ground, c, light ? 0.45f : 0.32f);
+                c.a = 1f;
+                MakeOpaque(r.material);
+            }
+            else c.a = light ? 0.22f : 0.14f;
             r.material.color = c;
         }
 
         foreach (LineRenderer line in FindObjectsByType<LineRenderer>(FindObjectsSortMode.None))
         {
+            if (!line.name.StartsWith("WireframeLine")) continue;
             line.material.color = NeonTheme.Cyan;
             line.startColor = NeonTheme.Cyan;
             line.endColor = NeonTheme.Cyan;
+            if (line.name.EndsWith("Vertical")) line.enabled = !BoardLook.HideVerticalLines;
         }
     }
 }

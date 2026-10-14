@@ -161,7 +161,8 @@ public class EmergencyChessBoard : MonoBehaviour
     
     void CreateSimpleLine(GameObject parent, Vector3 start, Vector3 end)
     {
-        GameObject lineObj = new GameObject("WireframeLine");
+        // Up-and-down lines are named apart so Customize can hide them (BoardLook)
+        GameObject lineObj = new GameObject(Mathf.Abs(start.y - end.y) > 0.01f ? "WireframeLine Vertical" : "WireframeLine");
         lineObj.transform.SetParent(parent.transform);
         
         LineRenderer line = lineObj.AddComponent<LineRenderer>();
