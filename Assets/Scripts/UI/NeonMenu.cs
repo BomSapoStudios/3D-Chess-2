@@ -104,6 +104,14 @@ public partial class NeonMenu : MonoBehaviour
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 4) { ShowCustomize(); ShowPromotionPreview(PromotionStyle.Current); }
+        else if (debugStats == 5)
+        {
+            // Switch animations mid-play: nothing from the first may stay behind
+            ShowCustomize();
+            ShowPromotionPreview(PromotionStyle.Kind.GlitchRebuild);
+            yield return new WaitForSeconds(0.9f);
+            ShowPromotionPreview(PromotionStyle.Kind.SpinMorph);
+        }
 #endif
     }
 

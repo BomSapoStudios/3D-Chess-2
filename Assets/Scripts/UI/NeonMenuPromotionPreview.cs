@@ -28,7 +28,7 @@ public partial class NeonMenu
         previewPopup.transform.SetAsLastSibling();
         previewPopup.SetActive(true);
         if (previewLoop != null) StopCoroutine(previewLoop);
-        previewLoop = StartCoroutine(PreviewLoop());
+        previewLoop = StartCoroutine(PreviewLoop(kind));
     }
 
     private void BuildPromotionPreview()
@@ -75,6 +75,7 @@ public partial class NeonMenu
     {
         if (previewLoop != null) StopCoroutine(previewLoop);
         previewLoop = null;
+        PieceEffects.ClearAround(StagePosition, 60f, null); // cubes, rings and copies from an animation mid-play
         if (previewStage != null) Destroy(previewStage);
         previewStage = null;
         PieceEffects.PreviewCamera = null;
@@ -82,9 +83,10 @@ public partial class NeonMenu
     }
 
     /// <summary>A pawn becomes a queen, again and again, until the card is closed</summary>
-    private IEnumerator PreviewLoop()
+    private IEnumerator PreviewLoop(PromotionStyle.Kind kind)
     {
         if (previewStage != null) Destroy(previewStage);
+        PieceEffects.ClearAround(StagePosition, 60f, null); // anything the last animation left behind
         previewStage = new GameObject("Promotion Stage");
         previewStage.transform.position = StagePosition;
 
@@ -117,7 +119,7 @@ public partial class NeonMenu
             previewCamera.transform.position = look + new Vector3(0f, height * 0.45f, -height * 2.5f);
             previewCamera.transform.LookAt(look);
             yield return null;
-            PieceEffects.Promote(pawn, queen);
+            PieceEffects.Promote(pawn, queen, kind);
             Destroy(pawn.gameObject);
             yield return new WaitForSeconds(2.6f);
         }

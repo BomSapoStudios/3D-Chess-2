@@ -78,6 +78,24 @@ public class PieceEffects : MonoBehaviour
     public static float PreviewCell = 2.8f;
     private static Camera ViewCamera => PreviewCamera != null ? PreviewCamera : Camera.main;
 
+    /// <summary>
+    /// Stop every running effect and remove whatever it left near this point (the Customize
+    /// preview calls this when it switches animation or closes, so nothing lingers on its stage)
+    /// </summary>
+    public static void ClearAround(Vector3 centre, float radius, GameObject keep)
+    {
+        if (runner != null) runner.StopAllCoroutines();
+        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+        {
+            foreach (GameObject root in UnityEngine.SceneManagement.SceneManager.GetSceneAt(i).GetRootGameObjects())
+            {
+                if (root == keep || root == (runner != null ? runner.gameObject : null)) continue;
+                if (Vector3.Distance(root.transform.position, centre) < radius) Destroy(root);
+            }
+        }
+
+    }
+
     private static GameObject Solid(string name, Mesh mesh, Color color, Vector3 position, Vector3 scale)
     {
         var go = new GameObject(name);
@@ -425,14 +443,15 @@ public class PieceEffects : MonoBehaviour
     /// the new piece's shape. Call before the pawn is destroyed; the new piece must already be
     /// on its square.
     /// </summary>
-    public static void Promote(ChessPiece pawn, ChessPiece promoted)
+    public static void Promote(ChessPiece pawn, ChessPiece promoted, PromotionStyle.Kind? style = null)
     {
         if (promoted == null || !Enabled) return;
         GameObject copy = pawn != null ? VisualCopy(pawn) : null;
         if (copy != null) copy.transform.SetPositionAndRotation(promoted.transform.position, copy.transform.rotation);
         Color color = GlowColor(promoted.pieceColor);
-        if (PromotionStyle.Current == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
-        else if (PromotionStyle.Current == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
+        PromotionStyle.Kind kind = style ?? PromotionStyle.Current;
+        if (kind == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
+        else if (kind == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
         else Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, color));
     }
 
