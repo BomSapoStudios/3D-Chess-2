@@ -1171,6 +1171,10 @@ public class PersistentCheckStatusUI : MonoBehaviour
         statusText.resizeTextForBestFit = display; // long result lines shrink to fit rather than clip
         statusText.resizeTextMaxSize = fontSize + 6;
         statusText.resizeTextMinSize = 12;
+        // Results keep clear of the corner buttons (help, menu) and shrink to fit the bar
+        RectTransform tr = statusText.rectTransform;
+        tr.offsetMin = new Vector2(display ? 110f : 0f, tr.offsetMin.y);
+        tr.offsetMax = new Vector2(display ? -110f : 0f, tr.offsetMax.y);
         if (bannerDrop == null) bannerDrop = statusText.gameObject.AddComponent<Shadow>();
         bannerDrop.enabled = drop.a > 0f;
         bannerDrop.effectColor = drop;
