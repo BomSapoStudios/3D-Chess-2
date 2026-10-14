@@ -1,0 +1,155 @@
+// 3D Chess Server v2 — Prisma Schema
+// Dev:  DATABASE_URL="file:./dev.db"   (SQLite, zero setup)
+// Prod: DATABASE_URL="postgresql://..."  (swap one env var)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String?  @unique
+  passwordHash String?  // null for guest accounts
+  isGuest      Boolean  @default(false)
+  eloRating    Int      @default(1200)
+  gamesPlayed  Int      @default(0)
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  draws        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastSeenAt   DateTime @default(now())
+
+  // Relations
+  refreshTokens  RefreshToken[]
+  gamesAsWhite   Game[]         @relation("WhitePlayer")
+  gamesAsBlack   Game[]         @relation("BlackPlayer")
+  gamesAsGreen   Game[]         @relation("GreenPlayer")
+  gamesAsPurple  Game[]         @relation("PurplePlayer")
+  gamesAsYellow  Game[]         @relation("YellowPlayer")
+  gamesAsOrange  Game[]         @relation("OrangePlayer")
+  sentRequests   FriendRequest[] @relation("Requester")
+  receivedRequests FriendRequest[] @relation("Recipient")
+  friendsA       Friendship[]   @relation("FriendA")
+  friendsB       Friendship[]   @relation("FriendB")
+  matchmakingEntry MatchmakingEntry?
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+}
+
+// ─── Friend System ────────────────────────────────────────────────────────────
+
+model FriendRequest {
+  id          String   @id @default(uuid())
+  requesterId String
+  recipientId String
+  requester   User     @relation("Requester", fields: [requesterId], references: [id])
+  recipient   User     @relation("Recipient", fields: [recipientId], references: [id])
+  status      String   @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([requesterId, recipientId])
+}
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  userA     User     @relation("FriendA", fields: [userAId], references: [id])
+  userB     User     @relation("FriendB", fields: [userBId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userAId, userBId])
+}
+
+// ─── Games ────────────────────────────────────────────────────────────────────
+
+model Game {
+  id           String    @id @default(uuid())
+  roomCode     String
+  boardSize    String    // "4x4x4" | "6x6x6" | "8x8x8"
+  playerCount  Int
+  chaosMode    Boolean   @default(false)
+  timedMode    Boolean   @default(false)
+  timePerPlayer Int?     // seconds
+  status       String    @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED | ABANDONED
+  result       String?   // "WHITE_WIN" | "DRAW" | etc.
+  endReason    String?   // "CHECKMATE" | "STALEMATE" | "RESIGNATION" | "TIMEOUT" | "DRAW_AGREEMENT"
+  winnerId     String?
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+
+  // Player slots (null if not used)
+  whitePlayerId  String?
+  blackPlayerId  String?
+  greenPlayerId  String?
+  purplePlayerId String?
+  yellowPlayerId String?
+  orangePlayerId String?
+
+  // Relations
+  whitePlayer  User? @relation("WhitePlayer",  fields: [whitePlayerId],  references: [id])
+  blackPlayer  User? @relation("BlackPlayer",  fields: [blackPlayerId],  references: [id])
+  greenPlayer  User? @relation("GreenPlayer",  fields: [greenPlayerId],  references: [id])
+  purplePlayer User? @relation("PurplePlayer", fields: [purplePlayerId], references: [id])
+  yellowPlayer User? @relation("YellowPlayer", fields: [yellowPlayerId], references: [id])
+  orangePlayer User? @relation("OrangePlayer", fields: [orangePlayerId], references: [id])
+
+  moves Move[]
+}
+
+model Move {
+  id         String   @id @default(uuid())
+  gameId     String
+  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  moveNumber Int
+  playerColor String  // "White" | "Black" | "Green" | "Purple" | "Yellow" | "Orange"
+  fromX      Int
+  fromY      Int
+  fromZ      Int
+  toX        Int
+  toY        Int
+  toZ        Int
+  pieceType  String   // "King" | "Queen" | "Rook" | "Bishop" | "Knight" | "Pawn"
+  isCapture  Boolean  @default(false)
+  capturedPieceType String?
+  isPromotion Boolean @default(false)
+  promotedTo String?
+  isChaosRotation Boolean @default(false)
+  chaosRotationType String?
+  notation   String?  // e.g. "Qe4→f5"
+  timestamp  DateTime @default(now())
+
+  @@index([gameId, moveNumber])
+}
+
+// ─── Matchmaking ──────────────────────────────────────────────────────────────
+
+model MatchmakingEntry {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playerCount Int      @default(2)
+  boardSize   String   @default("4x4x4")
+  chaosMode   Boolean  @default(false)
+  timedMode   Boolean  @default(false)
+  eloRating   Int      @default(1200)
+  joinedAt    DateTime @default(now())
+}

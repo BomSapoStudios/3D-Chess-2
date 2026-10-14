@@ -51,3 +51,6 @@ ios_build/
 burst_*.txt
 # Build output
 Builds/
+
+# Local secrets for the old server
+server-v2/.env
