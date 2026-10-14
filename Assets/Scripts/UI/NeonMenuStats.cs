@@ -187,6 +187,8 @@ public partial class NeonMenu
         Line(statsList, $"Winning streak {s.streak}, best {s.bestStreak}", NeonTheme.White, 15);
         StatsEndings e = s.endings;
         if (e != null) Line(statsList, $"Endings: {e.checkmate} checkmate, {e.resignation} resigned, {e.timeout} out of time, {e.draw} drawn, {e.walkout} walked out", NeonTheme.Lavender, 14, 38);
+        if (s.captures != null && (s.captures.taken + s.captures.lost) > 0)
+            Line(statsList, $"Pieces taken {s.captures.taken}, lost {s.captures.lost}" + (string.IsNullOrEmpty(s.captures.mostTaken) ? "" : $"   Most taken: {s.captures.mostTaken}s"), NeonTheme.Lavender, 14);
         Line(statsList, $"Walk-out rate {s.walkoutRate}%" + (string.IsNullOrEmpty(s.favorite) ? "" : $"   Favorite: {s.favorite}"), NeonTheme.Lavender, 14);
         if (s.recent != null && s.recent.Length > 0)
         {

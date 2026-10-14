@@ -19,6 +19,10 @@ export interface ResultPlayer {
   /** 1 = winner; players who tie share a place */
   place: number;
   walkout: boolean;
+  /** Pieces this player took and lost, and what they took (piece type → count) */
+  taken?: number;
+  lost?: number;
+  takenTypes?: Record<string, number>;
 }
 
 export interface GameResult {
@@ -73,6 +77,10 @@ export function setupTables(sql: SqlStorage): void {
     CREATE INDEX IF NOT EXISTS walkouts_by_account ON walkouts (account_id, at);
     CREATE TABLE IF NOT EXISTS cooldowns (account_id TEXT PRIMARY KEY, until INTEGER, level INTEGER, last_walkout INTEGER);
   `);
+  // Captures came later: add their columns to existing tables
+  for (const column of ['taken INTEGER DEFAULT 0', 'lost INTEGER DEFAULT 0', "taken_types TEXT DEFAULT '{}'"]) {
+    try { sql.exec(`ALTER TABLE player_games ADD COLUMN ${column}`); } catch { /* already there */ }
+  }
 }
 
 function ratingOf(sql: SqlStorage, userId: string, mode: Mode): { rating: number; games: number; best: number } {
@@ -132,8 +140,8 @@ export function recordGame(sql: SqlStorage, r: GameResult, now: number): Record<
     sql.exec('INSERT OR REPLACE INTO ratings (account_id, mode, rating, games, best) VALUES (?, ?, ?, ?, ?)',
       p.userId, mode, after, games, Math.max(old.best, after));
     const result = draw && p.place === 1 ? 'draw' : p.place === 1 ? 'win' : 'loss';
-    sql.exec('INSERT OR REPLACE INTO player_games (account_id, game_id, color, place, result, walkout, rating_before, rating_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      p.userId, gameId, p.color, p.place, result, p.walkout ? 1 : 0, old.rating, after);
+    sql.exec('INSERT OR REPLACE INTO player_games (account_id, game_id, color, place, result, walkout, rating_before, rating_after, taken, lost, taken_types) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      p.userId, gameId, p.color, p.place, result, p.walkout ? 1 : 0, old.rating, after, p.taken ?? 0, p.lost ?? 0, JSON.stringify(p.takenTypes ?? {}));
     changes[p.userId] = { mode, before: Math.round(old.rating), after: Math.round(after), games, tier: bestTier(sql, p.userId), tierBefore };
   }
   return changes;
@@ -166,14 +174,19 @@ export function cooldownUntil(sql: SqlStorage, userId: string, now: number): num
 export function stats(sql: SqlStorage, userId: string, viewerId: string | null, nameOf: (id: string) => string) {
   const duel = ratingOf(sql, userId, 'duel'), melee = ratingOf(sql, userId, 'melee');
   const rows = sql.exec(`
-    SELECT pg.game_id, pg.result, pg.walkout, pg.rating_before, pg.rating_after, g.ended_at, g.mode, g.board, g.player_count, g.end_reason
+    SELECT pg.game_id, pg.result, pg.walkout, pg.rating_before, pg.rating_after, pg.taken, pg.lost, pg.taken_types, g.ended_at, g.mode, g.board, g.player_count, g.end_reason
     FROM player_games pg JOIN games_played g ON g.id = pg.game_id
     WHERE pg.account_id = ? ORDER BY g.ended_at ASC`, userId).toArray();
 
   let wins = 0, losses = 0, draws = 0, walkouts = 0, streak = 0, bestStreak = 0;
   const endings: Record<string, number> = { checkmate: 0, resignation: 0, timeout: 0, walkout: 0, draw: 0 };
   const setups = new Map<string, number>();
+  let taken = 0, lost = 0;
+  const takenTypes: Record<string, number> = {};
   for (const r of rows) {
+    taken += (r.taken as number) ?? 0;
+    lost += (r.lost as number) ?? 0;
+    try { for (const [type, n] of Object.entries(JSON.parse((r.taken_types as string) || '{}') as Record<string, number>)) takenTypes[type] = (takenTypes[type] ?? 0) + n; } catch { /* old row */ }
     const result = r.result as string;
     if (result === 'win') { wins++; streak++; bestStreak = Math.max(bestStreak, streak); }
     else { streak = 0; if (result === 'draw') draws++; else losses++; }
@@ -221,6 +234,7 @@ export function stats(sql: SqlStorage, userId: string, viewerId: string | null, 
     streak, bestStreak,
     walkoutRate: total ? Math.round(walkouts * 100 / total) : 0,
     endings, favorite, recent, headToHead,
+    captures: { taken, lost, mostTaken: Object.entries(takenTypes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null },
   };
 }
 

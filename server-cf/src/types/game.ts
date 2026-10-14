@@ -82,6 +82,7 @@ export interface MoveRecord {
   pieceType: PieceType;
   isCapture: boolean;
   capturedPieceType?: PieceType;
+  capturedColor?: PlayerColor;
   isPromotion: boolean;
   promotedTo?: PieceType;
   isChaosRotation: boolean;

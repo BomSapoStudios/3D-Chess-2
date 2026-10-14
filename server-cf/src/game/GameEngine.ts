@@ -314,6 +314,7 @@ export class GameEngine {
       pieceType: piece.type,
       isCapture,
       capturedPieceType: captured?.type,
+      capturedColor: captured?.color,
       isPromotion: false,
       isChaosRotation: false,
       notation: this.buildNotation(piece.type, color, from, to, isCapture),

@@ -612,7 +612,10 @@ public class PlayerStats
     public StatsEndings endings;
     public RecentGame[] recent;
     public HeadToHead headToHead;
+    public StatsCaptures captures;
 }
+
+[Serializable] public class StatsCaptures { public int taken, lost; public string mostTaken; }
 
 [Serializable] public class ModeRating { public int rating, best, games; public string tier; }
 [Serializable] public class StatsEndings { public int checkmate, resignation, timeout, walkout, draw; }

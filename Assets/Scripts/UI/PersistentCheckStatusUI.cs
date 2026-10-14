@@ -678,7 +678,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
     {
         int remainingPlayers = PlayerManager.Instance != null ? PlayerManager.Instance.GetActivePlayerCount() : 0;
 
-        string conquestMessage = $"⚔️ CONQUEST! {conqueror.ToString().ToUpper()} CAPTURED {defeated.ToString().ToUpper()}'S PIECES! {remainingPlayers} PLAYERS REMAIN";
+        string conquestMessage = $"CONQUEST! {conqueror.ToString().ToUpper()} CAPTURED {defeated.ToString().ToUpper()}'S PIECES! {remainingPlayers} PLAYERS REMAIN";
 
         Debug.Log($"🎨 PersistentCheckStatusUI.OnConquestEvent: {conquestMessage}");
 
@@ -743,7 +743,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
     private void OnDrawAcceptedEvent(PieceColor acceptingPlayer)
     {
         gameEnded = true;
-        gameEndMessage = "⚖️ DRAW ACCEPTED! GAME IS A DRAW!";
+        gameEndMessage = "DRAW ACCEPTED! GAME IS A DRAW!";
         
         Debug.Log($"🏁 PersistentCheckStatusUI.OnDrawAcceptedEvent: {gameEndMessage}");
         UpdateStatusDisplay();
@@ -757,7 +757,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
     {
         PieceColor winner = GameEndDetectionManager.ForfeitWinner(forfeitingPlayer);
         gameEnded = true;
-        gameEndMessage = $"🏆 {winner.ToString().ToUpper()} WINS! ({forfeitingPlayer} Forfeited)";
+        gameEndMessage = $"{winner.ToString().ToUpper()} WINS! ({forfeitingPlayer.ToString().ToUpper()} FORFEITED)";
         
         Debug.Log($"🏁 PersistentCheckStatusUI.OnForfeitEvent: {gameEndMessage}");
         UpdateStatusDisplay();
@@ -974,8 +974,8 @@ public class PersistentCheckStatusUI : MonoBehaviour
             statusMessage = chaosMessage;
             statusText.text = statusMessage;
             
-            // Orange background for chaos events
-            backgroundImage.color = new Color(1f, 0.5f, 0f, 0.9f); // Bright orange
+            // Chaos spins: yellow neon on the dark bar
+            SetBannerStyle(NeonTheme.Yellow, NeonTheme.Pink, display: false);
         }
         // Show game end message if game is over
         else if (gameEnded)
@@ -983,19 +983,13 @@ public class PersistentCheckStatusUI : MonoBehaviour
             statusMessage = gameEndMessage;
             statusText.text = statusMessage;
             
-            // Special background for game end
-            if (gameEndMessage.Contains("CHECKMATE"))
-            {
-                backgroundImage.color = new Color(0.9f, 0.1f, 0.1f, 0.9f); // Bright red for checkmate
-            }
+            // Neon banner for the result: display lettering with a hard drop, colored by outcome
+            if (gameEndMessage.Contains("CHECKMATE") || gameEndMessage.Contains("OVERRUN"))
+                SetBannerStyle(NeonTheme.Pink, NeonTheme.Cyan, display: true);
             else if (gameEndMessage.Contains("STALEMATE") || gameEndMessage.Contains("DRAW"))
-            {
-                backgroundImage.color = new Color(0.9f, 0.9f, 0.1f, 0.9f); // Yellow for stalemate/draw
-            }
-            else if (gameEndMessage.Contains("WINS"))
-            {
-                backgroundImage.color = new Color(0.1f, 0.8f, 0.1f, 0.9f); // Green for forfeit win
-            }
+                SetBannerStyle(NeonTheme.Yellow, NeonTheme.Pink, display: true);
+            else
+                SetBannerStyle(NeonTheme.Lime, NeonTheme.Pink, display: true);
             
             // Add pulsing effect for game end
             StartCoroutine(PulseEffect());
@@ -1136,6 +1130,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
                 }
             }
 
+            SetBannerStyle(NeonTheme.Lime, Color.clear, display: false);
             if (anyPlayerInCheck)
             {
                 // Red background if anyone is in check
@@ -1163,6 +1158,25 @@ public class PersistentCheckStatusUI : MonoBehaviour
     /// Pulse effect for check status
     /// MULTI-PLAYER SUPPORT: Check any player in check
     /// </summary>
+    private Shadow bannerDrop;
+
+    /// <summary>The bar's look: dark see-through neon ground, text in a neon color, and for results the display font with a hard drop</summary>
+    private void SetBannerStyle(Color text, Color drop, bool display)
+    {
+        if (statusText == null) return;
+        backgroundImage.color = display ? new Color(backgroundColor.r, backgroundColor.g, backgroundColor.b, 0.85f) : backgroundImage.color;
+        statusText.color = text;
+        Font font = display ? NeonTheme.DisplayFont : NeonTheme.BodyFont;
+        if (font != null) statusText.font = font;
+        statusText.resizeTextForBestFit = display; // long result lines shrink to fit rather than clip
+        statusText.resizeTextMaxSize = fontSize + 6;
+        statusText.resizeTextMinSize = 12;
+        if (bannerDrop == null) bannerDrop = statusText.gameObject.AddComponent<Shadow>();
+        bannerDrop.enabled = drop.a > 0f;
+        bannerDrop.effectColor = drop;
+        bannerDrop.effectDistance = new Vector2(3f, -3f);
+    }
+
     private System.Collections.IEnumerator PulseEffect()
     {
         // Check if any player is in check

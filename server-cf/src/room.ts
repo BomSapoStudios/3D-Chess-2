@@ -47,6 +47,8 @@ interface RoomMeta {
   /** Each colour's rating change once the result is recorded */
   ratings?: Record<string, RatingChange> | null;
   resultSent?: boolean;
+  /** Take your time: the turn (by its start time) whose "running low" warning was sent */
+  lowWarnedTurn?: number | null;
 }
 
 interface Rematch {
@@ -82,6 +84,7 @@ const IDLE_CAP_MS = 7 * 24 * HOUR;           // any room nobody touches for a we
 const LIVE_IDLE_MS = 30 * MINUTE;            // Live: nobody places or moves for this long (app left open) ends the game
 const GAME_OVER_LINGER_MS = 5 * MINUTE;      // finished games close this long after they end, connected or not
 const REMATCH_MS = 15 * 1000;                // players have this long after a game to agree to a rematch
+const LOW_CLOCK_MS = 2 * HOUR;               // Take your time: warn the player on move when this much of their day is left
 
 
 export class Room extends DurableObject<Env> {
@@ -469,9 +472,17 @@ export class Room extends DurableObject<Env> {
     const result: GameResult = {
       roomCode: meta.code,
       rated: this.gameOver.reason !== 'abandoned',
-      players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => ({
-        userId, color, place: places[color] ?? state.players.length, walkout: walkouts.includes(userId),
-      })),
+      players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => {
+        const mine = state.moveHistory.filter(m => m.isCapture && m.playerColor === color);
+        const takenTypes: Record<string, number> = {};
+        for (const m of mine) if (m.capturedPieceType) takenTypes[m.capturedPieceType] = (takenTypes[m.capturedPieceType] ?? 0) + 1;
+        return {
+          userId, color, place: places[color] ?? state.players.length, walkout: walkouts.includes(userId),
+          taken: mine.length,
+          lost: state.moveHistory.filter(m => m.isCapture && m.capturedColor === color).length,
+          takenTypes,
+        };
+      }),
       boardSize: engine.config.boardSize,
       playerCount: engine.config.playerCount,
       pace: engine.config.pace ?? 'live',
@@ -601,6 +612,9 @@ export class Room extends DurableObject<Env> {
       const result = engine.forfeitByTimeout(loser);
       await this.afterResult(result, { type: 'game:timeout', color: loser });
     }
+
+    // Take your time: a nudge when the player on move is down to their last couple of hours
+    this.warnLowClock(now);
 
     // Take your time: a player who let a day pass without moving is out
     if (this.slowDeadlinePassed()) {
@@ -733,7 +747,10 @@ export class Room extends DurableObject<Env> {
     const clock = this.clockDeadline();
     if (clock) times.push(clock);
     const move = this.slowDeadline();
-    if (move) times.push(move);
+    if (move) {
+      times.push(move);
+      if (meta.lowWarnedTurn !== this.turnStartedAt) times.push(move - this.t(LOW_CLOCK_MS));
+    }
     if (this.gameOver && meta.emptySince != null) times.push(meta.emptySince + this.t(FINISHED_EMPTY_MS));
     if (this.gameOver && meta.gameOverAt != null) times.push(meta.gameOverAt + this.t(GAME_OVER_LINGER_MS));
     if (meta.rematch && !meta.rematch.code && !meta.rematch.failed) times.push(meta.rematch.deadline);
@@ -785,6 +802,20 @@ export class Room extends DurableObject<Env> {
     const mover = state.players.find(p => p.color === state.currentTurn);
     if (!mover || mover.type === 'ai') return null;
     return this.turnStartedAt + this.t(SLOW_MOVE_MS);
+  }
+
+  /** Push "your clock is running low" once per turn, if the player on move is away */
+  private warnLowClock(now: number): void {
+    const deadline = this.slowDeadline();
+    const meta = this.meta, state = this.engine?.getState();
+    if (!deadline || !meta || !state || meta.lowWarnedTurn === this.turnStartedAt) return;
+    if (now < deadline - this.t(LOW_CLOCK_MS) || now >= deadline) return;
+    meta.lowWarnedTurn = this.turnStartedAt;
+    this.ctx.waitUntil(this.ctx.storage.put('meta', meta));
+    const mover = Object.keys(this.seats).find(id => this.seats[id] === state.currentTurn);
+    if (!mover) return;
+    const hours = Math.max(1, Math.round((deadline - now) / HOUR));
+    this.notifyAway([mover], { kind: 'turn', title: 'Your clock is running low', body: `About ${hours} hour${hours === 1 ? '' : 's'} left to make your move, or you'll lose this game` });
   }
 
   private slowDeadlinePassed(): boolean {

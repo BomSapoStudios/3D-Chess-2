@@ -108,6 +108,7 @@ const alice = await guest('Alice'), bob = await guest('Bob');
   check(mine.games === 1 && mine.wins === 1 && mine.duel.rating === 1020 && mine.streak === 1, `Bob's stats add up (${mine.games} games, ${mine.wins} wins, ${mine.duel.rating})`);
   check(mine.recent[0]?.opponents[0] === alice.name && mine.recent[0].change === 20, 'recent games list the opponent and the change');
   check(mine.endings.resignation === 1, 'the ending is counted as a resignation');
+  check(mine.captures && mine.captures.taken === 0 && mine.captures.lost === 0, 'captures are counted (none in a resigned game)');
   const theirs = (await get(`/stats?of=${bob.userId}`, alice)).body;
   check(theirs.headToHead && theirs.headToHead.losses === 1 && theirs.headToHead.wins === 0, 'Alice sees her record against Bob');
   check(theirs.tier === 'Pawn', 'tier is Pawn until 5 rated games');
