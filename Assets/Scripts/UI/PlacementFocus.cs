@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// While pieces are being placed, hide every floor square outside the placing player's
-/// starting zone, and that player's own 3D bench (they use the on-screen one), so the squares you can use
+/// While pieces are being placed, dim every floor square outside the placing player's
+/// starting zone, and hide that player's own 3D bench (they use the on-screen one), so the squares you can use
 /// stand out from any angle. Everything comes back when placement ends.
 /// Only re-enables what it hid itself, so the Floors buttons keep working alongside it.
 /// </summary>
@@ -55,19 +55,14 @@ public class PlacementFocus : MonoBehaviour
 
         if (floors.Count == 0) FindFloors();
         PlacementZone zone = PlacementManager.GetPlacementZoneForColor(color.Value);
-        bool solid = BoardLook.SolidFloors;
         foreach (var (r, p) in floors)
         {
             if (r == null) continue;
             bool inZone = p.x >= zone.xMin && p.x <= zone.xMax && p.y >= zone.yMin && p.y <= zone.yMax && p.z >= zone.zMin && p.z <= zone.zMax;
-            if (solid)
-            {
-                // Solid floors stay whole (a board with holes in it reads as broken); squares
-                // outside the starting zone are just dimmed so the usable ones stand out
-                SetVisible(r, true);
-                Dim(r, !inZone);
-            }
-            else SetVisible(r, inZone);
+            // The board stays whole (without its vertical lines, missing squares look like a broken
+            // board); squares outside the starting zone are just dimmed so the usable ones stand out
+            SetVisible(r, true);
+            Dim(r, !inZone);
         }
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
         {
@@ -136,7 +131,9 @@ public class PlacementFocus : MonoBehaviour
         if (dim && !dimmed.Contains(r))
         {
             var block = new MaterialPropertyBlock();
-            block.SetColor(ColorId, Color.Lerp(r.sharedMaterial.color, NeonTheme.Ground, 0.4f));
+            Color c = r.sharedMaterial.color;
+            // Solid squares darken; see-through ones fade further
+            block.SetColor(ColorId, BoardLook.SolidFloors ? Color.Lerp(c, NeonTheme.Ground, 0.4f) : new Color(c.r, c.g, c.b, c.a * 0.55f));
             r.SetPropertyBlock(block);
             dimmed.Add(r);
         }
