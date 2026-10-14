@@ -103,6 +103,7 @@ public partial class NeonMenu : MonoBehaviour
         if (debugStats == 1) ShowProfile(null, ShowOnline);
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
+        else if (debugStats == 4) { ShowCustomize(); ShowPromotionPreview(PromotionStyle.Current); }
 #endif
     }
 
@@ -801,7 +802,8 @@ public partial class NeonMenu : MonoBehaviour
 
     private (string, System.Action, System.Func<bool>, System.Func<bool>) PromotionChip(PromotionStyle.Kind kind)
     {
-        return (PromotionStyle.DisplayName(kind), () => PromotionStyle.Current = kind, () => PromotionStyle.Current == kind, () => true);
+        // Picking one also shows it playing
+        return (PromotionStyle.DisplayName(kind), () => { PromotionStyle.Current = kind; ShowPromotionPreview(kind); }, () => PromotionStyle.Current == kind, () => true);
     }
 
     private (string, System.Action, System.Func<bool>, System.Func<bool>) PieceSetChip(PieceSets.Kind kind)

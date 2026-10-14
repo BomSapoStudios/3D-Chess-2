@@ -71,7 +71,12 @@ public class PieceEffects : MonoBehaviour
         }
     }
 
-    private static float Cell => ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
+    private static float Cell => ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : PreviewCell;
+
+    /// <summary>Set while the Customize preview plays promotions off the board: its camera and square size</summary>
+    public static Camera PreviewCamera;
+    public static float PreviewCell = 2.8f;
+    private static Camera ViewCamera => PreviewCamera != null ? PreviewCamera : Camera.main;
 
     private static GameObject Solid(string name, Mesh mesh, Color color, Vector3 position, Vector3 scale)
     {
@@ -441,7 +446,7 @@ public class PieceEffects : MonoBehaviour
         RestScale(t);
         Transform container = PiecesContainer;
         Vector3 up = container != null ? container.up : Vector3.up;
-        Camera cam = Camera.main;
+        Camera cam = ViewCamera;
         Vector3 side = cam != null ? cam.transform.right : Vector3.right;
         float cell = Cell;
 
