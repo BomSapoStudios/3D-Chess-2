@@ -55,11 +55,19 @@ public class PlacementFocus : MonoBehaviour
 
         if (floors.Count == 0) FindFloors();
         PlacementZone zone = PlacementManager.GetPlacementZoneForColor(color.Value);
+        bool solid = BoardLook.SolidFloors;
         foreach (var (r, p) in floors)
         {
             if (r == null) continue;
             bool inZone = p.x >= zone.xMin && p.x <= zone.xMax && p.y >= zone.yMin && p.y <= zone.yMax && p.z >= zone.zMin && p.z <= zone.zMax;
-            SetVisible(r, inZone);
+            if (solid)
+            {
+                // Solid floors stay whole (a board with holes in it reads as broken); squares
+                // outside the starting zone are just dimmed so the usable ones stand out
+                SetVisible(r, true);
+                Dim(r, !inZone);
+            }
+            else SetVisible(r, inZone);
         }
         foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
         {
@@ -120,8 +128,25 @@ public class PlacementFocus : MonoBehaviour
         else if (on && disabled.Remove(c)) c.enabled = true;
     }
 
+    private readonly HashSet<Renderer> dimmed = new HashSet<Renderer>();
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+
+    private void Dim(Renderer r, bool dim)
+    {
+        if (dim && !dimmed.Contains(r))
+        {
+            var block = new MaterialPropertyBlock();
+            block.SetColor(ColorId, Color.Lerp(r.sharedMaterial.color, NeonTheme.Ground, 0.4f));
+            r.SetPropertyBlock(block);
+            dimmed.Add(r);
+        }
+        else if (!dim && dimmed.Remove(r)) r.SetPropertyBlock(null);
+    }
+
     private void RestoreAll()
     {
+        foreach (Renderer r in dimmed) if (r != null) r.SetPropertyBlock(null);
+        dimmed.Clear();
         foreach (Renderer r in hidden) if (r != null) r.enabled = true;
         hidden.Clear();
         foreach (Collider c in disabled) if (c != null) c.enabled = true;
