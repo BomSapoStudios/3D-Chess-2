@@ -43,8 +43,18 @@ public class TurnPlannerUI : MonoBehaviour
         DontDestroyOnLoad(go);
     }
 
+    // The game scene's board (gone once you head home; ChessBoard and the game state outlive the scene)
+    private static EmergencyChessBoard sceneBoard;
+
+    private static bool InGameScene()
+    {
+        if (sceneBoard == null) sceneBoard = FindFirstObjectByType<EmergencyChessBoard>();
+        return sceneBoard != null;
+    }
+
     private static bool Playing =>
-        ChessBoard.Instance != null && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing;
+        ChessBoard.Instance != null && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing
+        && InGameScene();
 
     private static PieceColor CurrentPlayer => TurnManager.Instance != null ? TurnManager.Instance.GetCurrentPlayer() : PieceColor.White;
 
