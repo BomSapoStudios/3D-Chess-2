@@ -220,26 +220,37 @@ public class QueenBlitzDirector : MonoBehaviour
         if (state != GameState.PiecePlacement && state != GameState.Playing) return;
         if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
 
-        if (!laidOut)
-        {
-            laidOut = true;
-            LayOut();
-        }
+        // Wait for the trays: the piece prefabs are built along with them
+        if (!laidOut && PlacementManager.Instance != null && PlacementManager.Instance.PiecesReady) laidOut = LayOut();
         if (state == GameState.PiecePlacement && PlacementManager.Instance != null)
         {
             // The pawns have nothing to place: they're ready straight away
             if (!PlacementManager.Instance.IsPlayerReady(QueenBlitz.PawnColor))
                 PlacementManager.Instance.SetPlayerReady(QueenBlitz.PawnColor, true);
-            if (!queenPlaced && QueenBlitz.Current.queen.HasValue && PlacementManager.Instance.PiecesReady) PlaceGivenQueen();
+            if (laidOut && !queenPlaced && QueenBlitz.Current.queen.HasValue) PlaceGivenQueen();
         }
     }
 
-    private void LayOut()
+    /// <summary>Put the puzzle's pawns and blocks on the board; false if the pawns couldn't be made yet</summary>
+    private bool LayOut()
     {
         QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
-        foreach (BoardPosition p in puzzle.pawns) UndoManager.Create(ChessPieceType.Pawn, QueenBlitz.PawnColor, p);
+        var made = new List<ChessPiece>();
+        foreach (BoardPosition p in puzzle.pawns)
+        {
+            ChessPiece pawn = UndoManager.Create(ChessPieceType.Pawn, QueenBlitz.PawnColor, p);
+            if (pawn == null)
+            {
+                // Not ready: take back what was made and try again next frame
+                foreach (ChessPiece m in made) { ChessBoard.Instance.RemovePieceFromBoard(m, m.CurrentPosition); Destroy(m.gameObject); }
+                return false;
+            }
+            made.Add(pawn);
+        }
         Transform container = GameObject.Find("Pieces Container").transform;
         foreach (BoardPosition b in puzzle.blocks) blockObjects.Add(MakeBlock(container, b));
+        Debug.Log($"Queen Blitz: puzzle {QueenBlitz.Index + 1} laid out, {made.Count} pawns, {puzzle.blocks.Length} blocks");
+        return true;
     }
 
     /// <summary>A glowing stone cube sitting on the block's square</summary>

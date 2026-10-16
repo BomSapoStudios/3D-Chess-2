@@ -63,6 +63,7 @@ public class ChessBoard : MonoBehaviour
         else if (Instance != this)
         {
             Debug.LogWarning("ChessBoard: Duplicate instance detected, destroying...");
+            Instance.MatchBoardSize(); // the kept board may be from a game on another size of cube
             Destroy(gameObject);
         }
         else
@@ -73,6 +74,21 @@ public class ChessBoard : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// A new game is starting: the board outlives scenes, so if the new game is on a different
+    /// size of cube, rebuild the logical board at the new size (otherwise squares past the old
+    /// edge are out of range).
+    /// </summary>
+    public void MatchBoardSize()
+    {
+        if (BoardDimensionsManager.Instance == null) return;
+        Vector3Int dims = BoardDimensionsManager.Instance.GetDimensions();
+        if (dims == boardDimensions && pieces != null) return;
+        Debug.Log($"ChessBoard: Resizing from {boardDimensions.x}x{boardDimensions.y}x{boardDimensions.z} to {dims.x}x{dims.y}x{dims.z} for the new game");
+        boardDimensions = dims;
+        InitializeLogicalBoard();
+    }
+
     private void InitializeBoard()
     {
         Debug.Log("ChessBoard: Starting board initialization...");
