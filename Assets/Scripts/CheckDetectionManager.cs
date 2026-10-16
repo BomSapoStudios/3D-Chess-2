@@ -90,7 +90,7 @@ public class CheckDetectionManager : MonoBehaviour
         if (newState == GameState.Playing)
         {
             Debug.Log("CheckDetectionManager: Game started - enabling check detection");
-            enableCheckValidation = !ZombieMode.Active; // no check in zombie runs: the king is just another piece
+            enableCheckValidation = !ZombieMode.Active && !QueenBlitz.Active; // no check in zombie runs: the king is just another piece
             InvalidateCache();
             ResetUIStateTracking();
         }

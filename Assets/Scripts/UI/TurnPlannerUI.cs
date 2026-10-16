@@ -53,7 +53,7 @@ public class TurnPlannerUI : MonoBehaviour
     }
 
     private static bool Playing =>
-        ChessBoard.Instance != null && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing
+        !QueenBlitz.Active && ChessBoard.Instance != null && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing
         && InGameScene();
 
     private static PieceColor CurrentPlayer => TurnManager.Instance != null ? TurnManager.Instance.GetCurrentPlayer() : PieceColor.White;

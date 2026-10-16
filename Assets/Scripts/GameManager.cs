@@ -731,6 +731,11 @@ public class GameManager : MonoBehaviour
         foreach (PieceColor color in activePlayers)
         {
             if (ZombieMode.Active && color == ZombieMode.ZombieColor) continue; // the zombies arrive during play
+            if (QueenBlitz.Active)
+            {
+                if (color == QueenBlitz.PlayerColor) CreatePieceInTray(color, ChessPieceType.Queen); // puzzles: a lone queen
+                continue;
+            }
             Debug.Log($"🎭 Creating pieces for {color} player...");
             CreatePieceInTray(color, ChessPieceType.King);
             CreatePieceInTray(color, ChessPieceType.Queen);

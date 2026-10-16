@@ -9,6 +9,8 @@ public class Queen : ChessPiece
 {
     public override List<BoardPosition> GetValidMoves()
     {
+        if (QueenBlitz.Active) return QueenBlitz.SweepMoves(this); // drives through pawns, stops at blocks
+
         List<BoardPosition> validMoves = new List<BoardPosition>();
         
         // Queen can move in all 26 directions (like King but unlimited range)

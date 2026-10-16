@@ -553,6 +553,10 @@ public class ChessBoard : MonoBehaviour
             }
         }
         
+        // Queen Blitz: the queen sweeps up every pawn she passes through on the way
+        if (QueenBlitz.Active && !_isSimulationMode && piece.pieceType == ChessPieceType.Queen)
+            QueenBlitz.SweepPath(piece, from, to);
+
         // Check for capture before updating board array
         ChessPiece targetPiece = GetPieceAt(to);
         
@@ -687,7 +691,7 @@ public class ChessBoard : MonoBehaviour
         // CRITICAL FIX: Don't check CanMovePieces() here as it checks for animations
         // The piece might already be animating, which would block NextTurn() from being called
         // NextTurn() has its own guard conditions to ensure we're in the right state
-        if (!isPromotion && !ZombieMode.HoldTurn && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
+        if (!isPromotion && !ZombieMode.HoldTurn && !QueenBlitz.Active && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
         {
             if (TurnManager.Instance != null)
             {
@@ -700,6 +704,11 @@ public class ChessBoard : MonoBehaviour
                 Debug.LogWarning("ChessBoard.MovePiece: TurnManager not available for turn switching");
             }
         }
+
+        // Queen Blitz: every queen move counts toward the par
+        if (QueenBlitz.Active && !_isSimulationMode && moveResult && piece.pieceType == ChessPieceType.Queen
+            && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
+            QueenBlitz.OnQueenMoved();
 
         // CHESS NOTATION UI: Notify UI systems about the move
         if (!isPromotion)

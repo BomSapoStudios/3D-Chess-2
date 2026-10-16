@@ -1,0 +1,106 @@
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+using System.Collections;
+using UnityEngine;
+
+/// <summary>
+/// Development-only: plays Queen Blitz puzzles by themselves with the solver's answers and checks
+/// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
+/// plays puzzle N (1-10) and stays on it; 99 plays them all in turn. Logs "BLITZ DEMO".
+/// </summary>
+public class BlitzDemo : MonoBehaviour
+{
+    private static BoardPosition P(int x, int y, int z) => new BoardPosition(x, y, z);
+
+    // The queen's start, then each square she stops on (from Tools/QueenBlitz/puzzles.py)
+    private static readonly BoardPosition[][] Solutions =
+    {
+        new[] { P(0, 1, 1), P(3, 1, 1) },
+        new[] { P(0, 0, 0), P(3, 0, 0), P(3, 3, 0) },
+        new[] { P(0, 0, 0), P(2, 2, 2), P(2, 2, 0) },
+        new[] { P(2, 0, 2), P(2, 0, 0), P(2, 2, 2), P(0, 0, 0) },
+        new[] { P(3, 0, 0), P(3, 2, 2), P(1, 2, 0) },
+        new[] { P(3, 0, 5), P(3, 0, 2), P(3, 5, 2), P(5, 3, 0) },
+        new[] { P(5, 0, 5), P(1, 0, 1), P(4, 0, 1), P(0, 4, 5) },
+        new[] { P(0, 0, 0), P(2, 0, 0), P(2, 3, 0) },
+        new[] { P(0, 1, 4), P(5, 1, 4), P(1, 5, 4), P(5, 5, 4), P(5, 5, 0) },
+        new[] { P(4, 5, 1), P(4, 0, 1), P(0, 0, 5), P(5, 5, 5), P(3, 5, 5), P(5, 5, 3) },
+    };
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Boot()
+    {
+        int which = PlayerPrefs.GetInt("DebugBlitzDemo", 0);
+        if (which == 0 || FindFirstObjectByType<BlitzDemo>() != null) return;
+        var go = new GameObject("Blitz Demo");
+        DontDestroyOnLoad(go);
+        go.AddComponent<BlitzDemo>().StartCoroutine(Run(which));
+    }
+
+    private static IEnumerator Run(int which)
+    {
+        yield return new WaitForSeconds(2f);
+        int first = which == 99 ? 0 : which - 1, last = which == 99 ? QueenBlitz.Puzzles.Length - 1 : which - 1;
+        int passed = 0;
+        for (int i = first; i <= last; i++)
+        {
+            bool ok = false;
+            yield return Play(i, r => ok = r, stay: which != 99);
+            if (ok) passed++;
+        }
+        Debug.Log($"BLITZ DEMO: done, {passed}/{last - first + 1} puzzles cleared at par");
+    }
+
+    private static IEnumerator Play(int index, System.Action<bool> result, bool stay)
+    {
+        QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
+        var config = new GameConfiguration();
+        config.playerCount = 2;
+        config.boardSize = puzzle.size == 4 ? BoardSize.Small4x4x4 : BoardSize.Medium6x6x6;
+        config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+        config.aiPlayerCount = 1;
+        config.queenBlitz = true;
+        config.blitzPuzzle = index;
+        config.ApplyToLegacyFields();
+        SceneController.Instance.LoadGameScene(config);
+        yield return new WaitForSeconds(1f);
+
+        while (PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
+        yield return new WaitForSeconds(1f);
+        BoardPosition[] solution = Solutions[index];
+        if (!puzzle.queen.HasValue)
+        {
+            // Place the queen where the solver starts, as a player would
+            ChessPiece queen = null;
+            foreach (ChessPiece p in PieceTray.GetTrayForColor(PieceColor.White).GetComponentsInChildren<ChessPiece>(true))
+                if (p.pieceType == ChessPieceType.Queen) queen = p;
+            Debug.Log($"BLITZ DEMO: {index + 1} placing the queen at {solution[0]} (zone allows it: {PlacementManager.IsPositionInColorZone(solution[0], PieceColor.White)})");
+            PlacementManager.Instance.ExecuteAIPlacement(queen, solution[0]);
+            yield return new WaitForSeconds(stay ? 4f : 1f); // leave time for a screenshot of placement
+            PlacementManager.Instance.SetPlayerReady(PieceColor.White, true);
+        }
+        float wait = 0f;
+        while (GameStateManager.Instance.currentState != GameState.Playing && wait < 20f) { wait += Time.deltaTime; yield return null; }
+        yield return new WaitForSeconds(1f);
+        int pawns = QueenBlitzDirector.Instance != null ? QueenBlitzDirector.Instance.PawnsLeft() : -1;
+        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name} started, state {GameStateManager.Instance.currentState}, pawns {pawns}, current {TurnManager.Instance.GetCurrentPlayer()}");
+
+        bool good = true;
+        for (int m = 1; m < solution.Length; m++)
+        {
+            ChessPiece queen = ChessBoard.Instance.GetPieceAt(solution[m - 1]);
+            if (queen == null || queen.pieceType != ChessPieceType.Queen) { Debug.Log($"BLITZ DEMO: FAIL no queen at {solution[m - 1]}"); good = false; break; }
+            if (!queen.GetValidMoves().Contains(solution[m])) { Debug.Log($"BLITZ DEMO: FAIL {solution[m]} isn't a legal sweep from {solution[m - 1]}"); good = false; break; }
+            while (!GameStateManager.Instance.CanMovePieces()) yield return null;
+            ChessBoard.Instance.MovePiece(solution[m - 1], solution[m]);
+            yield return new WaitForSeconds(1.2f);
+            Debug.Log($"BLITZ DEMO: {index + 1} move {QueenBlitz.Moves}: {solution[m - 1]} > {solution[m]}, pawns left {(QueenBlitzDirector.Instance != null ? QueenBlitzDirector.Instance.PawnsLeft() : -1)}, turn {TurnManager.Instance.GetCurrentPlayer()}");
+        }
+        wait = 0f;
+        while (GameStateManager.Instance.currentState != GameState.GameOver && wait < 6f) { wait += Time.deltaTime; yield return null; }
+        bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver;
+        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, best stars {QueenBlitz.BestStars(index)}");
+        result(cleared && good);
+        yield return new WaitForSeconds(stay ? 1f : 2.5f);
+    }
+}
+#endif

@@ -1,0 +1,363 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// Queen Blitz: a puzzle mode. The board holds pawns (and, later, blocks); the player has a
+/// single Queen and clears every pawn in as few moves as possible. A move slides the queen any
+/// distance along one of its 26 lines, sweeping up every pawn it passes through or stops on;
+/// blocks and the board's edge stop it. Early puzzles place the queen for you; later ones make
+/// you choose where she starts (placing her is not a move). On an ice floor she can't stop
+/// partway: every move slides to the board's edge or the square before a block.
+///
+/// Pars come from the solver in Tools/QueenBlitz (puzzles.py checks them all).
+/// </summary>
+public static class QueenBlitz
+{
+    public class Puzzle
+    {
+        public string name;
+        public int size;
+        public BoardPosition? queen;     // null: the player places the queen
+        public BoardPosition[] pawns;
+        public BoardPosition[] blocks;
+        public int par;
+        public string tip;
+        public bool ice;                 // ice floor: every move slides to the edge or a block
+    }
+
+    private static BoardPosition P(int x, int y, int z) => new BoardPosition(x, y, z);
+
+    public static readonly Puzzle[] Puzzles =
+    {
+        new Puzzle { name = "Straight Shot", size = 4, queen = P(0, 1, 1), par = 1,
+            pawns = new[] { P(1, 1, 1), P(2, 1, 1), P(3, 1, 1) }, blocks = new BoardPosition[0],
+            tip = "The queen drives straight through every pawn on her line." },
+        new Puzzle { name = "Corner Turn", size = 4, queen = P(0, 0, 0), par = 2,
+            pawns = new[] { P(1, 0, 0), P(2, 0, 0), P(3, 0, 0), P(3, 1, 0), P(3, 2, 0), P(3, 3, 0) }, blocks = new BoardPosition[0],
+            tip = "Finish one line where the next one begins." },
+        new Puzzle { name = "Stop Short", size = 4, queen = P(0, 0, 0), par = 2,
+            pawns = new[] { P(1, 1, 1), P(2, 2, 2), P(2, 2, 0), P(2, 2, 1) }, blocks = new BoardPosition[0],
+            tip = "You don't have to ride a line to the edge." },
+        new Puzzle { name = "Long Way Round", size = 4, queen = P(2, 0, 2), par = 3,
+            pawns = new[] { P(0, 0, 0), P(1, 1, 1), P(2, 0, 1), P(2, 1, 1), P(2, 2, 2) }, blocks = new BoardPosition[0],
+            tip = "The biggest sweep isn't always the best first move." },
+        new Puzzle { name = "Your Move", size = 4, queen = null, par = 2,
+            pawns = new[] { P(1, 2, 0), P(2, 2, 1), P(3, 1, 1), P(3, 2, 2) }, blocks = new BoardPosition[0],
+            tip = "Place the queen yourself. Where you start matters." },
+        new Puzzle { name = "Roadblocks", size = 6, queen = null, par = 3,
+            pawns = new[] { P(3, 0, 4), P(3, 5, 2), P(4, 4, 1), P(5, 3, 0) },
+            blocks = new[] { P(1, 1, 5), P(2, 4, 4), P(4, 1, 4), P(4, 3, 2) },
+            tip = "Blocks stop the queen. Find a way around them." },
+        new Puzzle { name = "Diagonal Detour", size = 6, queen = null, par = 3,
+            pawns = new[] { P(0, 4, 5), P(1, 3, 4), P(2, 0, 1), P(2, 2, 3), P(3, 0, 1), P(4, 0, 4) },
+            blocks = new[] { P(0, 1, 4), P(2, 2, 5), P(3, 3, 1), P(5, 5, 4) },
+            tip = "Only one starting square works in three." },
+        new Puzzle { name = "First Frost", size = 4, queen = P(0, 0, 0), par = 2, ice = true,
+            pawns = new[] { P(1, 0, 0), P(2, 0, 0), P(2, 1, 0), P(2, 2, 0), P(2, 3, 0) },
+            blocks = new[] { P(3, 0, 0) },
+            tip = "Ice! The queen slides until the edge or a block stops her." },
+        new Puzzle { name = "Ice Rink", size = 6, queen = null, par = 4, ice = true,
+            pawns = new[] { P(1, 1, 4), P(2, 4, 4), P(2, 5, 4), P(4, 1, 4), P(4, 5, 4), P(5, 1, 4), P(5, 5, 1), P(5, 5, 2), P(5, 5, 3), P(5, 5, 4) },
+            blocks = new[] { P(0, 1, 3), P(1, 0, 5), P(4, 3, 1), P(4, 3, 5), P(5, 1, 0), P(5, 2, 5), P(5, 3, 2), P(5, 5, 5) },
+            tip = "Use the blocks as brakes." },
+        new Puzzle { name = "Black Ice", size = 6, queen = null, par = 5, ice = true,
+            pawns = new[] { P(0, 0, 5), P(2, 2, 5), P(3, 0, 2), P(3, 3, 5), P(3, 5, 5), P(4, 3, 1), P(4, 4, 1), P(4, 4, 5), P(4, 5, 4), P(4, 5, 5), P(5, 5, 3) },
+            blocks = new[] { P(0, 5, 5), P(1, 4, 4), P(2, 3, 1), P(2, 5, 3), P(2, 5, 5), P(3, 2, 3), P(4, 3, 3), P(5, 3, 3) },
+            tip = "Only one starting square clears it in five." },
+    };
+
+    /// <summary>The current game is a Queen Blitz puzzle</summary>
+    public static bool Active { get; set; }
+    public static int Index { get; set; }
+    public static Puzzle Current => Puzzles[Mathf.Clamp(Index, 0, Puzzles.Length - 1)];
+    public static int Moves { get; set; }
+    public static bool Cleared { get; set; }
+
+    public const PieceColor PlayerColor = PieceColor.White;
+    public const PieceColor PawnColor = PieceColor.Black;
+
+    private static readonly HashSet<BoardPosition> blocked = new HashSet<BoardPosition>();
+
+    public static void Begin(int index)
+    {
+        Index = index;
+        Moves = 0;
+        Cleared = false;
+        blocked.Clear();
+        foreach (BoardPosition b in Current.blocks) blocked.Add(b);
+    }
+
+    public static bool IsBlocked(BoardPosition p) => Active && blocked.Contains(p);
+
+    /// <summary>3 stars at par, 2 at one over, 1 for any other clear</summary>
+    public static int Stars(int moves, int par) => moves <= par ? 3 : moves == par + 1 ? 2 : 1;
+
+    public static int BestMoves(int index) => PlayerPrefs.GetInt($"QueenBlitzBest.{index}", 0);
+    public static int BestStars(int index) => BestMoves(index) > 0 ? Stars(BestMoves(index), Puzzles[index].par) : 0;
+
+    /// <summary>Save a clear if it beats the best; true when it does</summary>
+    public static bool SaveBest()
+    {
+        int best = BestMoves(Index);
+        if (best > 0 && Moves >= best) return false;
+        PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    public static string StarText(int stars) => new string('★', stars) + new string('☆', 3 - stars);
+
+    // ───────────────────────── Queen lines ─────────────────────────
+
+    /// <summary>Every square the queen can stop on: along each of her 26 lines until a block or the edge, through pawns</summary>
+    public static List<BoardPosition> SweepMoves(ChessPiece queen)
+    {
+        var moves = new List<BoardPosition>();
+        if (ChessBoard.Instance == null) return moves;
+        BoardPosition from = queen.CurrentPosition;
+        for (int dx = -1; dx <= 1; dx++)
+        for (int dy = -1; dy <= 1; dy++)
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            if (dx == 0 && dy == 0 && dz == 0) continue;
+            var at = from;
+            BoardPosition? last = null;
+            while (true)
+            {
+                at = new BoardPosition(at.x + dx, at.y + dy, at.z + dz);
+                if (!ChessBoard.Instance.IsValidPosition(at) || blocked.Contains(at)) break;
+                ChessPiece there = ChessBoard.Instance.GetPieceAt(at);
+                if (there != null && there.pieceColor == queen.pieceColor) break;
+                if (!Current.ice) moves.Add(at);
+                last = at;
+            }
+            // On ice she can't stop partway: only the end of the slide
+            if (Current.ice && last.HasValue) moves.Add(last.Value);
+        }
+        return moves;
+    }
+
+    /// <summary>The squares strictly between two squares on one of the queen's lines</summary>
+    public static IEnumerable<BoardPosition> Between(BoardPosition from, BoardPosition to)
+    {
+        int dx = System.Math.Sign(to.x - from.x), dy = System.Math.Sign(to.y - from.y), dz = System.Math.Sign(to.z - from.z);
+        var at = new BoardPosition(from.x + dx, from.y + dy, from.z + dz);
+        int guard = 16;
+        while (at != to && guard-- > 0)
+        {
+            yield return at;
+            at = new BoardPosition(at.x + dx, at.y + dy, at.z + dz);
+        }
+    }
+
+    /// <summary>The queen is sliding from → to: sweep up the pawns she passes through (the one she lands on is taken as usual)</summary>
+    public static void SweepPath(ChessPiece queen, BoardPosition from, BoardPosition to)
+    {
+        foreach (BoardPosition p in Between(from, to))
+        {
+            ChessPiece pawn = ChessBoard.Instance.GetPieceAt(p);
+            if (pawn == null || pawn.pieceColor == queen.pieceColor) continue;
+            PieceEffects.Shatter(pawn, queen);
+            ChessBoard.Instance.RemovePieceFromBoard(pawn, p);
+        }
+    }
+
+    /// <summary>A queen move finished: count it and see whether the board is clear</summary>
+    public static void OnQueenMoved()
+    {
+        Moves++;
+        if (QueenBlitzDirector.Instance != null) QueenBlitzDirector.Instance.AfterMove();
+    }
+}
+
+/// <summary>A block in a Queen Blitz puzzle: the queen can't enter or pass its square</summary>
+public class QueenBlitzBlock : MonoBehaviour
+{
+    public BoardPosition at;
+}
+
+/// <summary>
+/// Sets up and referees a Queen Blitz puzzle in the game scene: lays out the pawns and blocks,
+/// places the queen when the puzzle gives her a square, keeps the turn with the player, counts
+/// moves, and ends the puzzle when the last pawn falls.
+/// </summary>
+public class QueenBlitzDirector : MonoBehaviour
+{
+    public static QueenBlitzDirector Instance { get; private set; }
+
+    private bool laidOut, queenPlaced, ended;
+    private readonly List<GameObject> blockObjects = new List<GameObject>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Install()
+    {
+        SceneManager.sceneLoaded += (scene, mode) => TryCreate();
+        TryCreate();
+    }
+
+    private static void TryCreate()
+    {
+        GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
+        bool inGame = Object.FindFirstObjectByType<MainMenuController>() == null;
+        QueenBlitz.Active = inGame && config != null && config.queenBlitz && !config.isOnlineGame;
+        if (!QueenBlitz.Active || Instance != null) return;
+        QueenBlitz.Begin(config.blitzPuzzle);
+        new GameObject("Queen Blitz Director").AddComponent<QueenBlitzDirector>();
+    }
+
+    private void Awake() => Instance = this;
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        if (state != GameState.PiecePlacement && state != GameState.Playing) return;
+        if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
+
+        if (!laidOut)
+        {
+            laidOut = true;
+            LayOut();
+        }
+        if (state == GameState.PiecePlacement && PlacementManager.Instance != null)
+        {
+            // The pawns have nothing to place: they're ready straight away
+            if (!PlacementManager.Instance.IsPlayerReady(QueenBlitz.PawnColor))
+                PlacementManager.Instance.SetPlayerReady(QueenBlitz.PawnColor, true);
+            if (!queenPlaced && QueenBlitz.Current.queen.HasValue && PlacementManager.Instance.PiecesReady) PlaceGivenQueen();
+        }
+    }
+
+    private void LayOut()
+    {
+        QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
+        foreach (BoardPosition p in puzzle.pawns) UndoManager.Create(ChessPieceType.Pawn, QueenBlitz.PawnColor, p);
+        Transform container = GameObject.Find("Pieces Container").transform;
+        foreach (BoardPosition b in puzzle.blocks) blockObjects.Add(MakeBlock(container, b));
+    }
+
+    /// <summary>A glowing stone cube sitting on the block's square</summary>
+    private static GameObject MakeBlock(Transform container, BoardPosition at)
+    {
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube.name = $"Blitz Block {at}";
+        Destroy(cube.GetComponent<Collider>()); // taps go to the board, not the block
+        cube.transform.SetParent(container, false);
+        float cell = ChessBoard.Instance.cellSize;
+        cube.transform.localPosition = ChessBoard.Instance.BoardToLocalPosition(at) + Vector3.up * cell * 0.3f;
+        cube.transform.localScale = Vector3.one * cell * 0.55f;
+        cube.transform.localRotation = Quaternion.identity;
+        var renderer = cube.GetComponent<MeshRenderer>();
+        Material mat = new Material(Shader.Find("Standard"));
+        mat.color = new Color(0.35f, 0.25f, 0.55f);
+        mat.EnableKeyword("_EMISSION");
+        mat.SetColor("_EmissionColor", NeonTheme.Pink * 0.35f);
+        renderer.material = mat;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // A neon outline so it reads as solid from any angle
+        GameObject edge = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Destroy(edge.GetComponent<Collider>());
+        edge.transform.SetParent(cube.transform, false);
+        edge.transform.localScale = Vector3.one * 1.08f;
+        Material glow = new Material(Shader.Find("Sprites/Default")) { color = new Color(NeonTheme.Pink.r, NeonTheme.Pink.g, NeonTheme.Pink.b, 0.25f) };
+        edge.GetComponent<MeshRenderer>().material = glow;
+        edge.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        cube.AddComponent<QueenBlitzBlock>().at = at;
+        return cube;
+    }
+
+    /// <summary>Early puzzles: the queen starts on her square, and the player starts straight away</summary>
+    private void PlaceGivenQueen()
+    {
+        PieceTray tray = PieceTray.GetTrayForColor(QueenBlitz.PlayerColor);
+        if (tray == null) return;
+        ChessPiece queen = null;
+        foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
+            if (p.pieceType == ChessPieceType.Queen && p.pieceColor == QueenBlitz.PlayerColor) { queen = p; break; }
+        if (queen == null) return;
+        queenPlaced = true;
+        PlacementManager.Instance.ExecuteAIPlacement(queen, QueenBlitz.Current.queen.Value);
+        StartCoroutine(ReadyNextFrame());
+    }
+
+    private IEnumerator ReadyNextFrame()
+    {
+        yield return null;
+        if (PlacementManager.Instance != null && !PlacementManager.Instance.IsPlayerReady(QueenBlitz.PlayerColor))
+            PlacementManager.Instance.SetPlayerReady(QueenBlitz.PlayerColor, true);
+    }
+
+    public int PawnsLeft()
+    {
+        int left = 0;
+        int n = QueenBlitz.Current.size;
+        for (int x = 0; x < n; x++)
+        for (int y = 0; y < n; y++)
+        for (int z = 0; z < n; z++)
+        {
+            ChessPiece p = ChessBoard.Instance.GetPieceAt(new BoardPosition(x, y, z));
+            if (p != null && p.pieceColor == QueenBlitz.PawnColor) left++;
+        }
+        return left;
+    }
+
+    public void AfterMove()
+    {
+        if (ended || PawnsLeft() > 0) return;
+        StartCoroutine(Finish());
+    }
+
+    private IEnumerator Finish()
+    {
+        ended = true;
+        QueenBlitz.Cleared = true;
+        // Let the sweep play out first
+        float until = Time.time + 3f;
+        while (Time.time < until && GameStateManager.Instance != null && !GameStateManager.Instance.CanMovePieces()) yield return null;
+        yield return new WaitForSeconds(0.3f);
+        bool best = QueenBlitz.SaveBest();
+        int par = QueenBlitz.Current.par;
+        int stars = QueenBlitz.Stars(QueenBlitz.Moves, par);
+        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}  {QueenBlitz.StarText(stars)}" + (best ? "  New best!" : "");
+        if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PlayerColor, reason);
+        else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
+    }
+
+    /// <summary>Start this puzzle again from the beginning</summary>
+    public static void Restart(int index)
+    {
+        GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
+        if (config == null) return;
+        config = config.Clone();
+        config.blitzPuzzle = Mathf.Clamp(index, 0, QueenBlitz.Puzzles.Length - 1);
+        SceneController.Instance.LoadGameScene(config);
+    }
+
+    // Puzzle name, moves and par along the top, the tip under it, and Restart
+    private void OnGUI()
+    {
+        var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        if (ended || (state != GameState.Playing && state != GameState.PiecePlacement)) return;
+        Vector2 ui = TouchGUI.Begin();
+        QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
+        string text = state == GameState.PiecePlacement
+            ? $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Place your queen    ·    Par {puzzle.par}"
+            : $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}    ·    Pawns {PawnsLeft()}";
+        Rect rect = new Rect(ui.x / 2f - 250f, 56f, 500f, 34f);
+        NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
+        GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
+        if (QueenBlitz.Moves == 0)
+            GUI.Label(new Rect(ui.x / 2f - 250f, 92f, 500f, 24f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+        if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
+            Restart(QueenBlitz.Index);
+        TouchGUI.End();
+    }
+}

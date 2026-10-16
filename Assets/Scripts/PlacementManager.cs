@@ -22,6 +22,7 @@ public struct PlacementZone
 
     public bool Contains(BoardPosition position)
     {
+        if (QueenBlitz.IsBlocked(position)) return false; // Queen Blitz blocks can't hold a piece
         return position.x >= xMin && position.x <= xMax &&
                position.y >= yMin && position.y <= yMax &&
                position.z >= zMin && position.z <= zMax;
@@ -85,6 +86,8 @@ public class PlacementManager : MonoBehaviour
 
         // Zombie runs: zombies can come from anywhere, so the player may use their whole first plane
         if (ZombieMode.Active && color == ZombieMode.PlayerColor) return new PlacementZone(0, 0, 0, boardSize - 1, 0, boardSize - 1);
+        // Queen Blitz: the queen may start on any free square of the cube
+        if (QueenBlitz.Active) return new PlacementZone(0, boardSize - 1, 0, boardSize - 1, 0, boardSize - 1);
 
         // Initialize zone boundaries
         int xMin = 0, xMax = boardSize - 1;
@@ -660,7 +663,7 @@ public class PlacementManager : MonoBehaviour
         for (int z = zone.zMin; z <= zone.zMax; z++)
         {
             var p = new BoardPosition(x, y, z);
-            if (ChessBoard.Instance.GetPieceAt(p) == null) list.Add(p); // the zone is already the colour's
+            if (ChessBoard.Instance.GetPieceAt(p) == null && !QueenBlitz.IsBlocked(p)) list.Add(p); // the zone is already the colour's
         }
         return list;
     }
@@ -1929,7 +1932,7 @@ public class PlacementManager : MonoBehaviour
                 }
             }
         }
-        if (ZombieMode.Active) hasBlackPieces = true; // the zombies arrive once play starts
+        if (ZombieMode.Active || QueenBlitz.Active) hasBlackPieces = true; // the zombies arrive once play starts; puzzle pawns are laid out
         
         Debug.Log($"PlacementManager: Game setup validation - Total pieces: {totalPieces}, White: {hasWhitePieces}, Black: {hasBlackPieces}");
         
@@ -2065,7 +2068,7 @@ public class PlacementManager : MonoBehaviour
     /// </summary>
     private void SpawnPawnsForGameplay()
     {
-        if (ZombieMode.Active) return; // zombie runs: the player has no pawns, and the zombies bring their own
+        if (ZombieMode.Active || QueenBlitz.Active) return; // zombie runs and puzzles bring their own pawns
         Debug.Log("Spawning pawns for gameplay...");
         
         // ANTI-CORRUPTION: First, clean up any existing pawns to prevent duplicates

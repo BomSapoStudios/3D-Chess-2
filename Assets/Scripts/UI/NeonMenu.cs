@@ -305,8 +305,9 @@ public partial class NeonMenu : MonoBehaviour
         quickLayout.childControlWidth = false;
         quickLayout.childControlHeight = false;
         quickLayout.childForceExpandWidth = false;
-        NeonButton(quickRow, "Quick Play vs Computer!", new Vector2(236, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, ShowSidePicker);
-        NeonButton(quickRow, "Zombies!", new Vector2(120, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 17, ShowZombiePicker);
+        NeonButton(quickRow, "Quick Play!", new Vector2(124, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, ShowSidePicker);
+        NeonButton(quickRow, "Zombies!", new Vector2(108, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 16, ShowZombiePicker);
+        NeonButton(quickRow, "Queen Blitz", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, ShowBlitzPicker);
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -2174,6 +2175,8 @@ public partial class NeonMenu : MonoBehaviour
         if (!quickPlay) SaveSetup();
         var config = new GameConfiguration();
         config.zombieMode = zombieRun;
+        config.queenBlitz = blitzRun;
+        config.blitzPuzzle = blitzChoice;
         config.playerCount = playerCount;
         config.boardSize = boardSize;
         config.aiDifficulty = difficulty;

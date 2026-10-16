@@ -77,6 +77,10 @@ public class LayerViewUI : MonoBehaviour
             foreach (Collider c in piece.GetComponentsInChildren<Collider>()) SetEnabled(c, visible);
         }
 
+        foreach (QueenBlitzBlock block in FindObjectsByType<QueenBlitzBlock>(FindObjectsSortMode.None))
+        {
+            HideIfOtherLevel(block.gameObject, block.at.y);
+        }
         foreach (PlacementTargetData target in FindObjectsByType<PlacementTargetData>(FindObjectsSortMode.None))
         {
             HideIfOtherLevel(target.gameObject, target.targetPosition.y);

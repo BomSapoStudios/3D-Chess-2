@@ -105,7 +105,7 @@ public class GameEndDetectionManager : MonoBehaviour
         if (newState == GameState.Playing)
         {
             Debug.Log("GameEndDetectionManager: Game started - enabling game end detection");
-            enableGameEndDetection = !ZombieMode.Active; // zombie runs end when the player has nothing left (ZombieDirector)
+            enableGameEndDetection = !ZombieMode.Active && !QueenBlitz.Active; // zombie runs end when the player has nothing left (ZombieDirector)
         }
         else if (newState == GameState.GameOver)
         {

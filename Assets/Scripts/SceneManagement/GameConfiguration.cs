@@ -51,6 +51,10 @@ public class GameConfiguration
     [Header("Zombie Survival")]
     public bool zombieMode = false;           // single player vs endless zombie pawns (ZombieDirector)
 
+    [Header("Queen Blitz")]
+    public bool queenBlitz = false;           // puzzle: clear the pawns with a lone queen (QueenBlitzDirector)
+    public int blitzPuzzle = 0;               // which puzzle (QueenBlitz.Puzzles)
+
     [Header("Online Multiplayer Settings")]
     public bool isOnlineGame = false;         // Is this an online multiplayer game?
     public bool isPublicGame = false;         // Is this game visible in public lobby?
@@ -230,7 +234,9 @@ public class GameConfiguration
             // Timed Play Settings
             enableTimedPlay = this.enableTimedPlay,
             timePerPlayerMinutes = this.timePerPlayerMinutes,
-            zombieMode = this.zombieMode
+            zombieMode = this.zombieMode,
+            queenBlitz = this.queenBlitz,
+            blitzPuzzle = this.blitzPuzzle
         };
 
         // Copy playerTypes list (critical for multi-player games)

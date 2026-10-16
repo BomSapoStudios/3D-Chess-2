@@ -69,7 +69,7 @@ public class RematchUI : MonoBehaviour
             gameOverAt = Time.unscaledTime;
             localDeadline = Time.unscaledTime + RematchSeconds;
             Haptics.Selection();
-            if (!Online && !ZombieMode.Active) RecordVsComputer();
+            if (!Online && !ZombieMode.Active && !QueenBlitz.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
         if (!Online) return;
@@ -153,6 +153,14 @@ public class RematchUI : MonoBehaviour
         SceneController.Instance.LoadGameScene(config);
     }
 
+    private void Leave(Action go)
+    {
+        Haptics.Selection();
+        leaving = true;
+        Showing = false;
+        go();
+    }
+
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
     /// <summary>Tap Rematch (RematchDemo)</summary>
     public void DebugRematch() => Rematch();
@@ -212,6 +220,21 @@ public class RematchUI : MonoBehaviour
             x += 66f;
         }
 
+        if (QueenBlitz.Active)
+        {
+            // Puzzles: try again, or on to the next one
+            bool more = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
+            if (TouchGUI.NeonButton(new Rect(x, rowY, 120, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
+            GUI.enabled = more;
+            if (TouchGUI.NeonButton(new Rect(x + 132, rowY, 150, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
+            GUI.enabled = true;
+            if (TouchGUI.NeonButton(new Rect(x + 294, rowY, 110, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
+            string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}" : "That's every puzzle so far!";
+            GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), next, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
+            TouchGUI.End();
+            return;
+        }
+
         GUI.enabled = possible && !voted;
         string label = voted ? "Waiting…" : "Rematch!";
         if (TouchGUI.NeonButton(new Rect(x, rowY, 170, 50), label, NeonTheme.Lime, NeonTheme.Pink, fontSize: 19)) Rematch();
@@ -226,6 +249,7 @@ public class RematchUI : MonoBehaviour
     private (string, Color) Headline()
     {
         if (ZombieMode.Active) return ("OVERRUN!", NeonTheme.Pink);
+        if (QueenBlitz.Active) return QueenBlitz.Cleared ? ("CLEARED!", NeonTheme.Lime) : ("GAVE UP", NeonTheme.Pink);
         PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
         string reason = Reason() ?? "";
         bool draw = winner == null || reason.IndexOf("draw", StringComparison.OrdinalIgnoreCase) >= 0;

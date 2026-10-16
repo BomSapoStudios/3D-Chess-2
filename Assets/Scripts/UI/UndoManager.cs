@@ -23,6 +23,7 @@ public class UndoManager : MonoBehaviour
         public List<SavedPiece> pieces = new List<SavedPiece>();
         public PieceColor turn;
         public int zombieRounds, zombiePawns, zombiePromoted;
+        public int blitzMoves;
     }
 
     private readonly List<Snapshot> history = new List<Snapshot>();
@@ -60,7 +61,10 @@ public class UndoManager : MonoBehaviour
     }
 
     /// <summary>This turn's start is already saved (the save waits for moves to settle)</summary>
-    private bool CurrentSaved => savedAtTurn == turnsSeen;
+    private bool CurrentSaved => savedAtTurn == TurnKey;
+
+    /// <summary>Which turn this is. Queen Blitz keeps the turn with the player, so each queen move counts as one.</summary>
+    private int TurnKey => QueenBlitz.Active ? QueenBlitz.Moves : turnsSeen;
 
     public bool CanUndo => Allowed() && PersonToMove() && history.Count >= (CurrentSaved ? 2 : 1) && GameStateManager.Instance.CanMovePieces()
                            && (InputManager.Instance == null || !InputManager.Instance.IsBusy);
@@ -85,12 +89,12 @@ public class UndoManager : MonoBehaviour
         activeCount = active;
 
         // Save once at the start of each turn a person plays, after the last move has settled
-        if (savedAtTurn != turnsSeen && PersonToMove() && GameStateManager.Instance.CanMovePieces())
+        if (savedAtTurn != TurnKey && PersonToMove() && GameStateManager.Instance.CanMovePieces())
         {
-            savedAtTurn = turnsSeen;
+            savedAtTurn = TurnKey;
             history.Add(Capture());
             if (history.Count > MaxSaved) history.RemoveAt(0);
-            Debug.Log($"Undo: saved the start of turn {turnsSeen} ({history.Count} saved)");
+            Debug.Log($"Undo: saved the start of turn {TurnKey} ({history.Count} saved)");
         }
     }
 
@@ -100,6 +104,7 @@ public class UndoManager : MonoBehaviour
         {
             turn = TurnManager.Instance.GetCurrentPlayer(),
             zombieRounds = ZombieMode.Rounds, zombiePawns = ZombieMode.PawnsDestroyed, zombiePromoted = ZombieMode.PromotedDestroyed,
+            blitzMoves = QueenBlitz.Moves,
         };
         foreach (ChessPiece p in BoardPieces())
             snap.pieces.Add(new SavedPiece { type = p.pieceType, color = p.pieceColor, at = p.CurrentPosition });
@@ -115,7 +120,7 @@ public class UndoManager : MonoBehaviour
         Snapshot target = history[history.Count - 1];          // the one before
         Debug.Log($"Undo: restoring {target.pieces.Count} pieces, {target.turn} to move");
         Restore(target);
-        savedAtTurn = turnsSeen; // the restored position is already saved
+        savedAtTurn = TurnKey; // the restored position is already saved
         Haptics.Selection();
     }
 
@@ -137,6 +142,7 @@ public class UndoManager : MonoBehaviour
         ZombieMode.PawnsDestroyed = snap.zombiePawns;
         ZombieMode.PromotedDestroyed = snap.zombiePromoted;
         if (ZombieDirector.Instance != null) ZombieDirector.Instance.Recount();
+        if (QueenBlitz.Active) QueenBlitz.Moves = snap.blitzMoves;
 
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.ClearDrawOffer();
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();

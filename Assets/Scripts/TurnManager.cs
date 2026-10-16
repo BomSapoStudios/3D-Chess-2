@@ -1574,7 +1574,7 @@ public class TurnManager : MonoBehaviour
             return false;
         }
 
-        if (ZombieMode.Active) return false; // you can't make peace with zombies
+        if (ZombieMode.Active || QueenBlitz.Active) return false; // you can't make peace with zombies (or pawns in a puzzle)
 
         // Online: only on your own turn, for your own side
         if (OnlineSession.IsActive && (!OnlineSession.IsLocal(currentPlayer) || IsPlayerAI(currentPlayer))) return false;

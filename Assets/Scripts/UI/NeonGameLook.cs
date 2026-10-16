@@ -35,6 +35,10 @@ public class NeonGameLook : MonoBehaviour
         }
     }
 
+    // Queen Blitz ice floors
+    private static readonly Color IceLight = NeonTheme.Hex("E4FBFF");
+    private static readonly Color IceDark = NeonTheme.Hex("8FD3FF");
+
     private EmergencyChessBoard board;
     private int styledFloors;
     private bool backdropApplied;
@@ -81,6 +85,16 @@ public class NeonGameLook : MonoBehaviour
             int.TryParse(parts[3], out int z);
             bool light = (x + y + z) % 2 == 0;
             Color c = light ? NeonTheme.Cyan : NeonTheme.Pink;
+            if (QueenBlitz.Active && QueenBlitz.Current.ice)
+            {
+                // Ice: frosty white-blue squares, a little more opaque so the board reads as frozen
+                c = light ? IceLight : IceDark;
+                c.a = BoardLook.SolidFloors ? 1f : light ? 0.42f : 0.32f;
+                if (BoardLook.SolidFloors) c = Color.Lerp(NeonTheme.Ground, c, light ? 0.75f : 0.6f);
+                r.material = BoardLook.SolidFloors ? SolidFloor : ClearFloor;
+                r.material.color = c;
+                continue;
+            }
             if (BoardLook.SolidFloors)
             {
                 // Solid: deep versions of the neon colours, so the pieces still stand out
@@ -99,12 +113,13 @@ public class NeonGameLook : MonoBehaviour
             r.material.color = c;
         }
 
+        Color wire = QueenBlitz.Active && QueenBlitz.Current.ice ? IceLight : NeonTheme.Cyan;
         foreach (LineRenderer line in FindObjectsByType<LineRenderer>(FindObjectsSortMode.None))
         {
             if (!line.name.StartsWith("WireframeLine")) continue;
-            line.material.color = NeonTheme.Cyan;
-            line.startColor = NeonTheme.Cyan;
-            line.endColor = NeonTheme.Cyan;
+            line.material.color = wire;
+            line.startColor = wire;
+            line.endColor = wire;
             if (line.name.EndsWith("Vertical") || line.name.EndsWith("Top")) line.enabled = !BoardLook.HideVerticalLines;
         }
     }
