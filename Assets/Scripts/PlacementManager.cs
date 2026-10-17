@@ -1203,12 +1203,12 @@ public class PlacementManager : MonoBehaviour
             return null;
         }
 
-        // Solid, unlit neon so the dots stay bright even behind the see-through floors
-        // of the big cubes (eight stacked translucent floors washed out transparent dots)
-        Shader unlit = Shader.Find("Unlit/Color");
-        Material material = new Material(unlit != null ? unlit : indicatorShader);
-        material.color = new Color(color.r, color.g, color.b, 1f);
-        if (unlit == null) material.renderQueue = 3000;
+        // Unlit neon, partly see-through so the board shows through the dots. Drawn after the
+        // see-through floors (queue 3100), so stacked floors don't wash them out.
+        Shader sprite = Shader.Find("Sprites/Default");
+        Material material = new Material(sprite != null ? sprite : indicatorShader);
+        material.color = new Color(color.r, color.g, color.b, 0.55f);
+        material.renderQueue = 3100;
 
         Debug.Log($"🎨 PlacementManager: Created placement material with shader {indicatorShader.name}, color {color}");
 
