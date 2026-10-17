@@ -631,6 +631,7 @@ public class PlacementManager : MonoBehaviour
             return;
         }
         PieceColor? color = FocusPlayer();
+        if (QueenBlitz.Active) color = null; // puzzles: a clear look at the board until the queen is picked up
         if (color.HasValue && (IsPlayerReady(color.Value) || !OnlineSession.CanControl(color.Value) || NextBenchPiece(color.Value) == null))
             color = null;
         if (!color.HasValue)
