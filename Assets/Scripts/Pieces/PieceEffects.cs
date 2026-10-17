@@ -10,7 +10,7 @@ using UnityEngine;
 ///  - Shatter: a captured piece holds still until the attacker reaches it, then bursts into glowing shards.
 ///  - Conquest: a checkmated king dissolves into orbs that fly to each of its pieces and turn them.
 /// </summary>
-public class PieceEffects : MonoBehaviour
+public partial class PieceEffects : MonoBehaviour
 {
     private static PieceEffects runner;
     private static Material glowMaterial;

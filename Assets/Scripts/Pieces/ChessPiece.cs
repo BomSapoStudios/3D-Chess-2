@@ -502,8 +502,20 @@ public abstract class ChessPiece : MonoBehaviour
             yield break;
         }
         
+        // Queen Blitz: the queen slides along the floor instead, kicking up dust (or ice) behind her
+        bool boardMove = context == AnimationContext.UserMove || context == AnimationContext.AIMove;
+        if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
+        {
+            yield return SlideCoroutine(startPos, endPos);
+            transform.localPosition = endPos;
+            isMoving = false;
+            if (GameStateManager.Instance != null) GameStateManager.Instance.ClearAnimationCache();
+            OnMoveComplete();
+            yield break;
+        }
+
         // Board moves hop: a quick crouch, an arc through the air, then a squash on landing
-        bool hop = context == AnimationContext.UserMove || context == AnimationContext.AIMove;
+        bool hop = boardMove;
         float cell = ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
         if (hop)
         {
@@ -573,6 +585,39 @@ public abstract class ChessPiece : MonoBehaviour
         OnMoveComplete();
     }
     
+    /// <summary>
+    /// Queen Blitz: slide from one square to another along the floor, speeding up and easing to
+    /// a stop, leaning into the slide, with a dust trail (ice spray on an ice floor).
+    /// </summary>
+    private System.Collections.IEnumerator SlideCoroutine(Vector3 startPos, Vector3 endPos)
+    {
+        float cell = ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
+        float cells = Vector3.Distance(startPos, endPos) / cell;
+        float duration = Mathf.Clamp(0.25f + cells * 0.14f, 0.35f, 1.1f);
+        bool ice = QueenBlitz.Current.ice;
+        Transform parent = transform.parent;
+        Vector3 worldDir = parent != null ? parent.TransformDirection(endPos - startPos) : endPos - startPos;
+        float nextTrail = 0f;
+
+        for (float time = 0f; time < duration; time += Time.deltaTime)
+        {
+            float t = Mathf.Clamp01(time / duration);
+            // Ice: a fast push that glides on; floor: ease in and out
+            float k = ice ? 1f - (1f - t) * (1f - t) : t * t * (3f - 2f * t);
+            transform.localPosition = Vector3.Lerp(startPos, endPos, k);
+            float speed = ice ? 2f * (1f - t) : 6f * t * (1f - t);
+            // Squash low and long while moving fast
+            PieceEffects.SetSquash(transform, 1f + 0.06f * speed, 1f - 0.08f * speed);
+            if (time >= nextTrail && speed > 0.25f)
+            {
+                nextTrail = time + 0.035f;
+                PieceEffects.SlideTrail(transform.position, worldDir, ice);
+            }
+            yield return null;
+        }
+        PieceEffects.SetSquash(transform, 1f, 1f);
+    }
+
     protected virtual void OnMoveComplete()
     {
         // Start delayed UI update to ensure visual feedback updates after move completes

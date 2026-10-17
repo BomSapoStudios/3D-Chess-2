@@ -159,9 +159,17 @@ public static class QueenBlitz
         {
             ChessPiece pawn = ChessBoard.Instance.GetPieceAt(p);
             if (pawn == null || pawn.pieceColor == queen.pieceColor) continue;
-            PieceEffects.Shatter(pawn, queen);
+            KnockAway(pawn, queen, from, to);
             ChessBoard.Instance.RemovePieceFromBoard(pawn, p);
         }
+    }
+
+    /// <summary>Knock a pawn flying the way the queen is sliding</summary>
+    public static void KnockAway(ChessPiece pawn, ChessPiece queen, BoardPosition from, BoardPosition to)
+    {
+        Vector3 local = ChessBoard.Instance.BoardToLocalPosition(to) - ChessBoard.Instance.BoardToLocalPosition(from);
+        Transform parent = queen.transform.parent;
+        PieceEffects.KnockAway(pawn, queen, parent != null ? parent.TransformDirection(local) : local, Current.ice);
     }
 
     /// <summary>A queen move finished: count it and see whether the board is clear</summary>
