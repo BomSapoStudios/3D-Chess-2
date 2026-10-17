@@ -5,11 +5,13 @@ using UnityEngine;
 /// <summary>
 /// Development-only: plays Queen Blitz puzzles by themselves with the solver's answers and checks
 /// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
-/// plays puzzle N (1-10) and stays on it; 99 plays them all in turn. Logs "BLITZ DEMO".
+/// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
+/// Auto-place for the queen (each of those should top out at 2 stars). Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
 {
     private static BoardPosition P(int x, int y, int z) => new BoardPosition(x, y, z);
+    private static bool autoPlace;
 
     // The queen's start, then each square she stops on (from Tools/QueenBlitz/puzzles.py)
     private static readonly BoardPosition[][] Solutions =
@@ -39,12 +41,14 @@ public class BlitzDemo : MonoBehaviour
     private static IEnumerator Run(int which)
     {
         yield return new WaitForSeconds(2f);
-        int first = which == 99 ? 0 : which - 1, last = which == 99 ? QueenBlitz.Puzzles.Length - 1 : which - 1;
+        bool all = which >= 98;
+        autoPlace = which == 98;
+        int first = all ? 0 : which - 1, last = all ? QueenBlitz.Puzzles.Length - 1 : which - 1;
         int passed = 0;
         for (int i = first; i <= last; i++)
         {
             bool ok = false;
-            yield return Play(i, r => ok = r, stay: which != 99);
+            yield return Play(i, r => ok = r, stay: !all);
             if (ok) passed++;
         }
         Debug.Log($"BLITZ DEMO: done, {passed}/{last - first + 1} puzzles cleared at par");
@@ -76,9 +80,15 @@ public class BlitzDemo : MonoBehaviour
             foreach (ChessPiece p in PieceTray.GetTrayForColor(PieceColor.White).GetComponentsInChildren<ChessPiece>(true))
                 if (p.pieceType == ChessPieceType.Queen) queen = p;
             Debug.Log($"BLITZ DEMO: {index + 1} placing the queen at {solution[0]} (zone allows it: {PlacementManager.IsPositionInColorZone(solution[0], PieceColor.White)})");
-            PlacementManager.Instance.ExecuteAIPlacement(queen, solution[0]);
+            if (autoPlace) QueenBlitz.AutoPlaceQueen();
+            else PlacementManager.Instance.ExecuteAIPlacement(queen, solution[0]);
             yield return new WaitForSeconds(stay ? 4f : 1f); // leave time for a screenshot of placement
             PlacementManager.Instance.SetPlayerReady(PieceColor.White, true);
+        }
+        if (autoPlace && !puzzle.queen.HasValue && ChessBoard.Instance.GetPieceAt(solution[0]) == null)
+        {
+            // Auto-place may pick another best square: play the solver's line from there instead
+            Debug.Log($"BLITZ DEMO: {index + 1} auto-placed at {puzzle.best}, solution starts at {solution[0]}");
         }
         float wait = 0f;
         while (GameStateManager.Instance.currentState != GameState.Playing && wait < 20f) { wait += Time.deltaTime; yield return null; }
@@ -102,8 +112,9 @@ public class BlitzDemo : MonoBehaviour
         // The cube has to be the puzzle's size, or its pawns and blocks sit off the board
         Vector3Int dims = BoardDimensionsManager.Instance.GetDimensions();
         if (dims.x != puzzle.size) { Debug.Log($"BLITZ DEMO: FAIL board is {dims.x}³ for a {puzzle.size}³ puzzle"); good = false; }
-        bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver;
-        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, best stars {QueenBlitz.BestStars(index)}");
+        bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver
+            && QueenBlitz.EarnedStars == (QueenBlitz.AutoPlaced ? 2 : 3);
+        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, stars {QueenBlitz.EarnedStars}, auto-placed {QueenBlitz.AutoPlaced}, best stars {QueenBlitz.BestStars(index)}");
         result(cleared && good);
         yield return new WaitForSeconds(stay ? 1f : 2.5f);
     }

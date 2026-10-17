@@ -352,6 +352,13 @@ public class PlacementUI : MonoBehaviour
         bool many = placing.Count > 1;
         float arrow = many ? 44f : 0f;
         Rect rect = new Rect(x, 140, width - (many ? arrow + 6f : 0f), buttonHeight);
+        if (QueenBlitz.Active)
+        {
+            // Puzzles: the queen goes on a best starting square, and the clear is worth a star less
+            if (TouchGUI.NeonButton(new Rect(x, 140, Mathf.Max(width, 240f), buttonHeight), "Auto-place (costs a star)", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 15))
+                QueenBlitz.AutoPlaceQueen();
+            return 1;
+        }
         if (TouchGUI.NeonButton(rect, $"Auto-place {current}", NeonTheme.Yellow, NeonTheme.Pink))
         {
             PlacementManager.Instance.AutoPlaceRemaining(current);
@@ -505,6 +512,7 @@ public class PlacementUI : MonoBehaviour
         // Show button for each active player
         foreach (PieceColor player in activePlayers)
         {
+            if (QueenBlitz.Active && player == QueenBlitz.PawnColor) continue; // the puzzle's pawns have nothing to ready
             if (!playerReadyButtonRects.ContainsKey(player))
             {
                 Debug.LogWarning($"PlacementUI: No button rect found for {player}");

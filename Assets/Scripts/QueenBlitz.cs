@@ -20,6 +20,7 @@ public static class QueenBlitz
         public string name;
         public int size;
         public BoardPosition? queen;     // null: the player places the queen
+        public BoardPosition best;       // a starting square that reaches par (Auto-place uses it)
         public BoardPosition[] pawns;
         public BoardPosition[] blocks;
         public int par;
@@ -43,14 +44,14 @@ public static class QueenBlitz
         new Puzzle { name = "Long Way Round", size = 4, queen = P(2, 0, 2), par = 3,
             pawns = new[] { P(0, 0, 0), P(1, 1, 1), P(2, 0, 1), P(2, 1, 1), P(2, 2, 2) }, blocks = new BoardPosition[0],
             tip = "The biggest sweep isn't always the best first move." },
-        new Puzzle { name = "Your Move", size = 4, queen = null, par = 2,
+        new Puzzle { name = "Your Move", size = 4, queen = null, best = P(3, 0, 0), par = 2,
             pawns = new[] { P(1, 2, 0), P(2, 2, 1), P(3, 1, 1), P(3, 2, 2) }, blocks = new BoardPosition[0],
             tip = "Place the queen yourself. Where you start matters." },
-        new Puzzle { name = "Roadblocks", size = 6, queen = null, par = 3,
+        new Puzzle { name = "Roadblocks", size = 6, queen = null, best = P(3, 0, 5), par = 3,
             pawns = new[] { P(3, 0, 4), P(3, 5, 2), P(4, 4, 1), P(5, 3, 0) },
             blocks = new[] { P(1, 1, 5), P(2, 4, 4), P(4, 1, 4), P(4, 3, 2) },
             tip = "Blocks stop the queen. Find a way around them." },
-        new Puzzle { name = "Diagonal Detour", size = 6, queen = null, par = 3,
+        new Puzzle { name = "Diagonal Detour", size = 6, queen = null, best = P(5, 0, 5), par = 3,
             pawns = new[] { P(0, 4, 5), P(1, 3, 4), P(2, 0, 1), P(2, 2, 3), P(3, 0, 1), P(4, 0, 4) },
             blocks = new[] { P(0, 1, 4), P(2, 2, 5), P(3, 3, 1), P(5, 5, 4) },
             tip = "Only one starting square works in three." },
@@ -58,11 +59,11 @@ public static class QueenBlitz
             pawns = new[] { P(1, 0, 0), P(2, 0, 0), P(2, 1, 0), P(2, 2, 0), P(2, 3, 0) },
             blocks = new[] { P(3, 0, 0) },
             tip = "Ice! The queen slides until the edge or a block stops her." },
-        new Puzzle { name = "Ice Rink", size = 6, queen = null, par = 4, ice = true,
+        new Puzzle { name = "Ice Rink", size = 6, queen = null, best = P(0, 1, 4), par = 4, ice = true,
             pawns = new[] { P(1, 1, 4), P(2, 4, 4), P(2, 5, 4), P(4, 1, 4), P(4, 5, 4), P(5, 1, 4), P(5, 5, 1), P(5, 5, 2), P(5, 5, 3), P(5, 5, 4) },
             blocks = new[] { P(0, 1, 3), P(1, 0, 5), P(4, 3, 1), P(4, 3, 5), P(5, 1, 0), P(5, 2, 5), P(5, 3, 2), P(5, 5, 5) },
             tip = "Use the blocks as brakes." },
-        new Puzzle { name = "Black Ice", size = 6, queen = null, par = 5, ice = true,
+        new Puzzle { name = "Black Ice", size = 6, queen = null, best = P(4, 5, 1), par = 5, ice = true,
             pawns = new[] { P(0, 0, 5), P(2, 2, 5), P(3, 0, 2), P(3, 3, 5), P(3, 5, 5), P(4, 3, 1), P(4, 4, 1), P(4, 4, 5), P(4, 5, 4), P(4, 5, 5), P(5, 5, 3) },
             blocks = new[] { P(0, 5, 5), P(1, 4, 4), P(2, 3, 1), P(2, 5, 3), P(2, 5, 5), P(3, 2, 3), P(4, 3, 3), P(5, 3, 3) },
             tip = "Only one starting square clears it in five." },
@@ -74,6 +75,8 @@ public static class QueenBlitz
     public static Puzzle Current => Puzzles[Mathf.Clamp(Index, 0, Puzzles.Length - 1)];
     public static int Moves { get; set; }
     public static bool Cleared { get; set; }
+    /// <summary>The player let Auto-place put the queen on the best square: the clear is worth a star less</summary>
+    public static bool AutoPlaced { get; set; }
 
     public const PieceColor PlayerColor = PieceColor.White;
     public const PieceColor PawnColor = PieceColor.Black;
@@ -85,6 +88,7 @@ public static class QueenBlitz
         Index = index;
         Moves = 0;
         Cleared = false;
+        AutoPlaced = false;
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
     }
@@ -94,17 +98,37 @@ public static class QueenBlitz
     /// <summary>3 stars at par, 2 at one over, 1 for any other clear</summary>
     public static int Stars(int moves, int par) => moves <= par ? 3 : moves == par + 1 ? 2 : 1;
 
-    public static int BestMoves(int index) => PlayerPrefs.GetInt($"QueenBlitzBest.{index}", 0);
-    public static int BestStars(int index) => BestMoves(index) > 0 ? Stars(BestMoves(index), Puzzles[index].par) : 0;
+    /// <summary>Stars for this clear: Auto-place costs one</summary>
+    public static int EarnedStars => Mathf.Max(1, Stars(Moves, Current.par) - (AutoPlaced ? 1 : 0));
 
-    /// <summary>Save a clear if it beats the best; true when it does</summary>
+    public static int BestMoves(int index) => PlayerPrefs.GetInt($"QueenBlitzBest.{index}", 0);
+    public static int BestStars(int index) =>
+        PlayerPrefs.GetInt($"QueenBlitzStars.{index}", BestMoves(index) > 0 ? Stars(BestMoves(index), Puzzles[index].par) : 0);
+
+    /// <summary>Save a clear if it beats the best stars (or the fewest moves); true when it does</summary>
     public static bool SaveBest()
     {
+        bool better = false;
+        if (EarnedStars > BestStars(Index)) { PlayerPrefs.SetInt($"QueenBlitzStars.{Index}", EarnedStars); better = true; }
         int best = BestMoves(Index);
-        if (best > 0 && Moves >= best) return false;
-        PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves);
+        if (best == 0 || Moves < best) { PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves); better = true; }
         PlayerPrefs.Save();
-        return true;
+        return better;
+    }
+
+    /// <summary>Auto-place: the queen goes on a square that can reach par, for a star</summary>
+    public static void AutoPlaceQueen()
+    {
+        if (PlacementManager.Instance == null || Current.queen.HasValue) return;
+        PieceTray tray = PieceTray.GetTrayForColor(PlayerColor);
+        if (tray == null) return;
+        foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
+        {
+            if (p.pieceType != ChessPieceType.Queen) continue;
+            AutoPlaced = true;
+            PlacementManager.Instance.ExecuteAIPlacement(p, Current.best);
+            return;
+        }
     }
 
     public static string StarText(int stars) => new string('★', stars) + new string('☆', 3 - stars);
@@ -344,8 +368,9 @@ public class QueenBlitzDirector : MonoBehaviour
         yield return new WaitForSeconds(0.3f);
         bool best = QueenBlitz.SaveBest();
         int par = QueenBlitz.Current.par;
-        int stars = QueenBlitz.Stars(QueenBlitz.Moves, par);
-        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}  {QueenBlitz.StarText(stars)}" + (best ? "  New best!" : "");
+        int stars = QueenBlitz.EarnedStars;
+        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}  {QueenBlitz.StarText(stars)}"
+            + (QueenBlitz.AutoPlaced ? "  (auto-placed: -1 star)" : "") + (best ? "  New best!" : "");
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PlayerColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
