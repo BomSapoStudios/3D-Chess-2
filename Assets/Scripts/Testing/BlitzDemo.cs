@@ -61,7 +61,9 @@ public class BlitzDemo : MonoBehaviour
         config.queenBlitz = true;
         config.blitzPuzzle = index;
         config.ApplyToLegacyFields();
-        SceneController.Instance.LoadGameScene(config);
+        // After the first puzzle, go on the way a player does: the result panel's Next puzzle
+        if (QueenBlitz.Active && GameStateManager.Instance.currentState == GameState.GameOver) QueenBlitzDirector.Restart(index);
+        else SceneController.Instance.LoadGameScene(config);
         yield return new WaitForSeconds(1f);
 
         while (PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
@@ -97,6 +99,9 @@ public class BlitzDemo : MonoBehaviour
         }
         wait = 0f;
         while (GameStateManager.Instance.currentState != GameState.GameOver && wait < 6f) { wait += Time.deltaTime; yield return null; }
+        // The cube has to be the puzzle's size, or its pawns and blocks sit off the board
+        Vector3Int dims = BoardDimensionsManager.Instance.GetDimensions();
+        if (dims.x != puzzle.size) { Debug.Log($"BLITZ DEMO: FAIL board is {dims.x}³ for a {puzzle.size}³ puzzle"); good = false; }
         bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver;
         Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, best stars {QueenBlitz.BestStars(index)}");
         result(cleared && good);

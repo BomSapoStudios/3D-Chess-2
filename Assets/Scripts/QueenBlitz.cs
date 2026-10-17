@@ -357,6 +357,9 @@ public class QueenBlitzDirector : MonoBehaviour
         if (config == null) return;
         config = config.Clone();
         config.blitzPuzzle = Mathf.Clamp(index, 0, QueenBlitz.Puzzles.Length - 1);
+        // The next puzzle may be on another size of cube
+        int size = QueenBlitz.Puzzles[config.blitzPuzzle].size;
+        config.boardSize = size == 4 ? BoardSize.Small4x4x4 : size == 6 ? BoardSize.Medium6x6x6 : BoardSize.Large8x8x8;
         SceneController.Instance.LoadGameScene(config);
     }
 
