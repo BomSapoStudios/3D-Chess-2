@@ -513,6 +513,7 @@ public class PlacementUI : MonoBehaviour
         foreach (PieceColor player in activePlayers)
         {
             if (QueenBlitz.Active && player == QueenBlitz.PawnColor) continue; // the puzzle's pawns have nothing to ready
+            if (ZombieMode.Active && player == ZombieMode.ZombieColor) continue; // nor do the zombies
             if (!playerReadyButtonRects.ContainsKey(player))
             {
                 Debug.LogWarning($"PlacementUI: No button rect found for {player}");

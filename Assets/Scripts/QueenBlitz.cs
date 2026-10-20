@@ -398,11 +398,12 @@ public class QueenBlitzDirector : MonoBehaviour
         string text = state == GameState.PiecePlacement
             ? $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Place your queen    ·    Par {puzzle.par}"
             : $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}    ·    Pawns {PawnsLeft()}";
-        Rect rect = new Rect(ui.x / 2f - 250f, 56f, 500f, 34f);
+        // At the very top (the turn line is hidden in puzzles), clear of the board
+        Rect rect = new Rect(ui.x / 2f - 250f, 6f, 500f, 32f);
         NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
         GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
         if (QueenBlitz.Moves == 0)
-            GUI.Label(new Rect(ui.x / 2f - 250f, 92f, 500f, 24f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+            GUI.Label(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
         if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
             Restart(QueenBlitz.Index);
         TouchGUI.End();

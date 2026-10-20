@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// A "?" button on the game screen that opens a one-screen guide to playing.
-/// The guide opens by itself the first time a game is started.
+/// Zombie Survival and Queen Blitz have their own guides with only their rules. Each guide
+/// opens by itself the first time its kind of game is started.
 /// </summary>
 public class HowToPlayUI : MonoBehaviour
 {
@@ -32,6 +33,57 @@ public class HowToPlayUI : MonoBehaviour
         "WINNING\n" +
         "Checkmate the other King. Lose your King and you're out.";
 
+    // Zombie Survival
+    private const string ZombieLeft =
+        "SETUP\n" +
+        "You have a King, Queen, 2 Rooks, 2 Bishops and 2 Knights, and no pawns. Place them anywhere on " +
+        "your first wall of the cube, or tap \"Auto-place\", then \"Ready to Play\".\n\n" +
+        "THE HORDE\n" +
+        "Zombie pawns rise on the far side and march toward you one step a round. A zombie bites any of " +
+        "your pieces on the squares diagonally in front of it; a blocked zombie waits. More rise every " +
+        "round, and two a round later on.\n\n" +
+        "PROMOTED ZOMBIES\n" +
+        "A zombie that reaches your side becomes a Knight (Pea) or a Queen (Walnut, Galaxy) and hunts you.";
+
+    private const string ZombieRight =
+        "HOW IT ENDS\n" +
+        "There is no check: your King is just another piece. The run ends when your last piece falls.\n\n" +
+        "SCORE\n" +
+        "10 a round survived, 5 per zombie pawn destroyed, 20 per promoted zombie. Best score is kept for each brain size.\n\n" +
+        "BRAIN SIZE\n" +
+        "Pea: two a round from round 25. Walnut: from 15. Galaxy: from 10, and bitten pieces rise as zombies.\n\n" +
+        "HELP\n" +
+        "Turn Planner (Zombie Hunt) shows the fastest way to destroy each zombie. Undo takes back your last round.";
+
+    // Queen Blitz
+    private const string BlitzLeft =
+        "THE GOAL\n" +
+        "Clear every pawn with your lone Queen in as few moves as you can. Match par for 3 stars, one over par for 2.\n\n" +
+        "SWEEPING\n" +
+        "Tap the Queen, then a dot. She slides any distance along any straight line or diagonal (26 directions) " +
+        "and knocks out every pawn she passes through, not just the one she stops on.\n\n" +
+        "PLACING THE QUEEN\n" +
+        "In early puzzles she's placed for you. Later you tap her on the bench and pick any free square; " +
+        "placing her isn't a move. \"Auto-place\" picks a best square but costs a star.";
+
+    private const string BlitzRight =
+        "BLOCKS\n" +
+        "Glowing blocks can't be entered or passed. They stop the Queen on the square before them.\n\n" +
+        "ICE\n" +
+        "On an ice floor the Queen can't stop partway: every move slides until the edge of the board " +
+        "or the square before a block.\n\n" +
+        "HELP\n" +
+        "Undo takes back a move. Restart starts the puzzle again. The floor buttons on the right show one " +
+        "floor at a time, and the View buttons look from either side.";
+
+    /// <summary>The guide for the game being played: its title, seen-key, and two columns</summary>
+    private static (string title, string key, string left, string right) Guide()
+    {
+        if (QueenBlitz.Active) return ("QUEEN BLITZ", "HowToPlaySeen.Blitz", BlitzLeft, BlitzRight);
+        if (ZombieMode.Active) return ("ZOMBIE SURVIVAL", "HowToPlaySeen.Zombies", ZombieLeft, ZombieRight);
+        return ("HOW TO PLAY", SeenKey, GuideLeft, GuideRight);
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Create()
     {
@@ -57,10 +109,11 @@ public class HowToPlayUI : MonoBehaviour
         if (!autoShownThisGame)
         {
             autoShownThisGame = true;
-            if (PlayerPrefs.GetInt(SeenKey, 0) == 0)
+            string key = Guide().key; // each mode's guide opens by itself the first time
+            if (PlayerPrefs.GetInt(key, 0) == 0)
             {
                 showing = true;
-                PlayerPrefs.SetInt(SeenKey, 1);
+                PlayerPrefs.SetInt(key, 1);
                 PlayerPrefs.Save();
             }
         }
@@ -92,14 +145,15 @@ public class HowToPlayUI : MonoBehaviour
         Rect panel = new Rect(margin, 15f, ui.x - margin * 2, ui.y - 30f);
         NeonTheme.GUIPanel(panel, NeonTheme.Cyan, 0.96f);
 
-        GUI.Label(new Rect(panel.x, panel.y + 6f, panel.width, 30f), "HOW TO PLAY", NeonTheme.GUILabelStyle(NeonTheme.Lime, 22, true, TextAnchor.MiddleCenter, display: true));
+        var guide = Guide();
+        GUI.Label(new Rect(panel.x, panel.y + 6f, panel.width, 30f), guide.title, NeonTheme.GUILabelStyle(NeonTheme.Lime, 22, true, TextAnchor.MiddleCenter, display: true));
 
         GUIStyle body = NeonTheme.GUILabelStyle(NeonTheme.White, 12, false, TextAnchor.UpperLeft);
         float columnWidth = (panel.width - 48f) / 2f;
         float top = panel.y + 40f;
         float columnHeight = panel.height - 100f;
-        GUI.Label(new Rect(panel.x + 16f, top, columnWidth, columnHeight), GuideLeft, body);
-        GUI.Label(new Rect(panel.x + 32f + columnWidth, top, columnWidth, columnHeight), GuideRight, body);
+        GUI.Label(new Rect(panel.x + 16f, top, columnWidth, columnHeight), guide.left, body);
+        GUI.Label(new Rect(panel.x + 32f + columnWidth, top, columnWidth, columnHeight), guide.right, body);
 
         if (NeonTheme.GUIButton(new Rect(panel.x + panel.width / 2f - 70f, panel.yMax - 52f, 140f, 42f), "Got it!", NeonTheme.Pink, NeonTheme.Cyan, false, 17))
         {

@@ -17,6 +17,7 @@ CONTENTS
    8. Clocks & Pace
    9. The Computer Opponent
   10. Zombie Survival
+ 10b. Queen Blitz
   11. In-Game Tools
   12. Online Play
   13. Rematch
@@ -320,6 +321,38 @@ Zombie Hunt (the Turn Planner in this mode):
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10b. QUEEN BLITZ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A single-player puzzle mode on the "Queen Blitz" button. Clear every pawn with a lone Queen
+in as few moves as possible.
+
+Moves:
+  • The Queen slides any distance along any of her 26 lines and knocks out every pawn she
+    passes through, not just the one she stops on. Pawns never move.
+  • Blocks can't be entered or passed; they stop her on the square before them.
+  • Ice floor: she can't stop partway. Every move slides to the board's edge or the square
+    before a block.
+
+Placing the Queen:
+  • Early puzzles place her for you. Later ones let you put her on any free square
+    (placing isn't a move). Dots only appear once you pick her up.
+  • "Auto-place (costs a star)" puts her on a square that can reach par, for one star less.
+
+Scoring:
+  • Par is the true fewest moves, found by the solver in Tools/QueenBlitz (with free
+    placement when you place the Queen). 3 stars at par, 2 at one over, 1 otherwise.
+  • Best stars per puzzle are kept on the puzzle card. Undo, Restart, Retry and Next puzzle.
+
+Screen:
+  • The puzzle name, moves, par and pawns left sit at the very top, with the puzzle's tip
+    under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
+
+The ten test puzzles: 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place her; blocks
+appear from 6; 8–10 are ice (pars 1, 2, 2, 3, 2, 3, 3, 2, 4, 5).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 11. IN-GAME TOOLS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -491,6 +524,7 @@ These are cosmetic only and never change the rules.
   Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
                                                 Robots allowed; rated
   Zombie Survival       1         8³            Pea / Walnut / Galaxy
+  Queen Blitz           1         4³ / 6³       Ten puzzles; stars vs par
   Chaos Mode            any       any           Add to any chess game
   Chess clock           any       any           Not with Take your time
 

@@ -340,6 +340,15 @@ public class PersistentCheckStatusUI : MonoBehaviour
     /// <summary>
     /// Handle new game button click - return to main menu for clean restart
     /// </summary>
+    // Queen Blitz has no turns to report: its puzzle title takes the top of the screen until the end
+    private void LateUpdate()
+    {
+        if (statusPanel == null) return;
+        bool over = GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.GameOver;
+        bool show = enablePersistentStatus && (!QueenBlitz.Active || over);
+        if (statusPanel.activeSelf != show) statusPanel.SetActive(show);
+    }
+
     /// <summary>The New Game button (shown at game over), in the same place and style as Turn Planner</summary>
     private void OnGUI()
     {
