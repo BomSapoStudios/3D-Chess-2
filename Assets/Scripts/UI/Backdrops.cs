@@ -15,9 +15,10 @@ public static class Backdrops
         NeonDesert = 2,
         CyberCity = 3,
         NeonJungle = 4,
+        MeltingClocks = 5,
     }
 
-    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.NeonGlow };
+    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.NeonGlow };
 
     private const string PrefKey = "Backdrop";
 
@@ -39,6 +40,7 @@ public static class Backdrops
             case Kind.NeonDesert: return "Neon Desert";
             case Kind.CyberCity: return "Cyber City";
             case Kind.NeonJungle: return "Neon Jungle";
+            case Kind.MeltingClocks: return "Melting Clocks";
             default: return "Neon Glow";
         }
     }
@@ -51,6 +53,7 @@ public static class Backdrops
             case Kind.NeonDesert: return "Synthwave sunset over shifting sand dunes, with drifting dust";
             case Kind.CyberCity: return "High above a rainy neon megacity at night, with flying traffic";
             case Kind.NeonJungle: return "A glowing night jungle above a frog pond, with robot critters";
+            case Kind.MeltingClocks: return "A dreamy golden dusk where soft clocks droop from branches and drift past the board";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
@@ -68,13 +71,14 @@ public static class Backdrops
             case Kind.NeonDesert: return () => DesertSky.Generate(SkyWidth, SkyHeight, 1984);
             case Kind.CyberCity: return () => CitySky.Generate(SkyWidth, SkyHeight, 2077);
             case Kind.NeonJungle: return () => JungleSky.Generate(SkyWidth, SkyHeight, 1066);
+            case Kind.MeltingClocks: return () => DreamSky.Generate(SkyWidth, SkyHeight, 1931);
             default: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 20261006);
         }
     }
 
     // Color shown while a sky is still being generated
     private static Color LoadingColor(Kind kind) =>
-        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : new Color32(4, 2, 14, 255);
+        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : new Color32(4, 2, 14, 255);
 
     /// <summary>
     /// Apply the chosen backdrop to a camera. Returns false while a sky is still being
@@ -143,6 +147,7 @@ public static class Backdrops
         if (kind == Kind.NeonDesert) Scenery.BuildDesert(cam);
         else if (kind == Kind.CyberCity) Scenery.BuildCity(cam);
         else if (kind == Kind.NeonJungle) Scenery.BuildJungle(cam);
+        else if (kind == Kind.MeltingClocks) Scenery.BuildDream(cam);
         else Scenery.Clear();
 
         RefreshReflections();
@@ -331,6 +336,35 @@ public static class Scenery
             light.color = new Color(0.65f, 0.9f, 1f);
             light.intensity = Mathf.Min(light.intensity, 0.95f);
             light.transform.rotation = Quaternion.Euler(40f, 45f, 0f);
+        }
+    }
+
+    public static void BuildDream(Camera cam)
+    {
+        Clear();
+        fogWasOn = RenderSettings.fog;
+        savedAmbient = RenderSettings.ambientLight;
+        changed = true;
+
+        root = new GameObject("Melting Clocks Scenery");
+        DreamScenery.Build(root.transform);
+
+        // Warm haze: the far plain fades into the glowing horizon
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = DreamSky.HazeColor;
+        RenderSettings.fogStartDistance = 90f;
+        RenderSettings.fogEndDistance = 420f;
+
+        // Low golden sun from the sky's sun (ahead of White, +x), teal sky light as ambient
+        RenderSettings.ambientLight = new Color(0.36f, 0.4f, 0.48f);
+        foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            savedLights[light] = (light.color, light.intensity, light.transform.rotation);
+            light.color = new Color(1f, 0.82f, 0.6f);
+            light.intensity = Mathf.Max(light.intensity, 1.1f);
+            light.transform.rotation = Quaternion.Euler(16f, -90f, 0f);
         }
     }
 
