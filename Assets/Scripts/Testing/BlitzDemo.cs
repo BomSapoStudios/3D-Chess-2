@@ -6,7 +6,7 @@ using UnityEngine;
 /// Development-only: plays Queen Blitz puzzles by themselves with the solver's answers and checks
 /// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
 /// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
-/// Auto-place for the queen (each of those should top out at 2 stars). Logs "BLITZ DEMO".
+/// Auto-place for the queen (each costs a pawn). Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
 {
@@ -112,9 +112,8 @@ public class BlitzDemo : MonoBehaviour
         // The cube has to be the puzzle's size, or its pawns and blocks sit off the board
         Vector3Int dims = BoardDimensionsManager.Instance.GetDimensions();
         if (dims.x != puzzle.size) { Debug.Log($"BLITZ DEMO: FAIL board is {dims.x}³ for a {puzzle.size}³ puzzle"); good = false; }
-        bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver
-            && QueenBlitz.EarnedStars == (QueenBlitz.AutoPlaced ? 2 : 3);
-        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, stars {QueenBlitz.EarnedStars}, auto-placed {QueenBlitz.AutoPlaced}, best stars {QueenBlitz.BestStars(index)}");
+        bool cleared = QueenBlitz.Cleared && QueenBlitz.Moves == puzzle.par && GameStateManager.Instance.currentState == GameState.GameOver;
+        Debug.Log($"BLITZ DEMO: {index + 1} {puzzle.name}: {(cleared && good ? "PASS" : "FAIL")} cleared {QueenBlitz.Cleared}, moves {QueenBlitz.Moves}, par {puzzle.par}, state {GameStateManager.Instance.currentState}, auto-placed {QueenBlitz.AutoPlaced}, paid {QueenBlitz.LastPaid}, pawns {PawnBank.Total}");
         result(cleared && good);
         yield return new WaitForSeconds(stay ? 1f : 2.5f);
     }

@@ -70,6 +70,9 @@ public class ZombieDirector : MonoBehaviour
     private const float StepDelay = 0.08f; // between zombie moves, so the horde moves as a wave
 
     private bool started, busy, ended;
+    private int bankedKills;   // most kills this run so far (Undo can't earn them twice)
+    private int creditedPawns; // pawns this run's kills are worth so far, before today's cap
+    private int pawnsThisRun;  // pawns paid this run (today's cap may stop it short of the kills)
     private int pawnsAfterTurn, promotedAfterTurn; // zombie counts when they last finished moving
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -135,6 +138,7 @@ public class ZombieDirector : MonoBehaviour
         ZombieMode.PawnsDestroyed += Mathf.Max(0, pawnsAfterTurn - pawnsNow);
         ZombieMode.PromotedDestroyed += Mathf.Max(0, promotedAfterTurn - promotedNow);
         ZombieMode.Rounds++;
+        BankKills();
 
         ZombieMode.HoldTurn = true;
         try
@@ -299,6 +303,23 @@ public class ZombieDirector : MonoBehaviour
         return piece;
     }
 
+    // ───────────────────────── Pawns ─────────────────────────
+
+    /// <summary>
+    /// Pay pawns for zombies destroyed since the last payment (within today's cap). The run's
+    /// kills are worth kills × the brain size's rate, rounded down, so fractions carry over.
+    /// </summary>
+    private void BankKills()
+    {
+        int kills = ZombieMode.PawnsDestroyed + ZombieMode.PromotedDestroyed;
+        if (kills <= bankedKills) return;
+        bankedKills = kills;
+        int worth = Mathf.FloorToInt(kills * PawnBank.PawnsPerZombieKill(ZombieMode.Difficulty) + 0.0001f);
+        if (worth <= creditedPawns) return;
+        pawnsThisRun += PawnBank.EarnFromZombies(worth - creditedPawns);
+        creditedPawns = worth;
+    }
+
     // ───────────────────────── The end ─────────────────────────
 
     private void EndRun()
@@ -306,7 +327,8 @@ public class ZombieDirector : MonoBehaviour
         if (ended) return;
         ended = true;
         bool best = ZombieMode.SaveBest();
-        string reason = $"Overrun after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})");
+        string reason = $"Overrun after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})")
+            + $". +{pawnsThisRun} pawn{(pawnsThisRun == 1 ? "" : "s")}" + (PawnBank.ZombieLeftToday == 0 ? " (today's limit reached)" : "");
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(ZombieMode.ZombieColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
@@ -359,8 +381,8 @@ public class ZombieDirector : MonoBehaviour
         Vector2 ui = TouchGUI.Begin();
         CountZombies(out int pawns, out int promoted);
         // Under the turn / last move line, on its own panel so it reads clearly over the board
-        string text = $"Round {ZombieMode.Rounds + 1}    ·    Zombies {pawns + promoted}    ·    Score {ZombieMode.Score}";
-        Rect rect = new Rect(ui.x / 2f - 200f, 56f, 400f, 34f);
+        string text = $"Round {ZombieMode.Rounds + 1}    ·    Zombies {pawns + promoted}    ·    Score {ZombieMode.Score}    ·    Pawns +{pawnsThisRun}";
+        Rect rect = new Rect(ui.x / 2f - 250f, 56f, 500f, 34f);
         NeonTheme.GUIPanel(rect, NeonTheme.Lime, 0.85f);
         GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Lime, 17, true, TextAnchor.MiddleCenter));
         TouchGUI.End();

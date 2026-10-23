@@ -75,7 +75,9 @@ public static class QueenBlitz
     public static Puzzle Current => Puzzles[Mathf.Clamp(Index, 0, Puzzles.Length - 1)];
     public static int Moves { get; set; }
     public static bool Cleared { get; set; }
-    /// <summary>The player let Auto-place put the queen on the best square: the clear is worth a star less</summary>
+    /// <summary>Pawns the last clear paid (0 if the puzzle had already paid out)</summary>
+    public static int LastPaid { get; set; }
+    /// <summary>The player paid for Auto-place to put the queen on a best square</summary>
     public static bool AutoPlaced { get; set; }
 
     public const PieceColor PlayerColor = PieceColor.White;
@@ -95,43 +97,48 @@ public static class QueenBlitz
 
     public static bool IsBlocked(BoardPosition p) => Active && blocked.Contains(p);
 
-    /// <summary>3 stars at par, 2 at one over, 1 for any other clear</summary>
-    public static int Stars(int moves, int par) => moves <= par ? 3 : moves == par + 1 ? 2 : 1;
+    /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
+    public static int Reward(int index) => Puzzles[index].pawns.Length;
 
-    /// <summary>Stars for this clear: Auto-place costs one</summary>
-    public static int EarnedStars => Mathf.Max(1, Stars(Moves, Current.par) - (AutoPlaced ? 1 : 0));
-
+    public static bool EverCleared(int index) => PlayerPrefs.GetInt($"QueenBlitzCleared.{index}", 0) == 1;
     public static int BestMoves(int index) => PlayerPrefs.GetInt($"QueenBlitzBest.{index}", 0);
-    public static int BestStars(int index) =>
-        PlayerPrefs.GetInt($"QueenBlitzStars.{index}", BestMoves(index) > 0 ? Stars(BestMoves(index), Puzzles[index].par) : 0);
 
-    /// <summary>Save a clear if it beats the best stars (or the fewest moves); true when it does</summary>
-    public static bool SaveBest()
+    /// <summary>Record a clear: pay the pawns if this puzzle still pays, keep the fewest moves.
+    /// Returns the pawns paid, and whether the moves are a new best.</summary>
+    public static (int paid, bool best) RecordClear()
     {
-        bool better = false;
-        if (EarnedStars > BestStars(Index)) { PlayerPrefs.SetInt($"QueenBlitzStars.{Index}", EarnedStars); better = true; }
-        int best = BestMoves(Index);
-        if (best == 0 || Moves < best) { PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves); better = true; }
+        int paid = 0;
+        if (!EverCleared(Index) || !PawnBank.BlitzPaysFirstClearOnly)
+        {
+            paid = Reward(Index);
+            PawnBank.Earn(paid);
+        }
+        PlayerPrefs.SetInt($"QueenBlitzCleared.{Index}", 1);
+        int before = BestMoves(Index);
+        bool best = before == 0 || Moves < before;
+        if (best) PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves);
         PlayerPrefs.Save();
-        return better;
+        return (paid, best && before > 0);
     }
 
-    /// <summary>Auto-place: the queen goes on a square that can reach par, for a star</summary>
+    /// <summary>Auto-place: the queen goes on a square that can reach par, for a pawn</summary>
+    public static bool CanAutoPlace => PawnBank.Total >= PawnBank.AutoPlaceCost;
+
     public static void AutoPlaceQueen()
     {
-        if (PlacementManager.Instance == null || Current.queen.HasValue) return;
+        if (PlacementManager.Instance == null || Current.queen.HasValue || !CanAutoPlace) return;
         PieceTray tray = PieceTray.GetTrayForColor(PlayerColor);
         if (tray == null) return;
         foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
         {
             if (p.pieceType != ChessPieceType.Queen) continue;
+            if (!PawnBank.Spend(PawnBank.AutoPlaceCost)) return;
             AutoPlaced = true;
             PlacementManager.Instance.ExecuteAIPlacement(p, Current.best);
             return;
         }
     }
 
-    public static string StarText(int stars) => new string('★', stars) + new string('☆', 3 - stars);
 
     // ───────────────────────── Queen lines ─────────────────────────
 
@@ -366,11 +373,11 @@ public class QueenBlitzDirector : MonoBehaviour
         float until = Time.time + 3f;
         while (Time.time < until && GameStateManager.Instance != null && !GameStateManager.Instance.CanMovePieces()) yield return null;
         yield return new WaitForSeconds(0.3f);
-        bool best = QueenBlitz.SaveBest();
         int par = QueenBlitz.Current.par;
-        int stars = QueenBlitz.EarnedStars;
-        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}  {QueenBlitz.StarText(stars)}"
-            + (QueenBlitz.AutoPlaced ? "  (auto-placed: -1 star)" : "") + (best ? "  New best!" : "");
+        var (paid, best) = QueenBlitz.RecordClear();
+        QueenBlitz.LastPaid = paid;
+        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}. "
+            + (paid > 0 ? $"+{paid} pawns!" : "Pawns already collected.") + (best ? " New best!" : "") + $"  You have {PawnBank.Total}.";
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PlayerColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }

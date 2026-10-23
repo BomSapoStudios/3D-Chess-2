@@ -354,9 +354,12 @@ public class PlacementUI : MonoBehaviour
         Rect rect = new Rect(x, 140, width - (many ? arrow + 6f : 0f), buttonHeight);
         if (QueenBlitz.Active)
         {
-            // Puzzles: the queen goes on a best starting square, and the clear is worth a star less
-            if (TouchGUI.NeonButton(new Rect(x, 140, Mathf.Max(width, 240f), buttonHeight), "Auto-place (costs a star)", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 15))
+            // Puzzles: the queen goes on a best starting square, for a pawn
+            GUI.enabled = QueenBlitz.CanAutoPlace;
+            string label = QueenBlitz.CanAutoPlace ? $"Auto-place (costs {PawnBank.AutoPlaceCost} pawn)" : "Auto-place (need a pawn)";
+            if (TouchGUI.NeonButton(new Rect(x, 140, Mathf.Max(width, 240f), buttonHeight), label, NeonTheme.Yellow, NeonTheme.Pink, fontSize: 15))
                 QueenBlitz.AutoPlaceQueen();
+            GUI.enabled = true;
             return 1;
         }
         if (TouchGUI.NeonButton(rect, $"Auto-place {current}", NeonTheme.Yellow, NeonTheme.Pink))

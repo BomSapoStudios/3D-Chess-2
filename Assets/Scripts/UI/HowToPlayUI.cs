@@ -50,6 +50,8 @@ public class HowToPlayUI : MonoBehaviour
         "There is no check: your King is just another piece. The run ends when your last piece falls.\n\n" +
         "SCORE\n" +
         "10 a round survived, 5 per zombie pawn destroyed, 20 per promoted zombie. Best score is kept for each brain size.\n\n" +
+        "PAWNS\n" +
+        "Each zombie you destroy earns pawns: 1 on Pea, 1.5 on Walnut, 2 on Galaxy (a run rounds down), up to 100 a day.\n\n" +
         "BRAIN SIZE\n" +
         "Pea: two a round from round 25. Walnut: from 15. Galaxy: from 10, and bitten pieces rise as zombies.\n\n" +
         "HELP\n" +
@@ -58,13 +60,13 @@ public class HowToPlayUI : MonoBehaviour
     // Queen Blitz
     private const string BlitzLeft =
         "THE GOAL\n" +
-        "Clear every pawn with your lone Queen in as few moves as you can. Match par for 3 stars, one over par for 2.\n\n" +
+        "Clear every pawn with your lone Queen in as few moves as you can (par is the fewest possible). The first time you clear a puzzle, you keep all its pawns.\n\n" +
         "SWEEPING\n" +
         "Tap the Queen, then a dot. She slides any distance along any straight line or diagonal (26 directions) " +
         "and knocks out every pawn she passes through, not just the one she stops on.\n\n" +
         "PLACING THE QUEEN\n" +
         "In early puzzles she's placed for you. Later you tap her on the bench and pick any free square; " +
-        "placing her isn't a move. \"Auto-place\" picks a best square but costs a star.";
+        "placing her isn't a move. \"Auto-place\" picks a best square for 1 pawn.";
 
     private const string BlitzRight =
         "BLOCKS\n" +

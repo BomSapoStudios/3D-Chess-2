@@ -8,6 +8,7 @@ public partial class NeonMenu
     private GameObject zombiePicker;
     private bool zombieRun;
     private TextMeshProUGUI[] zombieBestLabels;
+    private TextMeshProUGUI zombiePawnsLabel;
 
     private void ShowZombiePicker()
     {
@@ -18,6 +19,7 @@ public partial class NeonMenu
             int best = ZombieMode.Best(levels[i]);
             zombieBestLabels[i].text = best > 0 ? $"Best {best}" : "No runs yet";
         }
+        zombiePawnsLabel.text = $"Pawns per zombie: 1 / 1.5 / 2   ·   {PawnBank.ZombieLeftToday} of {PawnBank.ZombieDailyCap} left today   ·   You have {PawnBank.Total}";
         zombiePicker.transform.SetAsLastSibling();
         zombiePicker.SetActive(true);
     }
@@ -35,7 +37,7 @@ public partial class NeonMenu
         Image card = NewImage("Card", dim.transform, NeonTheme.Ground);
         card.sprite = NeonTheme.Rounded;
         card.type = Image.Type.Sliced;
-        Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(600, 290), Vector2.zero);
+        Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(600, 312), Vector2.zero);
         card.gameObject.AddComponent<Button>().transition = Selectable.Transition.None; // taps on the card don't close it
         Image border = NewImage("Border", card.transform, NeonTheme.Lime);
         border.sprite = NeonTheme.RoundedOutline;
@@ -65,13 +67,15 @@ public partial class NeonMenu
             var l = levels[i];
             float x = (i - 1) * 180f;
             Button b = NeonButton(card.transform, l.name, new Vector2(160, 56), l.color, NeonTheme.Ground, (i - 1) * 1f, 20, () => StartZombieRun(l.level));
-            Place((RectTransform)b.transform, new Vector2(0.5f, 0f), new Vector2(160, 56), new Vector2(x, 104));
+            Place((RectTransform)b.transform, new Vector2(0.5f, 0f), new Vector2(160, 56), new Vector2(x, 124));
             TextMeshProUGUI note = NewText("Note", card.transform, l.note, 13, NeonTheme.Lavender, TextAlignmentOptions.Center);
             note.fontStyle = FontStyles.Normal;
-            Place(note.rectTransform, new Vector2(0.5f, 0f), new Vector2(170, 36), new Vector2(x, 56));
+            Place(note.rectTransform, new Vector2(0.5f, 0f), new Vector2(170, 36), new Vector2(x, 76));
             zombieBestLabels[i] = NewText("Best", card.transform, "", 14, l.color, TextAlignmentOptions.Center);
-            Place(zombieBestLabels[i].rectTransform, new Vector2(0.5f, 0f), new Vector2(170, 22), new Vector2(x, 26));
+            Place(zombieBestLabels[i].rectTransform, new Vector2(0.5f, 0f), new Vector2(170, 22), new Vector2(x, 46));
         }
+        zombiePawnsLabel = NewText("Pawns", card.transform, "", 13, NeonTheme.Yellow, TextAlignmentOptions.Center);
+        Place(zombiePawnsLabel.rectTransform, new Vector2(0.5f, 0f), new Vector2(560, 20), new Vector2(0, 16));
         zombiePicker.SetActive(false);
     }
 

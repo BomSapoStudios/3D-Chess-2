@@ -312,6 +312,11 @@ Score:
   10 per round survived, 5 per zombie pawn destroyed, 20 per promoted zombie
   destroyed. Your best score is kept separately for each difficulty.
 
+Pawns:
+  Every zombie you destroy (pawn or promoted) earns pawns for your pawn bank: 1 on Pea,
+  1.5 on Walnut, 2 on Galaxy, with the run's total rounded down. Up to 100 pawns a day.
+  Undo can't earn the same zombie twice. See PAWNS below.
+
 Zombie Hunt (the Turn Planner in this mode):
   For each zombie, the fastest way one of your pieces can destroy it within
   4 moves, aiming at where the zombie will be rather than where it is.
@@ -337,12 +342,21 @@ Moves:
 Placing the Queen:
   • Early puzzles place her for you. Later ones let you put her on any free square
     (placing isn't a move). Dots only appear once you pick her up.
-  • "Auto-place (costs a star)" puts her on a square that can reach par, for one star less.
+  • "Auto-place" puts her on a square that can reach par, for 1 pawn (greyed out with none).
 
 Scoring:
   • Par is the true fewest moves, found by the solver in Tools/QueenBlitz (with free
-    placement when you place the Queen). 3 stars at par, 2 at one over, 1 otherwise.
-  • Best stars per puzzle are kept on the puzzle card. Undo, Restart, Retry and Next puzzle.
+    placement when you place the Queen). The goal is to match it.
+  • The first time you clear a puzzle you keep all of its pawns (the puzzle card shows
+    what each one pays). Replays pay nothing; the card then shows your best moves vs par.
+  • Undo, Restart, Retry and Next puzzle.
+
+PAWNS
+  Pawns are what you collect, for a future store (piece sets, puzzle packs). They live in
+  a pawn bank on the phone. Queen Blitz pays each puzzle's pawns on its first clear;
+  Zombie Survival pays 1 / 1.5 / 2 a zombie (Pea / Walnut / Galaxy), up to 100 a day;
+  Auto-place costs 1. Store prices (not built yet): piece set 4,500, puzzle pack 3,000.
+  The numbers are all in Assets/Scripts/PawnBank.cs.
 
 Screen:
   • The puzzle name, moves, par and pawns left sit at the very top, with the puzzle's tip
@@ -524,7 +538,7 @@ These are cosmetic only and never change the rules.
   Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
                                                 Robots allowed; rated
   Zombie Survival       1         8³            Pea / Walnut / Galaxy
-  Queen Blitz           1         4³ / 6³       Ten puzzles; stars vs par
+  Queen Blitz           1         4³ / 6³       Ten puzzles; pawns on first clear
   Chaos Mode            any       any           Add to any chess game
   Chess clock           any       any           Not with Take your time
 

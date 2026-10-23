@@ -2,23 +2,26 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Queen Blitz from the main menu: pick a puzzle (with your best stars on each) and play it</summary>
+/// <summary>Queen Blitz from the main menu: pick a puzzle (with the pawns each pays, or your best) and play it</summary>
 public partial class NeonMenu
 {
     private GameObject blitzPicker;
     private bool blitzRun;
     private int blitzChoice;
     private TextMeshProUGUI[] blitzStarLabels;
+    private TextMeshProUGUI blitzPawnsLabel;
 
     private void ShowBlitzPicker()
     {
         if (blitzPicker == null) BuildBlitzPicker();
         for (int i = 0; i < QueenBlitz.Puzzles.Length; i++)
         {
-            int stars = QueenBlitz.BestStars(i);
-            blitzStarLabels[i].text = stars > 0 ? QueenBlitz.StarText(stars) : $"Par {QueenBlitz.Puzzles[i].par}";
-            blitzStarLabels[i].color = stars > 0 ? NeonTheme.Yellow : NeonTheme.Muted;
+            // Not yet cleared: the pawns it pays. Cleared: your best against par
+            bool done = QueenBlitz.EverCleared(i);
+            blitzStarLabels[i].text = done ? $"Best {QueenBlitz.BestMoves(i)} / par {QueenBlitz.Puzzles[i].par}" : $"{QueenBlitz.Reward(i)} pawns";
+            blitzStarLabels[i].color = done ? NeonTheme.Lavender : NeonTheme.Yellow;
         }
+        blitzPawnsLabel.text = $"Your pawns: {PawnBank.Total}";
         blitzPicker.transform.SetAsLastSibling();
         blitzPicker.SetActive(true);
     }
@@ -47,8 +50,10 @@ public partial class NeonMenu
         TextMeshProUGUI title = NewText("Title", card.transform, "QUEEN BLITZ", 30, NeonTheme.Yellow, TextAlignmentOptions.Center);
         NeonTheme.ApplyFont(title, display: true);
         Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(580, 46), new Vector2(0, -36));
+        blitzPawnsLabel = NewText("Pawns", card.transform, "", 15, NeonTheme.Yellow, TextAlignmentOptions.Right);
+        Place(blitzPawnsLabel.rectTransform, new Vector2(1f, 1f), new Vector2(200, 24), new Vector2(-110, -22));
         TextMeshProUGUI hint = NewText("Hint", card.transform,
-            "One queen. Clear every pawn in as few moves as you can. She drives straight through pawns; blocks stop her.",
+            "One queen. Clear every pawn in as few moves as you can; she drives straight through them. Your first clear of a puzzle keeps its pawns.",
             15, NeonTheme.Lavender, TextAlignmentOptions.Center);
         hint.fontStyle = FontStyles.Normal;
         hint.enableWordWrapping = true;
