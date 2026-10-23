@@ -212,6 +212,7 @@ public static class DreamScenery
 
     private static Material stone, bark, pawnMat, handMat, backMat;
     private static Material[] faces, facesNoHands;
+    private static DreamDrips drips;
 
     public static void Build(Transform root)
     {
@@ -229,6 +230,10 @@ public static class DreamScenery
             faces[i] = FaceMaterial(bezels[i], true, i);
             facesNoHands[i] = FaceMaterial(bezels[i], false, i);
         }
+
+        // Drops that form under the clocks' lowest points and fall
+        drips = root.gameObject.AddComponent<DreamDrips>();
+        drips.Init(Lit(new Color(1f, 0.8f, 0.4f), new Color(0.7f, 0.42f, 0.12f), 0.6f, 0.92f, null), GroundY); // runny melted gold
 
         // A smooth sand plain far below the board
         var groundMat = Lit(Color.white, Color.black, 0f, 0.15f, GroundTexture());
@@ -253,7 +258,9 @@ public static class DreamScenery
             float h = -6f + (float)rng.NextDouble() * 26f;
             float size = 3.2f + (float)rng.NextDouble() * 2.6f;
             var clock = MakeClock(floaters, "Floating Clock", size, facesNoHands[i % facesNoHands.Length]);
-            clock.gameObject.AddComponent<DreamFloatingClock>().Init(angle, radius, h, size, rng.Next(), handMat);
+            var floater = clock.gameObject.AddComponent<DreamFloatingClock>();
+            floater.Init(angle, radius, h, size, rng.Next(), handMat);
+            drips.Add(clock, floater.Verts, size, true);
         }
 
         root.gameObject.AddComponent<DesertDust>();
@@ -420,6 +427,7 @@ public static class DreamScenery
         mesh.vertices = verts;
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
+        drips.Add(clock, verts, radius, false);
     }
 
     // Past a fold: s along the clock from the fold → offset (x away from the fold, y down)
@@ -567,6 +575,8 @@ public class DreamFloatingClock : MonoBehaviour
     private Transform minute, hour;
     private Mesh mesh;
     private Vector3[] flat, verts;
+    /// <summary>The clock's current (melted) shape, for the drips</summary>
+    public Vector3[] Verts => verts;
 
     public void Init(float startAngle, float orbitRadius, float h, float clockSize, int seed, Material handMat)
     {
@@ -635,5 +645,130 @@ public class DreamFloatingClock : MonoBehaviour
         mesh.vertices = verts;
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
+    }
+}
+
+/// <summary>
+/// Melting drops: a bead swells under one of a clock's lowest points, stretches, lets go,
+/// falls (stretching with speed) and splats flat on the sand. Pooled, one component for all clocks.
+/// </summary>
+public class DreamDrips : MonoBehaviour
+{
+    private class Source { public Transform clock; public Vector3[] verts; public float size; public bool moving; public float next; public int[] tips; }
+    private class Drop { public Transform t; public Source src; public int vertex; public float age, grow, bead; public Vector3 pos, vel; public int phase; } // 0 forming, 1 falling, 2 splat
+
+    private readonly System.Collections.Generic.List<Source> sources = new System.Collections.Generic.List<Source>();
+    private readonly System.Collections.Generic.List<Drop> drops = new System.Collections.Generic.List<Drop>();
+    private readonly System.Collections.Generic.Stack<Transform> pool = new System.Collections.Generic.Stack<Transform>();
+    private Material material;
+    private float groundY;
+    private System.Random rng = new System.Random(77);
+
+    public void Init(Material mat, float ground)
+    {
+        material = mat;
+        groundY = ground;
+    }
+
+    public void Add(Transform clock, Vector3[] verts, float size, bool moving)
+    {
+        var src = new Source { clock = clock, verts = verts, size = size, moving = moving, next = Time.time + (float)rng.NextDouble() * 2f };
+        if (!moving) src.tips = LowestPoints(src);
+        sources.Add(src);
+    }
+
+    // Vertices near the very bottom of the clock: where the drips run down to
+    private int[] LowestPoints(Source src)
+    {
+        float min = float.MaxValue;
+        var world = new float[src.verts.Length];
+        for (int i = 0; i < src.verts.Length; i++)
+        {
+            world[i] = src.clock.TransformPoint(src.verts[i]).y;
+            if (world[i] < min) min = world[i];
+        }
+        var tips = new System.Collections.Generic.List<int>();
+        float reach = src.size * 0.12f;
+        for (int i = 0; i < world.Length; i++) if (world[i] < min + reach) tips.Add(i);
+        return tips.ToArray();
+    }
+
+    private void Update()
+    {
+        float now = Time.time, dt = Time.deltaTime;
+        foreach (var src in sources)
+        {
+            if (src.clock == null || now < src.next) continue;
+            src.next = now + 0.5f + (float)rng.NextDouble() * 1.2f;
+            int[] tips = src.moving ? LowestPoints(src) : src.tips;
+            if (tips == null || tips.Length == 0) continue;
+            Transform t = pool.Count > 0 ? pool.Pop() : NewDrop();
+            t.gameObject.SetActive(true);
+            drops.Add(new Drop { t = t, src = src, vertex = tips[rng.Next(tips.Length)], grow = 0.9f + (float)rng.NextDouble() * 0.8f, bead = src.size * (0.08f + 0.05f * (float)rng.NextDouble()) });
+        }
+
+        for (int i = drops.Count - 1; i >= 0; i--)
+        {
+            Drop d = drops[i];
+            d.age += dt;
+            if (d.phase == 0)
+            {
+                if (d.src.clock == null) { Recycle(i); continue; }
+                // Swell and sag under the tip, then let go
+                float k = Mathf.Clamp01(d.age / d.grow);
+                Vector3 tip = d.src.clock.TransformPoint(d.src.verts[d.vertex]);
+                float r = d.bead * Mathf.Sqrt(k), stretch = 1f + 1.2f * k * k;
+                d.t.position = tip + Vector3.down * r * stretch * 0.8f;
+                d.t.rotation = Quaternion.identity;
+                d.t.localScale = new Vector3(r * 2f, r * 2f * stretch, r * 2f);
+                if (k >= 1f) { d.phase = 1; d.pos = d.t.position; d.vel = Vector3.down * 1.5f; d.age = 0f; }
+            }
+            else if (d.phase == 1)
+            {
+                d.vel += Vector3.down * 28f * dt;
+                d.pos += d.vel * dt;
+                float speed = -d.vel.y;
+                float stretch = 1f + Mathf.Min(speed * 0.06f, 1.6f);
+                d.t.position = d.pos;
+                d.t.localScale = new Vector3(d.bead * 2f / Mathf.Sqrt(stretch), d.bead * 2f * stretch, d.bead * 2f / Mathf.Sqrt(stretch));
+                if (d.pos.y <= groundY + 0.05f) { d.phase = 2; d.age = 0f; d.pos.y = groundY + 0.05f; }
+                else if (d.age > 8f) Recycle(i);
+            }
+            else
+            {
+                // Splat: spreads out flat, then soaks away
+                float k = d.age / 0.9f;
+                if (k >= 1f) { Recycle(i); continue; }
+                float spread = d.bead * (2f + 4f * Mathf.Sqrt(k)) * (1f - k * k);
+                d.t.position = d.pos;
+                d.t.localScale = new Vector3(spread, d.bead * 0.3f * (1f - k), spread);
+            }
+        }
+    }
+
+    // A drop right in front of the camera fills the screen as a dark blob: hide those
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        Vector3 eye = cam.transform.position;
+        foreach (Drop d in drops)
+            if ((d.t.position - eye).sqrMagnitude < 14f * 14f) d.t.localScale = Vector3.zero;
+    }
+
+    private Transform NewDrop()
+    {
+        Transform t = JungleScenery.Part(transform, PrimitiveType.Sphere, Vector3.zero, Vector3.zero, material);
+        t.name = "Drip";
+        return t;
+    }
+
+    private void Recycle(int index)
+    {
+        Transform t = drops[index].t;
+        drops.RemoveAt(index);
+        if (t == null) return;
+        t.gameObject.SetActive(false);
+        pool.Push(t);
     }
 }
