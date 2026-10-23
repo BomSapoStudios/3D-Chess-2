@@ -104,6 +104,7 @@ public partial class NeonMenu : MonoBehaviour
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 4) { ShowCustomize(); ShowPromotionPreview(PromotionStyle.Current); }
+        else if (debugStats == 5) { ShowCustomize(); ShowShapePreview(PieceShapes.Current); }
         else if (debugStats == 5)
         {
             // Switch animations mid-play: nothing from the first may stay behind
@@ -734,17 +735,22 @@ public partial class NeonMenu : MonoBehaviour
         RectTransform left = Card(root, "Pieces Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
         RectTransform right = Card(root, "Backdrop Card", NeonTheme.Pink, new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(8, 14), new Vector2(-24, -74));
 
+        // Which pieces: tapping one also shows the whole set on a turntable
         SectionLabel(left, "Piece set", NeonTheme.Cyan);
+        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            ShapeChip(PieceShapes.Kind.Cyberpunk),
+            ShapeChip(PieceShapes.Kind.AbyssGlow),
+        }, NeonTheme.Lime, 15);
+
+        SectionLabel(left, "Look (cyberpunk pieces)", NeonTheme.Cyan);
         ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
             PieceSetChip(PieceSets.Kind.NeonGlow),
             PieceSetChip(PieceSets.Kind.Chrome),
-        }, NeonTheme.Lime, 16);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
             PieceSetChip(PieceSets.Kind.Crystal),
             PieceSetChip(PieceSets.Kind.Classic),
-        }, NeonTheme.Lime, 16);
+        }, NeonTheme.Lime, 13);
         pieceSetNote = NewText("Note", left, "", 15, NeonTheme.Lavender, TextAlignmentOptions.Left);
         pieceSetNote.fontStyle = FontStyles.Normal;
         pieceSetNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
@@ -820,6 +826,12 @@ public partial class NeonMenu : MonoBehaviour
     }
 
     private TextMeshProUGUI promotionNote;
+
+    private (string, System.Action, System.Func<bool>, System.Func<bool>) ShapeChip(PieceShapes.Kind kind)
+    {
+        // Picking one also shows the set
+        return (PieceShapes.DisplayName(kind), () => { PieceShapes.Current = kind; ShowShapePreview(kind); }, () => PieceShapes.Current == kind, () => true);
+    }
 
     private (string, System.Action, System.Func<bool>, System.Func<bool>) PromotionChip(PromotionStyle.Kind kind)
     {

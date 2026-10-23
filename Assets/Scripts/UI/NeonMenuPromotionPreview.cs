@@ -125,13 +125,70 @@ public partial class NeonMenu
         }
     }
 
-    private ChessPiece StagePiece<T>() where T : ChessPiece
+    // ───────── Piece set preview ─────────
+
+    /// <summary>Customize > Piece set: the whole set, both sides, turning on a little turntable</summary>
+    private void ShowShapePreview(PieceShapes.Kind kind)
     {
-        var go = new GameObject($"Preview {typeof(T).Name}");
+        if (previewPopup == null) BuildPromotionPreview();
+        previewTitle.text = PieceShapes.DisplayName(kind).ToUpperInvariant();
+        previewNote.text = PieceShapes.Description(kind);
+        previewPopup.transform.SetAsLastSibling();
+        previewPopup.SetActive(true);
+        if (previewLoop != null) StopCoroutine(previewLoop);
+        previewLoop = StartCoroutine(ShapeLoop());
+    }
+
+    private IEnumerator ShapeLoop()
+    {
+        if (previewStage != null) Destroy(previewStage);
+        previewStage = new GameObject("Piece Set Stage");
+        previewStage.transform.position = StagePosition;
+
+        var light = new GameObject("Light").AddComponent<Light>();
+        light.transform.SetParent(previewStage.transform, false);
+        light.type = LightType.Directional;
+        light.transform.rotation = Quaternion.Euler(40f, -30f, 0f);
+        light.intensity = 1.1f;
+
+        previewCamera = new GameObject("Preview Camera").AddComponent<Camera>();
+        previewCamera.transform.SetParent(previewStage.transform, false);
+        previewCamera.clearFlags = CameraClearFlags.SolidColor;
+        previewCamera.backgroundColor = NeonTheme.Ground;
+        previewCamera.targetTexture = previewTexture;
+        previewCamera.fieldOfView = 34f;
+
+        // White's row in front, Black's behind, on a slowly turning turntable
+        var turntable = new GameObject("Turntable").transform;
+        turntable.SetParent(previewStage.transform, false);
+        System.Type[] order = { typeof(Rook), typeof(Knight), typeof(Bishop), typeof(Queen), typeof(King), typeof(Pawn) };
+        const float gap = 1.9f;
+        for (int row = 0; row < 2; row++)
+            for (int i = 0; i < order.Length; i++)
+            {
+                ChessPiece piece = StagePiece(order[i], row == 0 ? PieceColor.White : PieceColor.Black);
+                piece.transform.SetParent(turntable, false);
+                piece.transform.localPosition = new Vector3((i - (order.Length - 1) / 2f) * gap, 0f, row == 0 ? -1.4f : 1.4f);
+            }
+        Vector3 look = StagePosition + Vector3.up * 1.1f;
+        previewCamera.transform.position = look + new Vector3(0f, 3.6f, -14.5f);
+        previewCamera.transform.LookAt(look);
+        while (true)
+        {
+            turntable.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.5f) * 35f, 0f);
+            yield return null;
+        }
+    }
+
+    private ChessPiece StagePiece<T>() where T : ChessPiece => StagePiece(typeof(T), PieceColor.White);
+
+    private ChessPiece StagePiece(System.Type type, PieceColor color)
+    {
+        var go = new GameObject($"Preview {type.Name}");
         go.SetActive(false);
         go.transform.SetParent(previewStage.transform, false);
-        T piece = go.AddComponent<T>();
-        piece.pieceColor = PieceColor.White;
+        ChessPiece piece = (ChessPiece)go.AddComponent(type);
+        piece.pieceColor = color;
         piece.pieceType = PieceModels.TypeOf(piece);
         go.SetActive(true);
         piece.ApplyMaterial();

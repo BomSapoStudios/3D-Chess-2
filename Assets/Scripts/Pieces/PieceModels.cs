@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// The modeled cyberpunk pieces (Art/Pieces, exported to Resources/Pieces/Cyberpunk).
+/// The modeled pieces: cyberpunk (Art/Pieces, exported to Resources/Pieces/Cyberpunk), and the
+/// Abyss Glow set (Art/Pieces/Abyss, exported to Resources/Pieces/Abyss) when PieceShapes picks it.
 /// Each model has a "Body" mesh, which takes the piece set's material, and a "NeonStrip"
 /// mesh of light strips that glow in the team color. Pieces are still built from simple
 /// shapes first; Swap replaces those with the model when the piece wakes up.
@@ -12,7 +13,21 @@ public static class PieceModels
     public const string ModelName = "Cyberpunk Model";
     public const string StripName = "NeonStrip";
 
-    private static readonly Dictionary<ChessPieceType, GameObject> cache = new Dictionary<ChessPieceType, GameObject>();
+    private static readonly Dictionary<string, GameObject> cache = new Dictionary<string, GameObject>();
+    private static readonly Dictionary<ChessPieceType, Texture2D> details = new Dictionary<ChessPieceType, Texture2D>();
+
+    private static string Folder => PieceShapes.Folder(PieceShapes.Current);
+
+    /// <summary>The Abyss Glow detail map for a piece (grayscale; the material tints it)</summary>
+    public static Texture2D Detail(ChessPieceType type)
+    {
+        if (!details.TryGetValue(type, out Texture2D tex))
+        {
+            tex = Resources.Load<Texture2D>("Pieces/Abyss/" + type + "_Detail");
+            details[type] = tex;
+        }
+        return tex;
+    }
 
     public static ChessPieceType TypeOf(ChessPiece piece)
     {
@@ -33,10 +48,11 @@ public static class PieceModels
         if (piece.transform.Find(ModelName) != null) return true;
 
         ChessPieceType type = TypeOf(piece);
-        if (!cache.TryGetValue(type, out GameObject source))
+        string path = "Pieces/" + Folder + "/" + type;
+        if (!cache.TryGetValue(path, out GameObject source))
         {
-            source = Resources.Load<GameObject>("Pieces/Cyberpunk/" + type);
-            cache[type] = source;
+            source = Resources.Load<GameObject>(path);
+            cache[path] = source;
         }
         if (source == null) return false;
 
