@@ -655,7 +655,7 @@ public class DreamFloatingClock : MonoBehaviour
 public class DreamDrips : MonoBehaviour
 {
     private class Source { public Transform clock; public Vector3[] verts; public float size; public bool moving; public float next; public int[] tips; }
-    private class Drop { public Transform t; public Source src; public int vertex; public float age, grow, bead; public Vector3 pos, vel; public int phase; } // 0 forming, 1 falling, 2 splat
+    private class Drop { public Transform t; public Source src; public int vertex; public float age, grow, bead, steamAt; public Vector3 pos, vel; public int phase; } // 0 forming, 1 falling, 2 splat
 
     private readonly System.Collections.Generic.List<Source> sources = new System.Collections.Generic.List<Source>();
     private readonly System.Collections.Generic.List<Drop> drops = new System.Collections.Generic.List<Drop>();
@@ -668,6 +668,79 @@ public class DreamDrips : MonoBehaviour
     {
         material = mat;
         groundY = ground;
+        splash = Particles("Splash", new Color(1f, 0.82f, 0.4f, 1f), 400, 2.2f);
+        steam = Particles("Steam", new Color(1f, 0.93f, 0.85f, 0.5f), 300, 0f);
+        // Steam rises, slows, swells and fades away
+        var size = steam.sizeOverLifetime;
+        size.enabled = true;
+        size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.4f));
+        var fade = steam.colorOverLifetime;
+        fade.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.85f, 0.6f), 0f), new GradientColorKey(Color.white, 1f) },
+                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0f, 1f) });
+        fade.color = g;
+        var drag = steam.limitVelocityOverLifetime;
+        drag.enabled = true;
+        drag.drag = 1.2f;
+        var noise = steam.noise;
+        noise.enabled = true;
+        noise.strength = 0.6f;
+        noise.frequency = 0.4f;
+    }
+
+    private ParticleSystem splash, steam;
+
+    private ParticleSystem Particles(string name, Color color, int max, float gravity)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(transform, false);
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.maxParticles = max;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = gravity;
+        main.startColor = color;
+        var emission = ps.emission;
+        emission.enabled = false;
+        var shape = ps.shape;
+        shape.enabled = false;
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        renderer.sharedMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = NeonTheme.Circle.texture };
+        renderer.renderMode = ParticleSystemRenderMode.Billboard;
+        ps.Play();
+        return ps;
+    }
+
+    // A crown of little drops thrown up and out, falling back to the sand
+    private void Splash(Vector3 at, float bead)
+    {
+        var p = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+        int count = 9 + rng.Next(5);
+        for (int i = 0; i < count; i++)
+        {
+            float a = (i + (float)rng.NextDouble() * 0.5f) / count * Mathf.PI * 2f;
+            float out_ = 3f + (float)rng.NextDouble() * 4f, up = 5f + (float)rng.NextDouble() * 6f;
+            p.position = at + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * bead;
+            p.velocity = new Vector3(Mathf.Cos(a) * out_, up, Mathf.Sin(a) * out_) * Mathf.Clamp(bead * 1.6f, 0.5f, 1.4f);
+            p.startSize = bead * (0.35f + 0.35f * (float)rng.NextDouble());
+            p.startLifetime = 0.45f + 0.25f * (float)rng.NextDouble();
+            splash.Emit(p, 1);
+        }
+    }
+
+    // Wisps of steam rising off the puddle as it evaporates
+    private void Steam(Vector3 at, float bead)
+    {
+        var p = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+        p.position = at + new Vector3(((float)rng.NextDouble() - 0.5f) * bead * 4f, bead * 0.3f, ((float)rng.NextDouble() - 0.5f) * bead * 4f);
+        p.velocity = new Vector3(((float)rng.NextDouble() - 0.5f) * 0.6f, 2.5f + (float)rng.NextDouble() * 2f, ((float)rng.NextDouble() - 0.5f) * 0.6f);
+        p.startSize = bead * (1.6f + (float)rng.NextDouble());
+        p.startLifetime = 1.6f + (float)rng.NextDouble() * 0.8f;
+        steam.Emit(p, 1);
     }
 
     public void Add(Transform clock, Vector3[] verts, float size, bool moving)
@@ -731,15 +804,16 @@ public class DreamDrips : MonoBehaviour
                 float stretch = 1f + Mathf.Min(speed * 0.06f, 1.6f);
                 d.t.position = d.pos;
                 d.t.localScale = new Vector3(d.bead * 2f / Mathf.Sqrt(stretch), d.bead * 2f * stretch, d.bead * 2f / Mathf.Sqrt(stretch));
-                if (d.pos.y <= groundY + 0.05f) { d.phase = 2; d.age = 0f; d.pos.y = groundY + 0.05f; }
+                if (d.pos.y <= groundY + 0.05f) { d.phase = 2; d.age = 0f; d.pos.y = groundY + 0.05f; d.steamAt = 0.15f; Splash(d.pos, d.bead); }
                 else if (d.age > 8f) Recycle(i);
             }
             else
             {
-                // Splat: spreads out flat, then soaks away
-                float k = d.age / 0.9f;
+                // Splat: spreads into a puddle, then shrinks as it steams away
+                float k = d.age / 1.6f;
                 if (k >= 1f) { Recycle(i); continue; }
-                float spread = d.bead * (2f + 4f * Mathf.Sqrt(k)) * (1f - k * k);
+                if (d.age >= d.steamAt) { Steam(d.pos, d.bead); d.steamAt = d.age + 0.12f; }
+                float spread = d.bead * (2f + 4f * Mathf.Sqrt(Mathf.Min(1f, k * 4f))) * (1f - k * k);
                 d.t.position = d.pos;
                 d.t.localScale = new Vector3(spread, d.bead * 0.3f * (1f - k), spread);
             }
