@@ -34,9 +34,10 @@ public class PawnPromotionUI : MonoBehaviour
         onPieceSelected = onSelection;
 
         string team = playerColor == PieceColor.White ? "Light" : "Dark";
+        string folder = PieceShapes.Current == PieceShapes.Kind.AbyssGlow ? "Abyss/" : ""; // icons match the chosen piece set
         for (int i = 0; i < Choices.Length; i++)
         {
-            icons[i] = Resources.Load<Texture2D>($"PieceIcons/{team}_{Choices[i]}");
+            icons[i] = Resources.Load<Texture2D>($"PieceIcons/{folder}{team}_{Choices[i]}");
         }
     }
 
