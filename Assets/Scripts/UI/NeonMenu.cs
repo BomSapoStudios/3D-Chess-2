@@ -785,13 +785,18 @@ public partial class NeonMenu : MonoBehaviour
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
             BackdropChip(Backdrops.Kind.DeepSpace),
+            BackdropChip(Backdrops.Kind.EarthOrbit),
             BackdropChip(Backdrops.Kind.NeonDesert),
-            BackdropChip(Backdrops.Kind.CyberCity),
         }, NeonTheme.Cyan, 14);
         ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
+            BackdropChip(Backdrops.Kind.CyberCity),
             BackdropChip(Backdrops.Kind.NeonJungle),
             BackdropChip(Backdrops.Kind.MeltingClocks),
+        }, NeonTheme.Cyan, 14);
+        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
+            BackdropChip(Backdrops.Kind.DeepSea),
             BackdropChip(Backdrops.Kind.NeonGlow),
         }, NeonTheme.Cyan, 14);
         backdropNote = NewText("Note", right, "", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);

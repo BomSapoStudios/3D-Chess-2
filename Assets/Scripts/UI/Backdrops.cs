@@ -16,9 +16,11 @@ public static class Backdrops
         CyberCity = 3,
         NeonJungle = 4,
         MeltingClocks = 5,
+        EarthOrbit = 6,
+        DeepSea = 7,
     }
 
-    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.NeonGlow };
+    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.EarthOrbit, Kind.DeepSea, Kind.NeonGlow };
 
     private const string PrefKey = "Backdrop";
 
@@ -41,6 +43,8 @@ public static class Backdrops
             case Kind.CyberCity: return "Cyber City";
             case Kind.NeonJungle: return "Neon Jungle";
             case Kind.MeltingClocks: return "Melting Clocks";
+            case Kind.EarthOrbit: return "Earth Orbit";
+            case Kind.DeepSea: return "Deep Sea";
             default: return "Neon Glow";
         }
     }
@@ -54,6 +58,8 @@ public static class Backdrops
             case Kind.CyberCity: return "High above a rainy neon megacity at night, with flying traffic";
             case Kind.NeonJungle: return "A glowing night jungle above a frog pond, with robot critters";
             case Kind.MeltingClocks: return "A dreamy golden dusk where soft clocks droop from branches and drift past the board";
+            case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the sun, the moon and satellites whizzing by";
+            case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
@@ -72,13 +78,15 @@ public static class Backdrops
             case Kind.CyberCity: return () => CitySky.Generate(SkyWidth, SkyHeight, 2077);
             case Kind.NeonJungle: return () => JungleSky.Generate(SkyWidth, SkyHeight, 1066);
             case Kind.MeltingClocks: return () => DreamSky.Generate(SkyWidth, SkyHeight, 1931);
+            case Kind.EarthOrbit: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 1957);
+            case Kind.DeepSea: return () => DeepSeaSky.Generate(SkyWidth, SkyHeight, 4040);
             default: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 20261006);
         }
     }
 
     // Color shown while a sky is still being generated
     private static Color LoadingColor(Kind kind) =>
-        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : new Color32(4, 2, 14, 255);
+        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : kind == Kind.DeepSea ? new Color32(5, 23, 38, 255) : new Color32(4, 2, 14, 255);
 
     /// <summary>
     /// Apply the chosen backdrop to a camera. Returns false while a sky is still being
@@ -148,6 +156,8 @@ public static class Backdrops
         else if (kind == Kind.CyberCity) Scenery.BuildCity(cam);
         else if (kind == Kind.NeonJungle) Scenery.BuildJungle(cam);
         else if (kind == Kind.MeltingClocks) Scenery.BuildDream(cam);
+        else if (kind == Kind.EarthOrbit) Scenery.BuildOrbit(cam);
+        else if (kind == Kind.DeepSea) Scenery.BuildDeepSea(cam);
         else Scenery.Clear();
 
         RefreshReflections();
@@ -365,6 +375,57 @@ public static class Scenery
             light.color = new Color(1f, 0.82f, 0.6f);
             light.intensity = Mathf.Max(light.intensity, 1.1f);
             light.transform.rotation = Quaternion.Euler(16f, -90f, 0f);
+        }
+    }
+
+    public static void BuildOrbit(Camera cam)
+    {
+        Clear();
+        fogWasOn = RenderSettings.fog;
+        savedAmbient = RenderSettings.ambientLight;
+        changed = true;
+
+        root = new GameObject("Earth Orbit Scenery");
+        // Lights are saved before OrbitSky points them at the sun
+        foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            savedLights[light] = (light.color, light.intensity, light.transform.rotation);
+            light.intensity = Mathf.Max(light.intensity, 1.2f);
+        }
+        OrbitScenery.Build(root.transform);
+
+        // No air up here: no haze, and a cool dim fill from the Earth below
+        RenderSettings.fog = false;
+        RenderSettings.ambientLight = new Color(0.22f, 0.26f, 0.36f);
+    }
+
+    public static void BuildDeepSea(Camera cam)
+    {
+        Clear();
+        fogWasOn = RenderSettings.fog;
+        savedAmbient = RenderSettings.ambientLight;
+        changed = true;
+
+        root = new GameObject("Deep Sea Scenery");
+        DeepSeaScenery.Build(root.transform);
+
+        // Murky water: everything fades into the deep blue a little way out
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = DeepSeaSky.HazeColor;
+        RenderSettings.fogStartDistance = 30f;
+        RenderSettings.fogEndDistance = 165f;
+
+        // Faint blue-green light filtering down from far above
+        RenderSettings.ambientLight = new Color(0.16f, 0.3f, 0.38f);
+        foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            savedLights[light] = (light.color, light.intensity, light.transform.rotation);
+            light.color = new Color(0.55f, 0.85f, 1f);
+            light.intensity = Mathf.Min(light.intensity, 0.9f);
+            light.transform.rotation = Quaternion.Euler(75f, 20f, 0f);
         }
     }
 
