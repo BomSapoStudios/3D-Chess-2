@@ -14,6 +14,7 @@ public static class PieceShapes
         MushroomGrove = 2,
         WildKingdom = 3,
         CloseEncounters = 4,
+        RoboArena = 5,
     }
 
     private const string PrefKey = "PieceShapes";
@@ -33,7 +34,7 @@ public static class PieceShapes
         }
     }
 
-    public static readonly Kind[] All = { Kind.Cyberpunk, Kind.AbyssGlow, Kind.MushroomGrove, Kind.WildKingdom, Kind.CloseEncounters };
+    public static readonly Kind[] All = { Kind.Cyberpunk, Kind.AbyssGlow, Kind.MushroomGrove, Kind.WildKingdom, Kind.CloseEncounters, Kind.RoboArena };
 
     /// <summary>Customize is showing a set that isn't unlocked yet (its preview), or null</summary>
     public static Kind? Showing;
@@ -49,6 +50,7 @@ public static class PieceShapes
             case Kind.MushroomGrove: return "Mushroom Grove";
             case Kind.WildKingdom: return "Wild Kingdom";
             case Kind.CloseEncounters: return "Close Encounters";
+            case Kind.RoboArena: return "Robo Arena";
             default: return "Cyberpunk";
         }
     }
@@ -57,10 +59,11 @@ public static class PieceShapes
     {
         switch (kind)
         {
-            case Kind.AbyssGlow: return "Sea-carved pieces: pale pearl against deep violet, with glowing rims";
-            case Kind.MushroomGrove: return "Toadstools and a tree-frog knight, in moonlight white and deep plum";
+            case Kind.AbyssGlow: return "Sea creatures carved in coral, with a seahorse knight and anglerfish";
+            case Kind.MushroomGrove: return "Toadstools, morels and a tree-frog knight";
             case Kind.WildKingdom: return "Lion king, peacock queen, owl, zebra, elephant castle and meerkat pawns";
             case Kind.CloseEncounters: return "Little green men, a flying-saucer rook and an alien steed";
+            case Kind.RoboArena: return "Battle robots: a tank-tread rook, a mech horse and a shield-bearing queen";
             default: return "Faceted pieces with glowing light strips";
         }
     }
@@ -74,12 +77,13 @@ public static class PieceShapes
             case Kind.MushroomGrove: return "Mushroom";
             case Kind.WildKingdom: return "Wild";
             case Kind.CloseEncounters: return "Aliens";
+            case Kind.RoboArena: return "Robots";
             default: return "Cyberpunk";
         }
     }
 
-    /// <summary>Sets with their own colors, which the Look doesn't change</summary>
-    public static bool OwnColors(Kind kind) => kind != Kind.Cyberpunk;
+    /// <summary>Sets whose models carry a detail texture (shaded into the finish)</summary>
+    public static bool Textured(Kind kind) => kind != Kind.Cyberpunk;
 
     /// <summary>Where this set's bench/promotion icons live under Resources/PieceIcons ("" for cyberpunk)</summary>
     public static string IconFolder(Kind kind) => kind == Kind.Cyberpunk ? "" : Folder(kind) + "/";

@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// What's unlocked on this phone, and what things cost. Cyberpunk pieces and the Neon Glow
-/// backdrop are free; every other piece set and backdrop unlocks for pawns (PawnBank) or, once
+/// What's unlocked on this phone, and what things cost. Cyberpunk pieces, the Neon Glow backdrop
+/// and the Fade promotion are free; everything else unlocks for pawns (PawnBank) or, once
 /// in-app purchases are set up, for money. Ownership is saved on this phone.
 /// </summary>
 public static class Store
@@ -13,7 +13,13 @@ public static class Store
     public const int BackdropPawns = 1500;                        // placeholder until Brandon confirms
     public const string BackdropDollars = "$0.99";                // placeholder until Brandon confirms
 
+    public const int PromotionPawns = 1000;                       // placeholder until Brandon confirms
+    public const string PromotionDollars = "$0.99";               // placeholder until Brandon confirms
+
     public static string Id(PieceShapes.Kind set) => "set." + set;
+    public static string Id(PromotionStyle.Kind promotion) => "promotion." + promotion;
+    public static bool Free(PromotionStyle.Kind promotion) => promotion == PromotionStyle.Kind.Fade;
+    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || TestUnlockAll || PlayerPrefs.GetInt("Owned." + Id(promotion), 0) == 1;
     public static string Id(Backdrops.Kind backdrop) => "backdrop." + backdrop;
 
     public static bool Free(PieceShapes.Kind set) => set == PieceShapes.Kind.Cyberpunk;

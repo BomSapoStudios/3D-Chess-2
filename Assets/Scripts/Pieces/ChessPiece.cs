@@ -160,25 +160,16 @@ public abstract class ChessPiece : MonoBehaviour
         {
             targetMaterial = modeled ? PieceSets.CreateBodyMaterial(pieceColor) : PieceSets.CreateMaterial(pieceColor);
         }
-        // The textured sets: their own two-tone colors, or the chosen finish over their carved detail
-        if (modeled && PieceShapes.OwnColors(PieceShapes.Active))
+        // The textured sets: the side's colour in the chosen finish, with the texture only shading
+        // in detail (eyes, stripes, spots)
+        if (modeled && PieceShapes.Textured(PieceShapes.Active))
         {
-            ChessPieceType type = PieceModels.TypeOf(this);
-            if (PieceSets.UsesSetColors)
+            targetMaterial = PieceSets.CreateMaterial(pieceColor); // glowing all over: these models have no light strips
+            Texture2D shade = PieceModels.FinishDetail(PieceModels.TypeOf(this));
+            if (shade != null)
             {
-                targetMaterial = PieceSets.CreateShapeMaterial(PieceShapes.Active, pieceColor);
-                Texture2D detail = PieceModels.Detail(type);
-                if (detail != null && targetMaterial.HasProperty("_DetailTex")) targetMaterial.SetTexture("_DetailTex", detail);
-            }
-            else
-            {
-                targetMaterial = PieceSets.CreateMaterial(pieceColor); // glowing all over: these models have no light strips
-                Texture2D shade = PieceModels.FinishDetail(type);
-                if (shade != null)
-                {
-                    targetMaterial.mainTexture = shade;
-                    if (targetMaterial.HasProperty("_EmissionMap") && targetMaterial.IsKeywordEnabled("_EMISSION")) targetMaterial.SetTexture("_EmissionMap", shade);
-                }
+                targetMaterial.mainTexture = shade;
+                if (targetMaterial.HasProperty("_EmissionMap") && targetMaterial.IsKeywordEnabled("_EMISSION")) targetMaterial.SetTexture("_EmissionMap", shade);
             }
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;

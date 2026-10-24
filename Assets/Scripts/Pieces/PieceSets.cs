@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Finishes for the chess pieces (Customize > Pieces > Finish). A finish restyles every piece's
 /// material on whichever piece set (PieceShapes) is chosen; textured sets keep their carved
-/// detail under it. SetColors is each set's own palette (for Cyberpunk that's Neon Glow).
+/// detail under it. A piece's main colour is always its side's colour.
 /// Add a finish by adding a value to Kind, a name in DisplayName and a case in CreateMaterial.
 /// </summary>
 public static class PieceSets
@@ -14,16 +14,20 @@ public static class PieceSets
         NeonGlow = 1,
         Chrome = 2,
         Crystal = 3,
-        SetColors = 4,
+        SetColors = 4,   // retired (sets' own palettes): read as Neon Glow
     }
 
-    public static readonly Kind[] All = { Kind.SetColors, Kind.NeonGlow, Kind.Chrome, Kind.Crystal, Kind.Classic };
+    public static readonly Kind[] All = { Kind.NeonGlow, Kind.Chrome, Kind.Crystal, Kind.Classic };
 
     private const string PrefKey = "PieceSet";
 
     public static Kind Current
     {
-        get => (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.SetColors);
+        get
+        {
+            var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.NeonGlow);
+            return picked == Kind.SetColors ? Kind.NeonGlow : picked;
+        }
         set
         {
             PlayerPrefs.SetInt(PrefKey, (int)value);
@@ -31,17 +35,13 @@ public static class PieceSets
         }
     }
 
-    /// <summary>The finish the pieces actually get: Set colors means Neon Glow on the cyberpunk pieces</summary>
-    public static Kind Effective => Current == Kind.SetColors && !PieceShapes.OwnColors(PieceShapes.Active) ? Kind.NeonGlow : Current;
-
-    /// <summary>True when the set's own palette is in use (the set's shader), not a finish</summary>
-    public static bool UsesSetColors => Current == Kind.SetColors && PieceShapes.OwnColors(PieceShapes.Active);
+    /// <summary>The finish the pieces get (same as Current)</summary>
+    public static Kind Effective => Current;
 
     public static string DisplayName(Kind kind)
     {
         switch (kind)
         {
-            case Kind.SetColors: return "Set colors";
             case Kind.NeonGlow: return "Neon Glow";
             case Kind.Chrome: return "Chrome";
             case Kind.Crystal: return "Crystal";
@@ -56,7 +56,6 @@ public static class PieceSets
             case Kind.NeonGlow: return "Pieces glow like light tubes";
             case Kind.Chrome: return "Mirror-polished, reflects the backdrop";
             case Kind.Crystal: return "See-through glass with a sheen";
-            case Kind.SetColors: return "The set's own colors";
             default: return "Plain white and dark pieces";
         }
     }
@@ -66,7 +65,6 @@ public static class PieceSets
     /// </summary>
     public static Color Tint(Kind kind, PieceColor player)
     {
-        if (kind == Kind.SetColors) kind = Kind.NeonGlow;
         if (kind == Kind.Classic)
         {
             switch (player)
@@ -101,7 +99,6 @@ public static class PieceSets
 
     public static Material CreateMaterial(Kind kind, PieceColor player)
     {
-        if (kind == Kind.SetColors) kind = Kind.NeonGlow;
         Color tint = Tint(kind, player);
         Material material;
 
@@ -170,37 +167,6 @@ public static class PieceSets
         material.SetColor("_EmissionColor", tint * 2.2f);
         material.SetFloat("_Metallic", 0f);
         material.SetFloat("_Glossiness", 0.5f);
-        return material;
-    }
-
-    /// <summary>
-    /// The Abyss Glow set's material (PieceShapes): the model's detail map runs between two tints
-    /// for each side, and the rim glows in the side's color. The detail map is set per piece.
-    /// </summary>
-    public static Material CreateAbyssMaterial(PieceColor player) => CreateShapeMaterial(PieceShapes.Kind.AbyssGlow, player);
-
-    /// <summary>
-    /// The material for a modeled set that brings its own colors (PieceShapes): the piece's
-    /// detail map runs between two tints for each side, with a rim glowing in the side's color.
-    /// The dark side's upper tint stays low so it reads as clearly dark.
-    /// </summary>
-    public static Material CreateShapeMaterial(PieceShapes.Kind set, PieceColor player)
-    {
-        Color tint = Tint(Kind.NeonGlow, player);
-        Shader shader = Shader.Find("Chess/AbyssPiece");
-        if (shader == null) return CreateMaterial(player);
-        var material = new Material(shader);
-        Color dark, light, rim;
-        if (set == PieceShapes.Kind.MushroomGrove && player == PieceColor.White) { dark = new Color(0.5f, 0.58f, 0.56f); light = new Color(0.95f, 0.98f, 0.96f); rim = NeonTheme.Cyan; }
-        else if ((set == PieceShapes.Kind.WildKingdom || set == PieceShapes.Kind.CloseEncounters) && player == PieceColor.White) { dark = new Color(0.42f, 0.5f, 0.5f); light = new Color(0.95f, 0.98f, 0.96f); rim = NeonTheme.Cyan; } // deeper low end so the fur and feathers show
-        else if ((set == PieceShapes.Kind.MushroomGrove || set == PieceShapes.Kind.WildKingdom || set == PieceShapes.Kind.CloseEncounters) && player == PieceColor.Black) { dark = new Color(0.03f, 0.01f, 0.05f); light = new Color(0.28f, 0.12f, 0.4f); rim = new Color(1f, 0.2f, 0.8f); }
-        else if (player == PieceColor.White) { dark = new Color(0.45f, 0.62f, 0.68f); light = new Color(0.95f, 0.98f, 0.97f); rim = NeonTheme.Cyan; }
-        else if (player == PieceColor.Black) { dark = new Color(0.04f, 0.02f, 0.08f); light = new Color(0.35f, 0.18f, 0.5f); rim = new Color(1f, 0.2f, 0.8f); }
-        else { dark = tint * 0.12f; light = tint * 0.85f; rim = tint; }
-        material.SetColor("_DarkTint", dark);
-        material.SetColor("_LightTint", light);
-        material.SetColor("_RimColor", rim);
-        material.SetColor("_Color", light);
         return material;
     }
 

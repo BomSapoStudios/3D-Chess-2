@@ -14,6 +14,8 @@ public partial class NeonMenu
     private IEnumerator CaptureMenuThumbs()
     {
         yield return new WaitForSeconds(1f);
+        PieceSets.Kind finish = PieceSets.Current;
+        PieceSets.Current = PieceSets.Kind.NeonGlow;   // every card shows the default finish
         freezeTurntable = true;
         foreach (PieceShapes.Kind k in PieceShapes.All)
         {
@@ -24,10 +26,11 @@ public partial class NeonMenu
         }
         freezeTurntable = false;
         PieceShapes.Showing = null;
+        PieceSets.Current = finish;
         foreach (PromotionStyle.Kind k in System.Enum.GetValues(typeof(PromotionStyle.Kind)))
         {
             ShowPromotionPreview(k);
-            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : k == PromotionStyle.Kind.Splat ? 0.95f : 0.75f); // mid-animation, where each looks most like itself
+            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : k == PromotionStyle.Kind.Splat ? 0.95f : k == PromotionStyle.Kind.Fade ? 0.6f : 0.75f); // mid-animation, where each looks most like itself
             ThumbCapture.Save(previewTexture, "Promo_" + k);
         }
         ClosePromotionPreview();

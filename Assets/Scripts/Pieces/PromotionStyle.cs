@@ -1,15 +1,26 @@
 using UnityEngine;
 
-/// <summary>Which animation plays when a pawn is promoted (picked in Customize, kept on this phone)</summary>
+/// <summary>
+/// Which animation plays when a pawn is promoted (picked in Customize, kept on this phone).
+/// Fade is free; the others unlock in Customize (Store).
+/// </summary>
 public static class PromotionStyle
 {
-    public enum Kind { GlitchRebuild, SpinMorph, Coronation, BlackHole, Splat }
+    public enum Kind { GlitchRebuild, SpinMorph, Coronation, BlackHole, Splat, Fade }
+
+    /// <summary>The order they're shown in</summary>
+    public static readonly Kind[] All = { Kind.Fade, Kind.GlitchRebuild, Kind.SpinMorph, Kind.Coronation, Kind.BlackHole, Kind.Splat };
 
     private const string PrefKey = "PromotionStyle";
 
+    /// <summary>The animation in use: the one picked, if it's unlocked (Store), else Fade</summary>
     public static Kind Current
     {
-        get => (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.GlitchRebuild);
+        get
+        {
+            var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.Fade);
+            return Store.Owns(picked) ? picked : Kind.Fade;
+        }
         set
         {
             PlayerPrefs.SetInt(PrefKey, (int)value);
@@ -17,9 +28,11 @@ public static class PromotionStyle
         }
     }
 
-    public static string DisplayName(Kind kind) => kind == Kind.Splat ? "Splat" : kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : kind == Kind.BlackHole ? "Black hole" : "Glitch rebuild";
+    public static string DisplayName(Kind kind) => kind == Kind.Fade ? "Fade" : kind == Kind.Splat ? "Splat" : kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : kind == Kind.BlackHole ? "Black hole" : "Glitch rebuild";
 
-    public static string Description(Kind kind) => kind == Kind.Splat
+    public static string Description(Kind kind) => kind == Kind.Fade
+        ? "The pawn fades away as the new piece fades in."
+        : kind == Kind.Splat
         ? "The new piece comes flying in and squashes the pawn with a big splat of paint."
         : kind == Kind.SpinMorph
         ? "The pawn spins into a column of light and the new piece spins out of it."

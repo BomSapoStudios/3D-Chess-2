@@ -32,7 +32,7 @@ public partial class NeonMenu
 
     // Preview card
     private Image previewBorder;
-    private GameObject piecesView, backdropView, boardView, effectsView, setColorsRow;
+    private GameObject piecesView, backdropView, boardView, effectsView;
     private RawImage piecesPicture, backdropPicture, boardPicture, effectsPicture;
     private TextMeshProUGUI piecesName, piecesBlurb, backdropName, backdropBlurb, effectsName, effectsBlurb;
     private Image[] teamDots;
@@ -50,9 +50,13 @@ public partial class NeonMenu
     private Backdrops.Kind? showingBackdrop;
     private Backdrops.Kind ShownBackdrop => showingBackdrop ?? Backdrops.Current;
 
+    // A locked promotion animation being looked at
+    private PromotionStyle.Kind? showingPromotion;
+    private PromotionStyle.Kind ShownPromotion => showingPromotion ?? PromotionStyle.Current;
+
     // Unlock panels in the preview card (pieces and backdrop)
     private class UnlockPanel { public GameObject root; public TextMeshProUGUI pawnLabel, dollarLabel, note; public Image pawnButton; }
-    private UnlockPanel piecesUnlock, backdropUnlock;
+    private UnlockPanel piecesUnlock, backdropUnlock, effectsUnlock;
     private GameObject finishBox;
 
     private class PickCard
@@ -70,7 +74,7 @@ public partial class NeonMenu
         RectTransform root = customizeScreen.GetComponent<RectTransform>();
         Stretch(root);
         var hooks = customizeScreen.AddComponent<ScreenHooks>();
-        hooks.disabled = () => { StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; };
+        hooks.disabled = () => { StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; showingPromotion = null; };
         hooks.enabled = () => { if (previewBorder != null) { RefreshCustomize(); StartPreviewForTab(); } };
 
         // ── Top bar: Back, title, pawns, Done! ──
@@ -192,6 +196,7 @@ public partial class NeonMenu
         tab = t;
         PieceShapes.Showing = null;
         showingBackdrop = null;
+        showingPromotion = null;
         foreach (var r in railTabs)
         {
             bool on = r.tab == t;
@@ -270,7 +275,6 @@ public partial class NeonMenu
         TextMeshProUGUI finishLabel = NewText("Label", looks, "Finish", 12, NeonTheme.Lavender, TextAlignmentOptions.Left);
         finishLabel.fontStyle = FontStyles.Normal;
         finishLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 14;
-        setColorsRow = LookRow(looks, PieceSets.Kind.SetColors, null);   // only for sets with their own palette
         LookRow(looks, PieceSets.Kind.NeonGlow, PieceSets.Kind.Chrome);
         LookRow(looks, PieceSets.Kind.Crystal, PieceSets.Kind.Classic);
         RectTransform dots = NewRect("Team colors", looks);
@@ -308,14 +312,14 @@ public partial class NeonMenu
         // Effects: the animation's picture with a Play button that plays it right here
         RectTransform ev = PreviewColumn(card.transform, "Effects");
         effectsView = ev.gameObject;
-        effectsPicture = PreviewPicture(ev, 150);
+        effectsPicture = PreviewPicture(ev, 108);
         Button play = effectsPicture.gameObject.AddComponent<Button>();
         play.transition = Selectable.Transition.None;
         effectsPicture.raycastTarget = true;
         play.onClick.AddListener(() =>
         {
             Haptics.Selection();
-            effectsPicture.texture = PlayInlinePromotion(PromotionStyle.Current);
+            effectsPicture.texture = PlayInlinePromotion(ShownPromotion);
             Cover(effectsPicture);
             playPill.SetActive(false);
         });
@@ -329,11 +333,13 @@ public partial class NeonMenu
         playPill = pill.gameObject;
         effectsName = PreviewName(ev, NeonTheme.Yellow);
         effectsBlurb = PreviewBlurb(ev);
+        effectsBlurb.GetComponent<LayoutElement>().preferredHeight = 52; // these run to three lines
+        effectsUnlock = BuildUnlockPanel(ev);
     }
 
     private void ShowEffectsThumb()
     {
-        effectsPicture.texture = Thumb("Promo_" + PromotionStyle.Current);
+        effectsPicture.texture = Thumb("Promo_" + ShownPromotion);
         Cover(effectsPicture);
         playPill.SetActive(true);
     }
@@ -405,10 +411,11 @@ public partial class NeonMenu
 
     private void UnlockWithPawns()
     {
-        bool pieces = tab == CustomizeTab.Pieces;
+        bool pieces = tab == CustomizeTab.Pieces, effects = tab == CustomizeTab.Effects;
         string id; int price;
         if (pieces && PieceShapes.Showing.HasValue) { id = Store.Id(PieceShapes.Showing.Value); price = Store.PieceSetPawns; }
-        else if (!pieces && showingBackdrop.HasValue) { id = Store.Id(showingBackdrop.Value); price = Store.BackdropPawns; }
+        else if (effects && showingPromotion.HasValue) { id = Store.Id(showingPromotion.Value); price = Store.PromotionPawns; }
+        else if (tab == CustomizeTab.Backdrop && showingBackdrop.HasValue) { id = Store.Id(showingBackdrop.Value); price = Store.BackdropPawns; }
         else return;
         if (!Store.BuyWithPawns(id, price))
         {
@@ -418,6 +425,7 @@ public partial class NeonMenu
         Haptics.Selection();
         // Unlocked: put it to use straight away
         if (pieces) { PieceShapes.Current = PieceShapes.Showing.Value; PieceShapes.Showing = null; }
+        else if (effects) { PromotionStyle.Current = showingPromotion.Value; showingPromotion = null; }
         else { Backdrops.Current = showingBackdrop.Value; showingBackdrop = null; }
         ShowToast("Unlocked!");
         BuildCards();
@@ -439,7 +447,7 @@ public partial class NeonMenu
 
     private (string, System.Action, System.Func<bool>, System.Func<bool>) FinishChip(PieceSets.Kind k)
     {
-        System.Func<bool> on = k == PieceSets.Kind.SetColors ? (System.Func<bool>)(() => PieceSets.UsesSetColors) : () => !PieceSets.UsesSetColors && PieceSets.Effective == k;
+        System.Func<bool> on = () => PieceSets.Current == k;
         return (PieceSets.DisplayName(k), () => { PieceSets.Current = k; StartPreviewForTab(); }, on, () => true);
     }
 
@@ -568,7 +576,7 @@ public partial class NeonMenu
         {
             case CustomizeTab.Pieces:
                 gridTitle.text = "Piece set"; gridHint.text = "Tap to use it";
-                foreach (PieceShapes.Kind k in PieceShapes.All)
+                foreach (PieceShapes.Kind k in Sorted(PieceShapes.All, Store.Free, Store.Owns, PieceShapes.DisplayName))
                 {
                     PieceShapes.Kind kind = k;
                     AddCard(PieceShapes.DisplayName(k), Thumb("Pieces_" + k), () => PieceShapes.Current == kind, () => PieceShapes.Active == kind,
@@ -578,7 +586,7 @@ public partial class NeonMenu
                 break;
             case CustomizeTab.Backdrop:
                 gridTitle.text = "Backdrop the board floats in"; gridHint.text = $"{Backdrops.All.Length} scenes";
-                foreach (Backdrops.Kind k in Backdrops.All)
+                foreach (Backdrops.Kind k in Sorted(Backdrops.All, Store.Free, Store.Owns, Backdrops.DisplayName))
                 {
                     Backdrops.Kind kind = k;
                     AddCard(Backdrops.DisplayName(k), Thumb("Backdrop_" + k), () => Backdrops.Current == kind, () => ShownBackdrop == kind,
@@ -591,13 +599,28 @@ public partial class NeonMenu
                 break;
             default:
                 gridTitle.text = "Promotion animation"; gridHint.text = "Tap Play to watch";
-                foreach (PromotionStyle.Kind k in System.Enum.GetValues(typeof(PromotionStyle.Kind)))
+                foreach (PromotionStyle.Kind k in Sorted(PromotionStyle.All, Store.Free, Store.Owns, PromotionStyle.DisplayName))
                 {
                     PromotionStyle.Kind kind = k;
-                    AddCard(PromotionStyle.DisplayName(k), Thumb("Promo_" + k), () => PromotionStyle.Current == kind, () => PromotionStyle.Current == kind, () => PromotionStyle.Current = kind);
+                    AddCard(PromotionStyle.DisplayName(k), Thumb("Promo_" + k), () => PromotionStyle.Current == kind, () => ShownPromotion == kind,
+                        () => { showingPromotion = Store.Owns(kind) ? (PromotionStyle.Kind?)null : kind; if (Store.Owns(kind)) PromotionStyle.Current = kind; },
+                        Store.Owns(kind) ? 0 : Store.PromotionPawns);
                 }
                 break;
         }
+    }
+
+    /// <summary>The free default first, then what's unlocked (A to Z), then what's locked (A to Z)</summary>
+    private static IEnumerable<T> Sorted<T>(IEnumerable<T> items, System.Func<T, bool> free, System.Func<T, bool> owned, System.Func<T, string> name)
+    {
+        var list = new List<T>(items);
+        list.Sort((a, b) =>
+        {
+            int Rank(T x) => free(x) ? 0 : owned(x) ? 1 : 2;
+            int byRank = Rank(a).CompareTo(Rank(b));
+            return byRank != 0 ? byRank : string.Compare(name(a), name(b), System.StringComparison.OrdinalIgnoreCase);
+        });
+        return list;
     }
 
     /// <summary>
@@ -681,7 +704,7 @@ public partial class NeonMenu
     private System.Collections.IEnumerator PlayAfterPick()
     {
         yield return null;
-        effectsPicture.texture = PlayInlinePromotion(PromotionStyle.Current);
+        effectsPicture.texture = PlayInlinePromotion(ShownPromotion);
         Cover(effectsPicture);
         playPill.SetActive(false);
     }
@@ -753,7 +776,6 @@ public partial class NeonMenu
         if (setLocked) ShowUnlock(piecesUnlock, Store.PieceSetPawns, Store.PieceSetDollars); else piecesUnlock.root.SetActive(false);
         piecesName.text = PieceShapes.DisplayName(set);
         piecesBlurb.text = PieceShapes.Description(set);
-        setColorsRow.SetActive(PieceShapes.OwnColors(set)); // the cyberpunk pieces' own colors are Neon Glow
         PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
         for (int i = 0; i < teamDots.Length; i++) teamDots[i].color = PieceSets.Tint(PieceSets.Effective, sides[i]);
 
@@ -762,8 +784,9 @@ public partial class NeonMenu
         backdropBlurb.text = Backdrops.Description(ShownBackdrop);
         if (showingBackdrop.HasValue) ShowUnlock(backdropUnlock, Store.BackdropPawns, Store.BackdropDollars); else backdropUnlock.root.SetActive(false);
 
-        effectsName.text = PromotionStyle.DisplayName(PromotionStyle.Current);
-        effectsBlurb.text = PromotionStyle.Description(PromotionStyle.Current);
+        effectsName.text = PromotionStyle.DisplayName(ShownPromotion);
+        effectsBlurb.text = PromotionStyle.Description(ShownPromotion);
+        if (showingPromotion.HasValue) ShowUnlock(effectsUnlock, Store.PromotionPawns, Store.PromotionDollars); else effectsUnlock.root.SetActive(false);
 
         foreach (var s in boardSwitches)
         {
