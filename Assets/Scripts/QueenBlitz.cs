@@ -432,7 +432,7 @@ public class QueenBlitzDirector : MonoBehaviour
     private int shownTotal;           // the total as shown (it counts up as earned pawns arrive)
     private float funnelStarted = -1f, tallyBump = -10f;
     private int funnelArrived;
-    private const float SlotSize = 26f, SlotGap = 6f, FunnelStep = 0.14f, FunnelFlight = 0.55f;
+    private const float SlotSize = 26f, SlotGap = 6f, FunnelStep = 0.09f, FunnelFlight = 0.5f;
     private static readonly Rect TallyRect = new Rect(16f, 16f, 150f, 44f);
 
     private Rect Slot(int i) => new Rect(20f + (i % 4) * (SlotSize + 12f), 186f + (i / 4) * (SlotSize + SlotGap), SlotSize, SlotSize);
@@ -487,7 +487,7 @@ public class QueenBlitzDirector : MonoBehaviour
                     Vector2 from = r.center, to = TallyRect.position + new Vector2(26f, TallyRect.height / 2f);
                     Vector2 mid = new Vector2(Mathf.Lerp(from.x, to.x, 0.5f) + 40f, Mathf.Lerp(from.y, to.y, 0.5f));
                     Vector2 at = Vector2.Lerp(Vector2.Lerp(from, mid, e), Vector2.Lerp(mid, to, e), e);
-                    float s = SlotSize * Mathf.Lerp(1f, 0.6f, e);
+                    float s = SlotSize * Mathf.Lerp(0.55f, 0.4f, e); // a stream of small pawns
                     GUI.color = NeonTheme.Yellow;
                     GUI.DrawTexture(new Rect(at.x - s / 2f, at.y - s / 2f, s, s), NeonIcons.Pawn);
                     continue;
