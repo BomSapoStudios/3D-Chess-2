@@ -180,7 +180,8 @@ public static class PieceSets
         var material = new Material(shader);
         Color dark, light, rim;
         if (set == PieceShapes.Kind.MushroomGrove && player == PieceColor.White) { dark = new Color(0.5f, 0.58f, 0.56f); light = new Color(0.95f, 0.98f, 0.96f); rim = NeonTheme.Cyan; }
-        else if (set == PieceShapes.Kind.MushroomGrove && player == PieceColor.Black) { dark = new Color(0.03f, 0.01f, 0.05f); light = new Color(0.28f, 0.12f, 0.4f); rim = new Color(1f, 0.2f, 0.8f); }
+        else if (set == PieceShapes.Kind.WildKingdom && player == PieceColor.White) { dark = new Color(0.42f, 0.5f, 0.5f); light = new Color(0.95f, 0.98f, 0.96f); rim = NeonTheme.Cyan; } // deeper low end so the fur and feathers show
+        else if ((set == PieceShapes.Kind.MushroomGrove || set == PieceShapes.Kind.WildKingdom) && player == PieceColor.Black) { dark = new Color(0.03f, 0.01f, 0.05f); light = new Color(0.28f, 0.12f, 0.4f); rim = new Color(1f, 0.2f, 0.8f); }
         else if (player == PieceColor.White) { dark = new Color(0.45f, 0.62f, 0.68f); light = new Color(0.95f, 0.98f, 0.97f); rim = NeonTheme.Cyan; }
         else if (player == PieceColor.Black) { dark = new Color(0.04f, 0.02f, 0.08f); light = new Color(0.35f, 0.18f, 0.5f); rim = new Color(1f, 0.2f, 0.8f); }
         else { dark = tint * 0.12f; light = tint * 0.85f; rim = tint; }

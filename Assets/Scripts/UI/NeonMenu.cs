@@ -741,8 +741,12 @@ public partial class NeonMenu : MonoBehaviour
         {
             ShapeChip(PieceShapes.Kind.Cyberpunk),
             ShapeChip(PieceShapes.Kind.AbyssGlow),
+        }, NeonTheme.Lime, 15);
+        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        {
             ShapeChip(PieceShapes.Kind.MushroomGrove),
-        }, NeonTheme.Lime, 14);
+            ShapeChip(PieceShapes.Kind.WildKingdom),
+        }, NeonTheme.Lime, 15);
 
         SectionLabel(left, "Look (cyberpunk pieces)", NeonTheme.Cyan);
         ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
