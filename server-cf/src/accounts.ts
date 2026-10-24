@@ -8,7 +8,7 @@ import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, sta
 // Accounts — one Durable Object (SQLite) holding every player account.
 //
 // • An account is the player: a stable id plus a unique generated name.
-// • Logins (Sign in with Apple / Google) are keys attached to an account, so the
+// • Logins (Sign in with Apple / Google / Game Center) are keys attached to an account, so the
 //   same player can come back after a reinstall or from a browser.
 // • Device link codes let a player move their account to another device without
 //   signing in to anything.

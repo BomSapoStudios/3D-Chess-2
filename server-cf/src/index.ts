@@ -1,5 +1,6 @@
 import { issueToken, verifyToken } from './auth.js';
 import { verifyIdToken, type Provider } from './oidc.js';
+import { verifyGameCenter } from './gamecenter.js';
 import type { GameConfig, PlayerColor } from './types/game.js';
 
 export { Room } from './room.js';
@@ -16,6 +17,8 @@ export { Accounts } from './accounts.js';
 //   POST /auth/refresh                  → fresh token + current name   (Bearer)
 //   POST /auth/apple   { idToken }      → sign in with Apple; links to the current
 //   POST /auth/google  { idToken }        account (Bearer optional) or restores yours
+//   POST /auth/gamecenter { teamPlayerId, publicKeyUrl, signature, salt, timestamp }
+//                                       → the same, with Apple's Game Center identity
 //   POST /names/reroll                  → a new unique name            (Bearer)
 //   GET  /me                            → { userId, name, providers }  (Bearer)
 //   POST /link/code                     → { code } to type on another device (Bearer)
@@ -135,6 +138,12 @@ export default {
       const subject = typeof body.idToken === 'string' ? await verifyIdToken(provider, body.idToken, audiences) : null;
       if (!subject) return json({ error: 'Sign-in failed, please try again' }, 401);
       return account('login', { provider, subject }, true);
+    }
+    if (request.method === 'POST' && path === '/auth/gamecenter') {
+      const bundleIds = env.APPLE_AUDIENCES.split(',').map(s => s.trim()).filter(Boolean);
+      const subject = await verifyGameCenter(body, bundleIds);
+      if (!subject) return json({ error: 'Game Center sign-in failed' }, 401);
+      return account('login', { provider: 'gamecenter', subject }, true);
     }
     if (request.method === 'POST' && path === '/names/reroll') return user ? account('reroll', {}, true) : needUser();
     if (request.method === 'GET' && path === '/me') return user ? account('me') : needUser();
