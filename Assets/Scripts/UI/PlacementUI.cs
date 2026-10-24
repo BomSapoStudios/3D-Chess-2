@@ -290,8 +290,8 @@ public class PlacementUI : MonoBehaviour
 
     private Texture2D Icon(PieceColor color, ChessPieceType type)
     {
-        // Icons match the chosen piece set (Abyss Glow has its own in PieceIcons/Abyss)
-        string key = (PieceShapes.Current == PieceShapes.Kind.AbyssGlow ? "Abyss/" : "") + (color == PieceColor.White ? "Light_" : "Dark_") + type;
+        // Icons match the chosen piece set (the other sets have theirs in PieceIcons/<Folder>)
+        string key = PieceShapes.IconFolder(PieceShapes.Current) + (color == PieceColor.White ? "Light_" : "Dark_") + type;
         if (!benchIcons.TryGetValue(key, out Texture2D tex))
         {
             tex = Resources.Load<Texture2D>("PieceIcons/" + key);

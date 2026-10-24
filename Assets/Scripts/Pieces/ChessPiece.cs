@@ -160,11 +160,12 @@ public abstract class ChessPiece : MonoBehaviour
         {
             targetMaterial = modeled ? PieceSets.CreateBodyMaterial(pieceColor) : PieceSets.CreateMaterial(pieceColor);
         }
-        // The Abyss Glow models bring their own two-tone colors, whatever the Look
-        if (modeled && PieceShapes.Current == PieceShapes.Kind.AbyssGlow)
+        // Abyss Glow and Mushroom Grove bring their own colors, whatever the Look
+        if (modeled && PieceShapes.OwnColors(PieceShapes.Current))
         {
-            targetMaterial = PieceSets.CreateAbyssMaterial(pieceColor);
-            if (targetMaterial.HasProperty("_DetailTex")) targetMaterial.SetTexture("_DetailTex", PieceModels.Detail(PieceModels.TypeOf(this)));
+            targetMaterial = PieceSets.CreateShapeMaterial(PieceShapes.Current, pieceColor);
+            if (PieceShapes.Current == PieceShapes.Kind.AbyssGlow && targetMaterial.HasProperty("_DetailTex"))
+                targetMaterial.SetTexture("_DetailTex", PieceModels.Detail(PieceModels.TypeOf(this)));
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
         PieceModels.Face(this);

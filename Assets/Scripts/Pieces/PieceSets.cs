@@ -165,14 +165,24 @@ public static class PieceSets
     /// The Abyss Glow set's material (PieceShapes): the model's detail map runs between two tints
     /// for each side, and the rim glows in the side's color. The detail map is set per piece.
     /// </summary>
-    public static Material CreateAbyssMaterial(PieceColor player)
+    public static Material CreateAbyssMaterial(PieceColor player) => CreateShapeMaterial(PieceShapes.Kind.AbyssGlow, player);
+
+    /// <summary>
+    /// The material for a modeled set that brings its own colors (PieceShapes): Abyss Glow runs
+    /// its detail map between two tints; Mushroom Grove is one solid color per side. Both have a
+    /// rim glowing in the side's color.
+    /// </summary>
+    public static Material CreateShapeMaterial(PieceShapes.Kind set, PieceColor player)
     {
         Color tint = Tint(Kind.NeonGlow, player);
         Shader shader = Shader.Find("Chess/AbyssPiece");
         if (shader == null) return CreateMaterial(player);
         var material = new Material(shader);
         Color dark, light, rim;
-        if (player == PieceColor.White) { dark = new Color(0.45f, 0.62f, 0.68f); light = new Color(0.95f, 0.98f, 0.97f); rim = NeonTheme.Cyan; }
+        if (set == PieceShapes.Kind.MushroomGrove && player == PieceColor.White) { dark = light = new Color(0.9f, 0.95f, 0.93f); rim = NeonTheme.Cyan; }
+        else if (set == PieceShapes.Kind.MushroomGrove && player == PieceColor.Black) { dark = light = new Color(0.18f, 0.08f, 0.28f); rim = new Color(1f, 0.2f, 0.8f); }
+        else if (set == PieceShapes.Kind.MushroomGrove) { dark = light = tint * 0.8f; rim = tint; }
+        else if (player == PieceColor.White) { dark = new Color(0.45f, 0.62f, 0.68f); light = new Color(0.95f, 0.98f, 0.97f); rim = NeonTheme.Cyan; }
         else if (player == PieceColor.Black) { dark = new Color(0.04f, 0.02f, 0.08f); light = new Color(0.35f, 0.18f, 0.5f); rim = new Color(1f, 0.2f, 0.8f); }
         else { dark = tint * 0.12f; light = tint * 0.85f; rim = tint; }
         material.SetColor("_DarkTint", dark);
