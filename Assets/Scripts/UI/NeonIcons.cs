@@ -36,6 +36,15 @@ public static class NeonIcons
         p.Fill((5.5f, 18), (18.5f, 18), (18.5f, 21.4f), (5.5f, 21.4f));
     });
 
+    /// <summary>An empty pawn: just its outline</summary>
+    public static Texture2D PawnOutline => Get("pawn outline", p =>
+    {
+        p.width = 1.6f;
+        p.Circle(12, 6, 3.4f);
+        p.Stroke(true, (8.6f, 11), (15.4f, 11), (17, 18), (7, 18));
+        p.Stroke(true, (5.5f, 18), (18.5f, 18), (18.5f, 21.4f), (5.5f, 21.4f));
+    });
+
     /// <summary>The board preview: three floors seen from the side, solid or open, with or without posts</summary>
     public static Texture2D CubeDiagram(bool solid, bool posts) => Get($"cube{solid}{posts}", p =>
     {

@@ -379,11 +379,14 @@ public class QueenBlitzDirector : MonoBehaviour
         float until = Time.time + 3f;
         while (Time.time < until && GameStateManager.Instance != null && !GameStateManager.Instance.CanMovePieces()) yield return null;
         yield return new WaitForSeconds(0.3f);
+        while (filledAt != null && shownTaken < filledAt.Length) yield return null; // let the last silhouettes fill in
+        yield return new WaitForSeconds(0.35f);
         int par = QueenBlitz.Current.par;
         var (paid, best) = QueenBlitz.RecordClear();
         QueenBlitz.LastPaid = paid;
-        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}. "
-            + (paid > 0 ? $"+{paid} pawns!" : "Pawns already collected.") + (best ? " New best!" : "") + $"  You have {PawnBank.Total}.";
+        // New pawns fly into the tally before the result shows (the pawns speak for themselves there)
+        if (paid > 0) yield return Funnel(paid);
+        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}." + (best ? " New best!" : "");
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PlayerColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
@@ -406,7 +409,14 @@ public class QueenBlitzDirector : MonoBehaviour
     private void TrackTaken()
     {
         int total = QueenBlitz.Current.pawns.Length;
-        if (filledAt == null || filledAt.Length != total) { filledAt = new float[total]; shownTaken = 0; }
+        if (filledAt == null || filledAt.Length != total)
+        {
+            filledAt = new float[total];
+            shownTaken = 0;
+            alreadyCollected = QueenBlitz.EverCleared(QueenBlitz.Index);
+            shownTotal = PawnBank.Total;
+        }
+        if (funnelStarted >= 0f) return; // the pawns are flying to the tally
         int taken = Mathf.Clamp(total - PawnsLeft(), 0, total);
         if (taken < shownTaken) shownTaken = taken;
         else if (taken > shownTaken && Time.time >= nextFill)
@@ -417,63 +427,126 @@ public class QueenBlitzDirector : MonoBehaviour
         }
     }
 
-    // The row of pawn silhouettes, centred under the title (below the tip while it shows)
-    private void DrawTracker(Vector2 ui, float y)
+    // ── The left column: your pawn total, Restart, Undo (UndoManager), then the puzzle's pawns ──
+    private bool alreadyCollected;    // cleared before: its pawns show filled but greyed out
+    private int shownTotal;           // the total as shown (it counts up as earned pawns arrive)
+    private float funnelStarted = -1f, tallyBump = -10f;
+    private int funnelArrived;
+    private const float SlotSize = 26f, SlotGap = 6f, FunnelStep = 0.14f, FunnelFlight = 0.55f;
+    private static readonly Rect TallyRect = new Rect(16f, 16f, 150f, 44f);
+
+    private Rect Slot(int i) => new Rect(20f + (i % 4) * (SlotSize + 12f), 186f + (i / 4) * (SlotSize + SlotGap), SlotSize, SlotSize);
+
+    /// <summary>Fly each newly earned pawn from its slot into the tally, one after another</summary>
+    private IEnumerator Funnel(int paid)
+    {
+        funnelStarted = Time.time;
+        funnelArrived = 0;
+        float done = Time.time + (paid - 1) * FunnelStep + FunnelFlight + 0.5f;
+        while (Time.time < done)
+        {
+            int arrived = Mathf.Clamp(Mathf.FloorToInt((Time.time - funnelStarted - FunnelFlight) / FunnelStep) + 1, 0, paid);
+            if (arrived > funnelArrived) { funnelArrived = arrived; shownTotal = PawnBank.Total - paid + arrived; tallyBump = Time.time; }
+            yield return null;
+        }
+        shownTotal = PawnBank.Total;
+    }
+
+    private void DrawTally()
+    {
+        NeonTheme.GUIPanel(TallyRect, NeonTheme.Yellow, 0.85f);
+        float k = Mathf.Clamp01((Time.time - tallyBump) / 0.3f);
+        float bump = 1f + 0.25f * (1f - k) * Mathf.Sin(k * Mathf.PI);
+        Color before = GUI.color;
+        GUI.color = NeonTheme.Yellow;
+        float s = 24f * bump;
+        GUI.DrawTexture(new Rect(TallyRect.x + 26f - s / 2f, TallyRect.center.y - s / 2f, s, s), NeonIcons.Pawn);
+        GUI.color = before;
+        int size = Mathf.RoundToInt(18 * bump);
+        GUI.Label(new Rect(TallyRect.x + 42f, TallyRect.y, TallyRect.width - 50f, TallyRect.height), $"{shownTotal:N0}",
+            NeonTheme.GUILabelStyle(NeonTheme.Yellow, size, true, TextAnchor.MiddleLeft));
+    }
+
+    private void DrawTracker()
     {
         if (filledAt == null) return;
-        int total = filledAt.Length;
-        const float size = 24f, gap = 6f;
-        float x0 = ui.x / 2f - (total * size + (total - 1) * gap) / 2f;
-        Texture2D icon = NeonIcons.Pawn;
         Color before = GUI.color;
-        for (int i = 0; i < total; i++)
+        Color grey = new Color(0.62f, 0.58f, 0.7f);
+        for (int i = 0; i < filledAt.Length; i++)
         {
-            Rect r = new Rect(x0 + i * (size + gap), y, size, size);
-            bool filled = i < shownTaken;
-            if (!filled)
+            Rect r = Slot(i);
+            bool taken = i < shownTaken;
+            // Earned pawns flying to the tally
+            if (funnelStarted >= 0f && taken && !alreadyCollected)
             {
-                GUI.color = new Color(NeonTheme.Lavender.r, NeonTheme.Lavender.g, NeonTheme.Lavender.b, 0.3f);
-                GUI.DrawTexture(r, icon);
+                float f = (Time.time - funnelStarted - i * FunnelStep) / FunnelFlight;
+                if (f >= 1f) continue;                 // arrived
+                if (f > 0f)
+                {
+                    float e = f * f;                      // speeds up into the tally
+                    Vector2 from = r.center, to = TallyRect.position + new Vector2(26f, TallyRect.height / 2f);
+                    Vector2 mid = new Vector2(Mathf.Lerp(from.x, to.x, 0.5f) + 40f, Mathf.Lerp(from.y, to.y, 0.5f));
+                    Vector2 at = Vector2.Lerp(Vector2.Lerp(from, mid, e), Vector2.Lerp(mid, to, e), e);
+                    float s = SlotSize * Mathf.Lerp(1f, 0.6f, e);
+                    GUI.color = NeonTheme.Yellow;
+                    GUI.DrawTexture(new Rect(at.x - s / 2f, at.y - s / 2f, s, s), NeonIcons.Pawn);
+                    continue;
+                }
+            }
+            if (!taken)
+            {
+                // Not taken yet: an empty outline, or a dim grey pawn if it was collected before
+                GUI.color = alreadyCollected ? new Color(grey.r, grey.g, grey.b, 0.4f) : new Color(NeonTheme.Lavender.r, NeonTheme.Lavender.g, NeonTheme.Lavender.b, 0.55f);
+                GUI.DrawTexture(r, alreadyCollected ? NeonIcons.Pawn : NeonIcons.PawnOutline);
                 continue;
             }
-            // Impact: lands big, squashes, and settles with a wobble; a white flash and a glow fade out
+            // Impact: lands big, squashes, and settles with a wobble; a flash and a glow fade out
             float k = Mathf.Clamp01((Time.time - filledAt[i]) / 0.4f);
             float bump = 1f + 0.55f * Mathf.Exp(-6f * k) * Mathf.Cos(k * Mathf.PI * 3f);
             float squash = 1f - 0.25f * Mathf.Exp(-8f * k) * Mathf.Sin(k * Mathf.PI * 3f);
-            float w = size * bump / squash, h = size * bump * squash;
+            float w = SlotSize * bump / squash, h = SlotSize * bump * squash;
             Rect hit = new Rect(r.center.x - w / 2f, r.yMax - h, w, h); // grows from its feet
+            Color fill = alreadyCollected ? grey : NeonTheme.Yellow;
             if (k < 1f)
             {
-                float glow = size * (0.8f + 1.3f * k);
-                GUI.color = new Color(NeonTheme.Yellow.r, NeonTheme.Yellow.g, NeonTheme.Yellow.b, 0.45f * (1f - k));
+                float glow = SlotSize * (0.8f + 1.3f * k);
+                GUI.color = new Color(fill.r, fill.g, fill.b, 0.45f * (1f - k));
                 GUI.DrawTexture(new Rect(r.center.x - glow / 2f, r.center.y - glow / 2f, glow, glow), NeonTheme.Circle.texture);
             }
-            GUI.color = Color.Lerp(Color.white, NeonTheme.Yellow, Mathf.Clamp01(k * 2.5f));
-            GUI.DrawTexture(hit, icon);
+            GUI.color = Color.Lerp(Color.white, fill, Mathf.Clamp01(k * 2.5f));
+            GUI.DrawTexture(hit, NeonIcons.Pawn);
         }
         GUI.color = before;
     }
 
-    // Puzzle name, moves and par along the top, the tip under it, the pawn tracker, and Restart
+    // Puzzle name, moves and par along the top with the tip under it; down the left your pawn
+    // total, Restart and the puzzle's pawns. After a clear, only the pawns and total stay while
+    // new pawns fly into it.
     private void OnGUI()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
-        if (ended || (state != GameState.Playing && state != GameState.PiecePlacement)) return;
+        bool playing = !ended && (state == GameState.Playing || state == GameState.PiecePlacement);
+        bool finishing = ended && state != GameState.GameOver;
+        bool over = state == GameState.GameOver;   // the result is up: just the total stays
+        if (!playing && !finishing && !over) return;
         Vector2 ui = TouchGUI.Begin();
-        QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
-        string text = state == GameState.PiecePlacement
-            ? $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Place your queen    ·    Par {puzzle.par}"
-            : $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}    ·    Pawns {PawnsLeft()}";
-        // At the very top (the turn line is hidden in puzzles), clear of the board
-        Rect rect = new Rect(ui.x / 2f - 250f, 6f, 500f, 32f);
-        NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
-        GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
-        bool tipShown = QueenBlitz.Moves == 0;
-        if (tipShown)
-            GUI.Label(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
-        DrawTracker(ui, tipShown ? 62f : 42f);
-        if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
-            Restart(QueenBlitz.Index);
+        if (playing)
+        {
+            QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
+            string text = state == GameState.PiecePlacement
+                ? $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Place your queen    ·    Par {puzzle.par}"
+                : $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}";
+            // At the very top (the turn line is hidden in puzzles), clear of the board
+            Rect rect = new Rect(ui.x / 2f - 230f, 6f, 460f, 32f);
+            NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
+            GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
+            if (QueenBlitz.Moves == 0)
+                GUI.Label(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+            if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
+                Restart(QueenBlitz.Index);
+        }
+        DrawTally();
+        if (!over) DrawTracker();
         TouchGUI.End();
     }
 }
