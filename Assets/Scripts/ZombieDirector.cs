@@ -327,6 +327,7 @@ public class ZombieDirector : MonoBehaviour
         if (ended) return;
         ended = true;
         bool best = ZombieMode.SaveBest();
+        GameCenter.ReportZombieRun(ZombieMode.Difficulty, ZombieMode.Rounds);
         string reason = $"Overrun after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})")
             + $". +{pawnsThisRun} pawn{(pawnsThisRun == 1 ? "" : "s")}" + (PawnBank.ZombieLeftToday == 0 ? " (today's limit reached)" : "");
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(ZombieMode.ZombieColor, reason);

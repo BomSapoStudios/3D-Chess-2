@@ -139,6 +139,7 @@ public class OnlineGameBridge : MonoBehaviour
         if (msg.type == "room:rematch" && msg.rematch != null) Rematch = msg.rematch;
         NetRatings ratings = msg.type == "game:rated" ? msg.ratings : msg.state?.ratings;
         if (ratings != null && ratings.For(OnlineSession.LocalColor) != null) MyRating = ratings.For(OnlineSession.LocalColor);
+        if (msg.type == "game:rated") GameCenter.ReportRating(MyRating); // the server's number, copied to Game Center
         if (msg.type == "game:over") ServerGameOver = true;
         if (GameReady() && backlog.Count == 0 && !OnlineSession.Replaying) Apply(msg);
         else backlog.Enqueue(msg);

@@ -76,6 +76,10 @@ public partial class NeonMenu : MonoBehaviour
         BuildStatsScreen();
         ShowMenu();
 
+        // Game Center: Apple's sign-in banner, then link the player and copy ratings across
+        GameCenter.Restored += OnGameCenterRestored;
+        GameCenter.SignIn();
+
         // Coming back to the menu from an online game ends the session
         if (OnlineSession.IsActive && OnlineClient.Instance != null) OnlineClient.Instance.LeaveOnline();
 
@@ -1635,6 +1639,14 @@ public partial class NeonMenu : MonoBehaviour
         });
         ResetFriendsCache();
     }
+
+    private void OnGameCenterRestored(string name)
+    {
+        ShowToast($"Welcome back, {name}!");
+        ResetFriendsCache();
+    }
+
+    private void OnDestroy() => GameCenter.Restored -= OnGameCenterRestored;
 
     private void ResetFriendsCache()
     {

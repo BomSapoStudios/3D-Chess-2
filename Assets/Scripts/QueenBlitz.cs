@@ -383,6 +383,7 @@ public class QueenBlitzDirector : MonoBehaviour
         yield return new WaitForSeconds(0.35f);
         int par = QueenBlitz.Current.par;
         var (paid, best) = QueenBlitz.RecordClear();
+        GameCenter.CheckPuzzles();
         QueenBlitz.LastPaid = paid;
         // New pawns fly into the tally before the result shows (the pawns speak for themselves there)
         if (paid > 0) yield return Funnel(paid);

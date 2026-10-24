@@ -42,26 +42,29 @@ public partial class NeonMenu
         statsTitle.rectTransform.anchorMin = new Vector2(0, 0);
         statsTitle.rectTransform.anchorMax = new Vector2(1, 1);
         statsTitle.rectTransform.offsetMin = new Vector2(70, 0);
-        statsTitle.rectTransform.offsetMax = new Vector2(-380, 0);
+        statsTitle.rectTransform.offsetMax = new Vector2(GameCenter.IsAvailable ? -490 : -380, 0);
 
         // Leaderboard filters, in the header's right side
         RectTransform chipsBox = NewRect("Filters", header);
         chipsBox.anchorMin = new Vector2(1, 0);
         chipsBox.anchorMax = new Vector2(1, 1);
         chipsBox.pivot = new Vector2(1, 0.5f);
-        chipsBox.sizeDelta = new Vector2(370, 0);
+        chipsBox.sizeDelta = new Vector2(GameCenter.IsAvailable ? 480 : 370, 0);
         var chipsLayout = chipsBox.gameObject.AddComponent<VerticalLayoutGroup>();
         chipsLayout.childControlWidth = true;
         chipsLayout.childControlHeight = true;
         chipsLayout.childForceExpandWidth = true;
         chipsLayout.childForceExpandHeight = false;
-        ChipRow(chipsBox, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        var filters = new System.Collections.Generic.List<(string, System.Action, System.Func<bool>, System.Func<bool>)>
         {
             ("Friends", () => { boardScope = "friends"; LoadBoard(); }, () => boardScope == "friends", () => true),
             ("Everyone", () => { boardScope = "everyone"; LoadBoard(); }, () => boardScope == "everyone", () => true),
             ("Duel", () => { boardMode = "duel"; LoadBoard(); }, () => boardMode == "duel", () => true),
             ("Melee", () => { boardMode = "melee"; LoadBoard(); }, () => boardMode == "melee", () => true),
-        }, NeonTheme.Yellow, 14);
+        };
+        // iPhone: Apple's Game Center leaderboards (a copy of ours, with Apple friends)
+        if (GameCenter.IsAvailable) filters.Add(("Game Center", GameCenter.Show, () => false, () => GameCenter.IsSignedIn));
+        ChipRow(chipsBox, filters.ToArray(), NeonTheme.Yellow, 14);
         boardChips = chipsBox.gameObject;
 
         statsLeft = Card(root, "Profile Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.42f, 1f), new Vector2(16, 14), new Vector2(-8, -74));

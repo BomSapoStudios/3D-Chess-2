@@ -155,6 +155,28 @@ public class OnlineClient : MonoBehaviour
         done(restored, error);
     }
 
+    /// <summary>
+    /// Link this account to the player's Game Center identity (Apple's signed proof, as JSON from
+    /// GameCenter.mm), or, if that Game Center player already has an account, switch to it.
+    /// With no account on this device yet, the server makes one or restores theirs.
+    /// Calls back with (restored, error).
+    /// </summary>
+    public IEnumerator LinkGameCenter(string proofJson, Action<bool, string> done)
+    {
+        bool restored = false;
+        string error = null;
+        bool sameServer = PlayerPrefs.GetString("OnlineTokenServer", "") == ServerUrl;
+        yield return Call("POST", "/auth/gamecenter", proofJson, HasToken && sameServer ? Token : null, (status, text) =>
+        {
+            if (status != 200) { error = ErrorText(status, text); return; }
+            restored = SaveAuth(text).restored;
+            if (restored) PlayerPrefs.SetInt("OnlineAppleLinked", 0); // another account; its own Apple link isn't known here
+            PlayerPrefs.Save();
+            refreshedThisSession = true;
+        });
+        done(restored, error);
+    }
+
     /// <summary>A code to type on another device to use this account there</summary>
     public IEnumerator CreateLinkCode(Action<string, string> done)
     {
