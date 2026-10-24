@@ -168,6 +168,19 @@ public class OnlineGameBridge : MonoBehaviour
                 }
                 break;
 
+            case "game:placementsRevealed":
+                // Setup was private: everyone's pieces go on the board just before play starts
+                if (msg.pieces != null)
+                    foreach (NetPlacement p in msg.pieces)
+                    {
+                        if (!Enum.TryParse(p.color, out PieceColor owner) || OnlineSession.IsLocal(owner)) continue;
+                        if (!Enum.TryParse(p.pieceType, out ChessPieceType type) || p.position == null) continue;
+                        BoardPosition at = p.position.ToBoard();
+                        if (ChessBoard.Instance != null && ChessBoard.Instance.GetPieceAt(at) != null) continue; // already shown
+                        Remote(() => PlaceFromTray(owner, type, at));
+                    }
+                break;
+
             case "game:playerReady":
                 if (fromOpponent) Remote(() => PlacementManager.Instance.SetPlayerReady(color.Value, true));
                 break;

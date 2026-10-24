@@ -143,6 +143,8 @@ Changing your mind:
   • Tap a placed piece, then tap another square in your zone to move it.
   • Or tap it and press "Back to bench" to take it off the board.
   • Both work online too. Once you press Ready your setup is locked.
+  • Online, setup is private: you only see your own pieces until every
+    player is Ready, then everyone's pieces appear and play starts.
   • Floors outside your zone are dimmed while you place.
 
 Who moves first:

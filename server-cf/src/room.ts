@@ -63,6 +63,8 @@ interface Attachment {
   userId: string;
   name: string;
   color: PlayerColor;
+  /** The app handles private setup (game:placementsRevealed); older apps see placements live */
+  reveal?: boolean;
 }
 
 interface GameOverInfo {
@@ -164,7 +166,7 @@ export class Room extends DurableObject<Env> {
       if (!this.meta || !this.engine) return new Response('Room not found', { status: 404 });
       const userId = request.headers.get('X-User-Id')!;
       const name = request.headers.get('X-User-Name') ?? 'Player';
-      return this.seatPlayer(userId, name);
+      return this.seatPlayer(userId, name, request.headers.get('X-Reveal') === '1');
     }
 
     return new Response('Not found', { status: 404 });
@@ -172,7 +174,7 @@ export class Room extends DurableObject<Env> {
 
   // ── Joining ──────────────────────────────────────────────────────────────────
 
-  private async seatPlayer(userId: string, name: string): Promise<Response> {
+  private async seatPlayer(userId: string, name: string, reveal = false): Promise<Response> {
     const engine = this.engine!;
     let color = this.seats[userId];
     const rejoining = color !== undefined;
@@ -198,7 +200,7 @@ export class Room extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server, [userId]);
-    server.serializeAttachment({ userId, name, color } satisfies Attachment);
+    server.serializeAttachment({ userId, name, color, reveal } satisfies Attachment);
     engine.setPlayerConnected(color, true);
     this.meta!.emptySince = null;
 
@@ -213,7 +215,7 @@ export class Room extends DurableObject<Env> {
     }
     await this.persist();
 
-    this.send(server, { type: 'room:joined', roomCode: this.meta!.code, yourColor: color, isHost: userId === this.meta!.hostUserId, state: this.stateForClients() });
+    this.send(server, { type: 'room:joined', roomCode: this.meta!.code, yourColor: color, isHost: userId === this.meta!.hostUserId, state: this.stateForClients({ userId, name, color, reveal }) });
     this.broadcast({ type: rejoining ? 'room:playerReconnected' : 'room:playerJoined', color, name, state: this.stateForClients() }, server);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -249,13 +251,14 @@ export class Room extends DurableObject<Env> {
         return this.send(ws, { type: 'pong', t: Date.now() });
 
       case 'room:state':
-        return reply(true, undefined, { state: this.stateForClients() });
+        return reply(true, undefined, { state: this.stateForClients(me) });
 
       case 'room:replay': {
         // Resend the game events a reconnecting player missed, in order
         const since = Math.max(0, Number(msg.since) || 0);
         const events = await this.ctx.storage.list<string>({ prefix: 'ev:', start: eventKey(since + 1) });
         for (const text of events.values()) {
+          if (!this.mayReceive(me, text)) continue; // other players' setup stays hidden
           try { ws.send(text); } catch { /* socket already gone */ }
         }
         return reply(true, undefined, { seq: this.seq });
@@ -311,6 +314,8 @@ export class Room extends DurableObject<Env> {
         this.meta!.lastPlayAt = Date.now();
         await this.logEvent({ type: 'game:playerReady', color: me.color });
         if (engine.allPlacementsComplete()) {
+          // Setup was private: now show everyone where everyone's pieces went
+          await this.logEvent({ type: 'game:placementsRevealed', pieces: this.allPieces() });
           engine.startGame();
           this.startTurnClock();
           await this.logEvent({ type: 'game:phaseChanged', phase: 'playing' });
@@ -846,12 +851,52 @@ export class Room extends DurableObject<Env> {
     const text = JSON.stringify({ ...message, seq: this.seq });
     await this.ctx.storage.put({ [eventKey(this.seq)]: text, seq: this.seq });
     for (const ws of this.ctx.getWebSockets()) {
+      if (!this.mayReceive(ws.deserializeAttachment() as Attachment | null, text)) continue;
       try { ws.send(text); } catch { /* socket already gone */ }
     }
   }
 
-  private stateForClients() {
-    const state = this.engine!.getState();
+  // ── Private setup ────────────────────────────────────────────────────────────
+  // While pieces are being placed nobody sees anyone else's: placements go only to the player
+  // who made them (and the host, for the robot seats their device plays). When everyone is
+  // ready, game:placementsRevealed shows the whole board.
+
+  /** The colours whose setup this player may see: their own, and the robots' if they host */
+  private ownColors(viewer: Attachment | null): PlayerColor[] {
+    if (!viewer) return [];
+    if (!viewer.reveal) return [...PLAYER_COLORS_BY_COUNT[6]]; // an older app: it sees everything as before
+    const robots = viewer.userId === this.meta?.hostUserId ? (this.engine?.config.aiColors ?? []) : [];
+    return [viewer.color, ...robots];
+  }
+
+  /** Placement events (piece placed or taken back) only reach their own side */
+  private mayReceive(viewer: Attachment | null, text: string): boolean {
+    if (!text.includes('"game:piecePlaced"') && !text.includes('"game:pieceUnplaced"')) return true;
+    try {
+      const event = JSON.parse(text) as { type: string; color: PlayerColor };
+      if (event.type !== 'game:piecePlaced' && event.type !== 'game:pieceUnplaced') return true;
+      return this.ownColors(viewer).includes(event.color);
+    } catch { return true; }
+  }
+
+  /** Every piece on the board, for the reveal */
+  private allPieces(): { color: PlayerColor; pieceType: string; position: BoardPosition }[] {
+    const pieces: { color: PlayerColor; pieceType: string; position: BoardPosition }[] = [];
+    for (const plane of this.engine!.getState().board)
+      for (const row of plane)
+        for (const cell of row)
+          if (cell) pieces.push({ color: cell.color, pieceType: cell.type, position: cell.position });
+    return pieces;
+  }
+
+  /** The room state; during setup, other players' pieces are left off the board for the viewer */
+  private stateForClients(viewer?: Attachment | null) {
+    const raw = this.engine!.getState();
+    let state = raw;
+    if (raw.phase === 'placement' && viewer !== undefined) {
+      const mine = this.ownColors(viewer);
+      state = { ...raw, board: raw.board.map(plane => plane.map(row => row.map(cell => cell && mine.includes(cell.color) ? cell : null))) };
+    }
     return {
       ...state,
       ranked: isRankedConfig(state.config),
@@ -884,9 +929,12 @@ export class Room extends DurableObject<Env> {
 
   private broadcast(message: object, except?: WebSocket): void {
     const text = JSON.stringify(message);
+    // During setup a message carrying the room state is redone for each player (private setup)
+    const perViewer = 'state' in message && this.engine?.getState().phase === 'placement';
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;
-      try { ws.send(text); } catch { /* socket already gone */ }
+      const own = perViewer ? JSON.stringify({ ...message, state: this.stateForClients(ws.deserializeAttachment() as Attachment | null) }) : text;
+      try { ws.send(own); } catch { /* socket already gone */ }
     }
   }
 }

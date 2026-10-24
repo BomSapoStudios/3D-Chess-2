@@ -79,8 +79,8 @@ const join = async (code, who) => { const c = await client(`${WS_BASE}/rooms/${c
 const get = (path, who) => fetch(BASE + path, { headers: { Authorization: `Bearer ${who.token}` } }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }));
 
 /** Start a 2-player game between host and guest; returns both sockets once play begins */
-async function playing(host, guestP) {
-  const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2 } }, host.token)).body;
+async function playing(host, guestP, extra = { timedMode: true, timePerPlayerSeconds: 1800 }) {
+  const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, ...extra } }, host.token)).body;
   const [a] = await join(room.code, host);
   const [b] = await join(room.code, guestP);
   await fillRest(a, 4, 'White'); await fillRest(b, 4, 'Black');
@@ -99,6 +99,19 @@ const alice = await guest('Alice'), bob = await guest('Bob');
   check(w && k && w.mode === 'duel', 'both players get a Duel rating change');
   check(w.after < 1000 && k.after > 1000 && Math.round(1000 - w.after) === Math.round(k.after - 1000), `the loser drops what the winner gains (${w.after} / ${k.after})`);
   check(k.after - 1000 === 20, `new players move 20 for an even game (K 40): ${k.after - 1000}`);
+  a.close(); b.close();
+}
+
+// 1b. Unranked games (no clock, or Chaos Mode) don't change ratings
+for (const [label, extra] of [['an untimed game', {}], ['a Chaos Mode game', { timedMode: true, timePerPlayerSeconds: 1800, chaosMode: true }]]) {
+  const x = await guest('Xena'), y = await guest('Yuri');
+  const { room, a, b } = await playing(x, y, extra);
+  const st = (await a.request({ type: 'room:state' })).state;
+  check(st.ranked === false, `${label} is marked unranked`);
+  await a.request({ type: 'game:resign' });
+  await b.wait(m => m.type === 'game:over', 8000);
+  await sleep(300);
+  check(!b.inbox.some(m => m.type === 'game:rated'), `${label} changes nobody's rating`);
   a.close(); b.close();
 }
 
@@ -148,7 +161,7 @@ const alice = await guest('Alice'), bob = await guest('Bob');
 // 5. Melee: places by finishing order, robots left out
 {
   const p = [await guest('P1'), await guest('P2'), await guest('P3')];
-  const room = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Purple'] } }, p[0].token)).body;
+  const room = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Purple'], timedMode: true, timePerPlayerSeconds: 1800 } }, p[0].token)).body;
   const c = [];
   for (const who of p) c.push((await join(room.code, who))[0]);
   for (const [i, color] of [[0, 'White'], [1, 'Black'], [2, 'Green']]) { await fillRest(c[i], 6, color); await c[i].request({ type: 'game:ready' }); }

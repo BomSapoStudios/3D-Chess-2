@@ -86,11 +86,11 @@ check(unauth.status === 401, 'creating a room needs a token');
 const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2 } }, alice.token)).body;
 check(/^[A-Z2-9]{6}$/.test(room.code), `room created (${room.code})`);
 
-const a = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${alice.token}`);
+const a = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${alice.token}&reveal=1`);
 const aJoined = await a.wait(m => m.type === 'room:joined');
 check(aJoined.yourColor === 'White' && aJoined.isHost, 'host seated as White');
 
-const b = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${bob.token}`);
+const b = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${bob.token}&reveal=1`);
 const bJoined = await b.wait(m => m.type === 'room:joined');
 check(bJoined.yourColor === 'Black', 'second player seated as Black');
 check(bJoined.state.phase === 'placement', 'room moves to placement when full');
@@ -119,8 +119,16 @@ check(!extraKing.ok, `a second King is refused (${extraKing.error})`);
 await fillRest(a, 4, 'White', [{ x: 0, y: 1, z: 0 }]);
 await fillRest(b, 4, 'Black', [{ x: 3, y: 2, z: 3 }, { x: 3, y: 0, z: 0 }]);
 
+// Setup is private: Black never hears where White's pieces went, and the board it's sent leaves them off
+check(!b.inbox.some(m => m.type === 'game:piecePlaced' && m.color === 'White'), 'Black is not told where White placed');
+const hiddenState = (await b.request({ type: 'room:state' })).state;
+check(!hiddenState.board[0][0][0] && !!hiddenState.board[3][3][3], "Black's view of the board shows only Black's pieces during setup");
+
 await a.request({ type: 'game:ready' });
 await b.request({ type: 'game:ready' });
+const revealed = await b.wait(m => m.type === 'game:placementsRevealed');
+check(revealed.pieces.some(p => p.color === 'White' && p.pieceType === 'King' && p.position.x === 0 && p.position.y === 0 && p.position.z === 0),
+  'when both are ready, Black is shown where White placed');
 const started = await a.wait(m => m.type === 'game:phaseChanged' && m.phase === 'playing');
 check(!!started, 'game starts when both are ready');
 const startState = (await a.request({ type: 'room:state' })).state;
@@ -140,7 +148,7 @@ check(!illegal.ok, `illegal move is refused (${illegal.error})`);
 // Reconnect: Bob drops and comes back to the same seat
 b.close();
 await a.wait(m => m.type === 'room:playerLeft' && m.color === 'Black');
-const b2 = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${bob.token}`);
+const b2 = await client(`${WS_BASE}/rooms/${room.code}/connect?token=${bob.token}&reveal=1`);
 const back = await b2.wait(m => m.type === 'room:joined');
 check(back.yourColor === 'Black' && back.state.turnNumber >= 1, 'reconnect keeps seat and game state');
 const m2 = await b2.request({ type: 'game:move', from: { x: 3, y: 3, z: 3 }, to: { x: 3, y: 2, z: 3 } });
@@ -159,7 +167,7 @@ check(over.winner === 'White' && over.reason === 'resignation', 'resignation end
 a.close(); b2.close();
 
 // Find Match pairs two waiting players
-const m1c = await client(`${WS_BASE}/matchmaking/connect?token=${alice.token}`);
+const m1c = await client(`${WS_BASE}/matchmaking/connect?token=${alice.token}&reveal=1`);
 const m2c = await client(`${WS_BASE}/matchmaking/connect?token=${carol.token}`);
 m1c.ws.send(JSON.stringify({ type: 'matchmaking:join', config: { boardSize: '4x4x4', playerCount: 2 } }));
 await m1c.wait(m => m.type === 'matchmaking:queued');
@@ -171,7 +179,7 @@ check(f1.roomCode && f1.roomCode === f2.roomCode, `Find Match pairs players into
 // Robot seats: the host's device plays them
 const botRoom = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Black', 'Purple'], chaosMode: true, chaosInterval: 5 } }, alice.token)).body;
 check(botRoom.config.aiColors?.length === 2 && botRoom.config.chaosInterval === 5, `room with two robot seats (${botRoom.code})`);
-const h = await client(`${WS_BASE}/rooms/${botRoom.code}/connect?token=${alice.token}`);
+const h = await client(`${WS_BASE}/rooms/${botRoom.code}/connect?token=${alice.token}&reveal=1`);
 const hJoined = await h.wait(m => m.type === 'room:joined');
 check(hJoined.state.players.length === 3 && hJoined.state.phase === 'waiting', 'robots are seated, one human seat still open');
 const g = await client(`${WS_BASE}/rooms/${botRoom.code}/connect?token=${carol.token}`);
@@ -188,7 +196,7 @@ h.close(); g.close();
 // Chaos Mode: the server picks the spin and tells everyone, so all boards stay identical
 {
   const cr = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, chaosMode: true, chaosInterval: 3 } }, alice.token)).body;
-  const ca = await client(`${WS_BASE}/rooms/${cr.code}/connect?token=${alice.token}`);
+  const ca = await client(`${WS_BASE}/rooms/${cr.code}/connect?token=${alice.token}&reveal=1`);
   await ca.wait(m => m.type === 'room:joined');
   const cb = await client(`${WS_BASE}/rooms/${cr.code}/connect?token=${carol.token}`);
   await cb.wait(m => m.type === 'room:joined');

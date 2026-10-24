@@ -104,6 +104,7 @@ public partial class NeonMenu : MonoBehaviour
         int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
         if (debugStats == 1) ShowProfile(null, ShowOnline);
         else if (debugStats == 12) ShowOnlineSetup();
+        else if (debugStats == 13) { ShowOnline(); StartCoroutine(CreateRoutine("{\"boardSize\":\"4x4x4\",\"playerCount\":2,\"timedMode\":true,\"timePerPlayerSeconds\":600}")); } // online test: make a room (OnlineTestPlayer plays it)
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 4) { ShowCustomize(); SelectTab(CustomizeTab.Effects); }
@@ -1067,6 +1068,7 @@ public partial class NeonMenu : MonoBehaviour
         ListenForStart();
         OnlineClient.Instance.JoinRoom(code);
         SetOnlineStatus($"Your game code is {code}. Send it to your friends; the game starts when every seat is filled.");
+        Debug.Log("ONLINE TEST: room " + code);
     }
 
     private IEnumerator JoinRoutine(string code)

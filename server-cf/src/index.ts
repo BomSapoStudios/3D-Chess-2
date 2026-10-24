@@ -212,7 +212,8 @@ export default {
       }
       if (!user) return new Response('Sign in first', { status: 401 });
       return stub.fetch('https://room/connect', {
-        headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name },
+        // reveal=1: the app shows other players' setup when play starts (private setup)
+        headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name, 'X-Reveal': url.searchParams.get('reveal') === '1' ? '1' : '0' },
       });
     }
 

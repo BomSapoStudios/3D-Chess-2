@@ -394,7 +394,7 @@ public class OnlineClient : MonoBehaviour
         RoomCode = upper;
         intentionalClose = false;
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
-                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}";
+                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}&reveal=1"; // we handle private setup
 
         var opened = socket = new GameSocket(url);
         opened.OnMessage += Handle;
@@ -681,6 +681,16 @@ public class ServerMessage
     public string fromColor;    // game:drawOffered
     public NetRatings ratings;  // game:rated
     public NetRematch rematch;  // room:rematch
+    public NetPlacement[] pieces; // game:placementsRevealed
+}
+
+/// <summary>One piece of the board shown when setup ends (setup is private until everyone is ready)</summary>
+[Serializable]
+public class NetPlacement
+{
+    public string color;
+    public string pieceType;
+    public NetPos position;
 }
 
 [Serializable]

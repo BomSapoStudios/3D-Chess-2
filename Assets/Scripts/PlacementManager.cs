@@ -251,8 +251,9 @@ public class PlacementManager : MonoBehaviour
             Debug.Log($"🎯 PlacementManager: Fired OnPlayerReadinessChanged for {playerColor}");
         }
 
-        // Check if we should transition to gameplay now
-        if (ready && AreAllPlayersReady())
+        // Check if we should transition to gameplay now. Online, the server starts play
+        // (game:phaseChanged), after showing everyone's private setup
+        if (ready && AreAllPlayersReady() && !OnlineSession.IsActive)
         {
             Debug.Log("🚀 PlacementManager: All players are now ready - checking if transition should occur");
             CheckPlacementCompletion();
