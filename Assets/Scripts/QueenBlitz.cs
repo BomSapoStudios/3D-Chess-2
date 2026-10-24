@@ -227,6 +227,11 @@ public class QueenBlitzDirector : MonoBehaviour
     public static QueenBlitzDirector Instance { get; private set; }
 
     private bool laidOut, queenPlaced, ended;
+
+    // The pawn tracker: one silhouette per pawn, filled in (with a little bump) as the queen takes them
+    private int shownTaken;
+    private float nextFill;
+    private float[] filledAt;
     private readonly List<GameObject> blockObjects = new List<GameObject>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -256,6 +261,7 @@ public class QueenBlitzDirector : MonoBehaviour
     private void Update()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        if (laidOut && ChessBoard.Instance != null) TrackTaken();
         if (state != GameState.PiecePlacement && state != GameState.Playing) return;
         if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
 
@@ -395,7 +401,60 @@ public class QueenBlitzDirector : MonoBehaviour
         SceneController.Instance.LoadGameScene(config);
     }
 
-    // Puzzle name, moves and par along the top, the tip under it, and Restart
+    // Fill in silhouettes one at a time (a sweep through several pawns fills them in quick
+    // succession); Undo empties them again straight away
+    private void TrackTaken()
+    {
+        int total = QueenBlitz.Current.pawns.Length;
+        if (filledAt == null || filledAt.Length != total) { filledAt = new float[total]; shownTaken = 0; }
+        int taken = Mathf.Clamp(total - PawnsLeft(), 0, total);
+        if (taken < shownTaken) shownTaken = taken;
+        else if (taken > shownTaken && Time.time >= nextFill)
+        {
+            filledAt[shownTaken] = Time.time;
+            shownTaken++;
+            nextFill = Time.time + 0.12f;
+        }
+    }
+
+    // The row of pawn silhouettes, centred under the title (below the tip while it shows)
+    private void DrawTracker(Vector2 ui, float y)
+    {
+        if (filledAt == null) return;
+        int total = filledAt.Length;
+        const float size = 24f, gap = 6f;
+        float x0 = ui.x / 2f - (total * size + (total - 1) * gap) / 2f;
+        Texture2D icon = NeonIcons.Pawn;
+        Color before = GUI.color;
+        for (int i = 0; i < total; i++)
+        {
+            Rect r = new Rect(x0 + i * (size + gap), y, size, size);
+            bool filled = i < shownTaken;
+            if (!filled)
+            {
+                GUI.color = new Color(NeonTheme.Lavender.r, NeonTheme.Lavender.g, NeonTheme.Lavender.b, 0.3f);
+                GUI.DrawTexture(r, icon);
+                continue;
+            }
+            // Impact: lands big, squashes, and settles with a wobble; a white flash and a glow fade out
+            float k = Mathf.Clamp01((Time.time - filledAt[i]) / 0.4f);
+            float bump = 1f + 0.55f * Mathf.Exp(-6f * k) * Mathf.Cos(k * Mathf.PI * 3f);
+            float squash = 1f - 0.25f * Mathf.Exp(-8f * k) * Mathf.Sin(k * Mathf.PI * 3f);
+            float w = size * bump / squash, h = size * bump * squash;
+            Rect hit = new Rect(r.center.x - w / 2f, r.yMax - h, w, h); // grows from its feet
+            if (k < 1f)
+            {
+                float glow = size * (0.8f + 1.3f * k);
+                GUI.color = new Color(NeonTheme.Yellow.r, NeonTheme.Yellow.g, NeonTheme.Yellow.b, 0.45f * (1f - k));
+                GUI.DrawTexture(new Rect(r.center.x - glow / 2f, r.center.y - glow / 2f, glow, glow), NeonTheme.Circle.texture);
+            }
+            GUI.color = Color.Lerp(Color.white, NeonTheme.Yellow, Mathf.Clamp01(k * 2.5f));
+            GUI.DrawTexture(hit, icon);
+        }
+        GUI.color = before;
+    }
+
+    // Puzzle name, moves and par along the top, the tip under it, the pawn tracker, and Restart
     private void OnGUI()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
@@ -409,8 +468,10 @@ public class QueenBlitzDirector : MonoBehaviour
         Rect rect = new Rect(ui.x / 2f - 250f, 6f, 500f, 32f);
         NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
         GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
-        if (QueenBlitz.Moves == 0)
+        bool tipShown = QueenBlitz.Moves == 0;
+        if (tipShown)
             GUI.Label(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+        DrawTracker(ui, tipShown ? 62f : 42f);
         if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
             Restart(QueenBlitz.Index);
         TouchGUI.End();
