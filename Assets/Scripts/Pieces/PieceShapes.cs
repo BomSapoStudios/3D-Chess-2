@@ -13,13 +13,19 @@ public static class PieceShapes
         AbyssGlow = 1,
         MushroomGrove = 2,
         WildKingdom = 3,
+        CloseEncounters = 4,
     }
 
     private const string PrefKey = "PieceShapes";
 
+    /// <summary>The set in use: the one picked, if it's unlocked (Store), else Cyberpunk</summary>
     public static Kind Current
     {
-        get => (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.Cyberpunk);
+        get
+        {
+            var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.Cyberpunk);
+            return Store.Owns(picked) ? picked : Kind.Cyberpunk;
+        }
         set
         {
             PlayerPrefs.SetInt(PrefKey, (int)value);
@@ -27,7 +33,13 @@ public static class PieceShapes
         }
     }
 
-    public static readonly Kind[] All = { Kind.Cyberpunk, Kind.AbyssGlow, Kind.MushroomGrove, Kind.WildKingdom };
+    public static readonly Kind[] All = { Kind.Cyberpunk, Kind.AbyssGlow, Kind.MushroomGrove, Kind.WildKingdom, Kind.CloseEncounters };
+
+    /// <summary>Customize is showing a set that isn't unlocked yet (its preview), or null</summary>
+    public static Kind? Showing;
+
+    /// <summary>The set pieces are built from right now: the one being previewed, else the one in use</summary>
+    public static Kind Active => Showing ?? Current;
 
     public static string DisplayName(Kind kind)
     {
@@ -36,6 +48,7 @@ public static class PieceShapes
             case Kind.AbyssGlow: return "Abyss Glow";
             case Kind.MushroomGrove: return "Mushroom Grove";
             case Kind.WildKingdom: return "Wild Kingdom";
+            case Kind.CloseEncounters: return "Close Encounters";
             default: return "Cyberpunk";
         }
     }
@@ -47,7 +60,8 @@ public static class PieceShapes
             case Kind.AbyssGlow: return "Sea-carved pieces: pale pearl against deep violet, with glowing rims";
             case Kind.MushroomGrove: return "Toadstools and a tree-frog knight, in moonlight white and deep plum";
             case Kind.WildKingdom: return "Lion king, peacock queen, owl, zebra, elephant castle and meerkat pawns";
-            default: return "Faceted neon pieces with light strips; the Look below recolors them";
+            case Kind.CloseEncounters: return "Little green men, a flying-saucer rook and an alien steed";
+            default: return "Faceted pieces with glowing light strips";
         }
     }
 
@@ -59,6 +73,7 @@ public static class PieceShapes
             case Kind.AbyssGlow: return "Abyss";
             case Kind.MushroomGrove: return "Mushroom";
             case Kind.WildKingdom: return "Wild";
+            case Kind.CloseEncounters: return "Aliens";
             default: return "Cyberpunk";
         }
     }

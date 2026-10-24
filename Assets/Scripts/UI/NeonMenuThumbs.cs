@@ -14,21 +14,20 @@ public partial class NeonMenu
     private IEnumerator CaptureMenuThumbs()
     {
         yield return new WaitForSeconds(1f);
-        PieceShapes.Kind saved = PieceShapes.Current;
         freezeTurntable = true;
         foreach (PieceShapes.Kind k in PieceShapes.All)
         {
-            PieceShapes.Current = k;
+            PieceShapes.Showing = k;
             ShowShapePreview(k);
             yield return new WaitForSeconds(2f);
             ThumbCapture.Save(previewTexture, "Pieces_" + k);
         }
         freezeTurntable = false;
-        PieceShapes.Current = saved;
+        PieceShapes.Showing = null;
         foreach (PromotionStyle.Kind k in System.Enum.GetValues(typeof(PromotionStyle.Kind)))
         {
             ShowPromotionPreview(k);
-            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : 0.75f); // mid-animation, where each looks most like itself
+            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : k == PromotionStyle.Kind.Splat ? 0.95f : 0.75f); // mid-animation, where each looks most like itself
             ThumbCapture.Save(previewTexture, "Promo_" + k);
         }
         ClosePromotionPreview();

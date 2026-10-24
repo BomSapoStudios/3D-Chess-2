@@ -108,6 +108,8 @@ public partial class NeonMenu : MonoBehaviour
         else if (debugStats == 5) { ShowCustomize(); SelectTab(CustomizeTab.Pieces); }
         else if (debugStats == 7) { ShowCustomize(); SelectTab(CustomizeTab.Backdrop); }
         else if (debugStats == 8) { ShowCustomize(); SelectTab(CustomizeTab.Board); }
+        else if (debugStats == 9) { ShowCustomize(); SelectTab(CustomizeTab.Pieces); PieceShapes.Showing = PieceShapes.Kind.CloseEncounters; Refresh(); StartPreviewForTab(); }
+        else if (debugStats == 10) { ShowCustomize(); SelectTab(CustomizeTab.Backdrop); showingBackdrop = Backdrops.Kind.DeepSea; Refresh(); StartPreviewForTab(); }
         // `DebugCapture -int 1`: render the Customize thumbnails for piece sets and promotions (NeonMenuThumbs)
         if (PlayerPrefs.GetInt("DebugCapture", 0) == 1) StartCoroutine(CaptureMenuThumbs());
         else if (debugStats == 6)

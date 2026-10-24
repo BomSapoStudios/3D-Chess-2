@@ -453,6 +453,7 @@ public partial class PieceEffects : MonoBehaviour
         if (kind == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.BlackHole) Runner.StartCoroutine(Runner.BlackHoleRoutine(copy, promoted, color));
+        else if (kind == PromotionStyle.Kind.Splat) Runner.StartCoroutine(Runner.SplatRoutine(copy, promoted, color));
         else Runner.StartCoroutine(Runner.PromoteRoutine(copy, promoted, color));
     }
 

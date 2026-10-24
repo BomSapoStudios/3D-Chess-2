@@ -32,7 +32,7 @@ public partial class NeonMenu
 
     // Preview card
     private Image previewBorder;
-    private GameObject piecesView, backdropView, boardView, effectsView, lookBox;
+    private GameObject piecesView, backdropView, boardView, effectsView, setColorsRow;
     private RawImage piecesPicture, backdropPicture, boardPicture, effectsPicture;
     private TextMeshProUGUI piecesName, piecesBlurb, backdropName, backdropBlurb, effectsName, effectsBlurb;
     private Image[] teamDots;
@@ -43,10 +43,21 @@ public partial class NeonMenu
     private RectTransform gridContent, boardRows;
     private ScrollRect gridScroll;
     private TextMeshProUGUI pawnBalance;
+    private int pawnTaps;
+    private float lastPawnTap;
+
+    // A locked backdrop being looked at (PieceShapes.Showing does this for piece sets)
+    private Backdrops.Kind? showingBackdrop;
+    private Backdrops.Kind ShownBackdrop => showingBackdrop ?? Backdrops.Current;
+
+    // Unlock panels in the preview card (pieces and backdrop)
+    private class UnlockPanel { public GameObject root; public TextMeshProUGUI pawnLabel, dollarLabel, note; public Image pawnButton; }
+    private UnlockPanel piecesUnlock, backdropUnlock;
+    private GameObject finishBox;
 
     private class PickCard
     {
-        public System.Func<bool> equipped;
+        public System.Func<bool> equipped, shown;
         public Image border, check;
     }
     private readonly List<PickCard> pickCards = new List<PickCard>();
@@ -59,7 +70,7 @@ public partial class NeonMenu
         RectTransform root = customizeScreen.GetComponent<RectTransform>();
         Stretch(root);
         var hooks = customizeScreen.AddComponent<ScreenHooks>();
-        hooks.disabled = StopInlinePreview;
+        hooks.disabled = () => { StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; };
         hooks.enabled = () => { if (previewBorder != null) { RefreshCustomize(); StartPreviewForTab(); } };
 
         // ── Top bar: Back, title, pawns, Done! ──
@@ -100,6 +111,21 @@ public partial class NeonMenu
         pawnBalance.rectTransform.anchorMax = new Vector2(1, 1);
         pawnBalance.rectTransform.offsetMin = new Vector2(36, 0);
         pawnBalance.rectTransform.offsetMax = new Vector2(-8, 0);
+        // Testing: seven quick taps on the pawn balance unlock everything (and again to lock it back)
+        Button chipButton = chip.gameObject.AddComponent<Button>();
+        chipButton.transition = Selectable.Transition.None;
+        chipButton.onClick.AddListener(() =>
+        {
+            pawnTaps = Time.unscaledTime - lastPawnTap < 0.6f ? pawnTaps + 1 : 1;
+            lastPawnTap = Time.unscaledTime;
+            if (pawnTaps < 7) return;
+            pawnTaps = 0;
+            Store.TestUnlockAll = !Store.TestUnlockAll;
+            ShowToast(Store.TestUnlockAll ? "Test mode: everything unlocked" : "Test mode off: locks are back");
+            BuildCards();
+            Refresh();
+            StartPreviewForTab();
+        });
 
         // ── Body: rail | preview card | grid ──
         RectTransform body = NewRect("Body", root);
@@ -164,6 +190,8 @@ public partial class NeonMenu
     private void SelectTab(CustomizeTab t)
     {
         tab = t;
+        PieceShapes.Showing = null;
+        showingBackdrop = null;
         foreach (var r in railTabs)
         {
             bool on = r.tab == t;
@@ -196,6 +224,9 @@ public partial class NeonMenu
     private void StartPreviewForTab()
     {
         if (!customizeScreen.activeInHierarchy) return;
+        // (Neon Glow is a plain colour: its picture says more than circling nothing)
+        if (tab == CustomizeTab.Backdrop && ShownBackdrop != Backdrops.Kind.NeonGlow) { backdropPicture.texture = StartBackdropPreview(); Cover(backdropPicture); }
+        else StopBackdropPreview();
         if (tab == CustomizeTab.Pieces) { piecesPicture.texture = PlayInlineShapes(); Cover(piecesPicture); }
         else
         {
@@ -223,19 +254,23 @@ public partial class NeonMenu
         previewBorder.raycastTarget = false;
         Stretch(previewBorder.rectTransform);
 
-        // Pieces: the set turning, its name and blurb, and for Cyberpunk the Looks and team colors
+        // Pieces: the set turning, its name and blurb, then the finish (for every set) and team colors
         RectTransform pv = PreviewColumn(card.transform, "Pieces");
         piecesView = pv.gameObject;
-        piecesPicture = PreviewPicture(pv, 118);
+        piecesPicture = PreviewPicture(pv, 80);
         piecesName = PreviewName(pv, NeonTheme.Lime);
         piecesBlurb = PreviewBlurb(pv);
-        RectTransform looks = NewRect("Looks", pv);
-        lookBox = looks.gameObject;
+        RectTransform looks = NewRect("Finish", pv);
+        finishBox = looks.gameObject;
         var looksLayout = looks.gameObject.AddComponent<VerticalLayoutGroup>();
         looksLayout.spacing = 4;
         looksLayout.childControlWidth = looksLayout.childControlHeight = true;
         looksLayout.childForceExpandWidth = true;
         looksLayout.childForceExpandHeight = false;
+        TextMeshProUGUI finishLabel = NewText("Label", looks, "Finish", 12, NeonTheme.Lavender, TextAlignmentOptions.Left);
+        finishLabel.fontStyle = FontStyles.Normal;
+        finishLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 14;
+        setColorsRow = LookRow(looks, PieceSets.Kind.SetColors, null);   // only for sets with their own palette
         LookRow(looks, PieceSets.Kind.NeonGlow, PieceSets.Kind.Chrome);
         LookRow(looks, PieceSets.Kind.Crystal, PieceSets.Kind.Classic);
         RectTransform dots = NewRect("Team colors", looks);
@@ -251,12 +286,15 @@ public partial class NeonMenu
             Place(teamDots[i].rectTransform, new Vector2(0, 0.5f), new Vector2(18, 18), new Vector2(50 + i * 26, 0));
         }
 
+        piecesUnlock = BuildUnlockPanel(pv);
+
         // Backdrop: the scene's picture, name and blurb
         RectTransform bv = PreviewColumn(card.transform, "Backdrop");
         backdropView = bv.gameObject;
-        backdropPicture = PreviewPicture(bv, 150);
+        backdropPicture = PreviewPicture(bv, 128);
         backdropName = PreviewName(bv, NeonTheme.PinkSoft);
         backdropBlurb = PreviewBlurb(bv);
+        backdropUnlock = BuildUnlockPanel(bv);
 
         // Board: a little cube that follows the switches
         RectTransform cv = PreviewColumn(card.transform, "Board");
@@ -300,16 +338,109 @@ public partial class NeonMenu
         playPill.SetActive(true);
     }
 
-    private void LookRow(RectTransform parent, PieceSets.Kind a, PieceSets.Kind b)
+    // ───────── Unlocking ─────────
+
+    private UnlockPanel BuildUnlockPanel(RectTransform parent)
     {
-        ChipRow(parent, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
+        var panel = new UnlockPanel();
+        RectTransform box = NewRect("Unlock", parent);
+        box.gameObject.AddComponent<LayoutElement>().preferredHeight = 70;
+        panel.root = box.gameObject;
+
+        Image pawnFace = NewImage("Pawns", box, NeonTheme.Yellow);
+        pawnFace.rectTransform.anchorMin = new Vector2(0, 1);
+        pawnFace.rectTransform.anchorMax = new Vector2(0.62f, 1);
+        pawnFace.rectTransform.pivot = new Vector2(0, 1);
+        pawnFace.rectTransform.offsetMin = new Vector2(0, -40);
+        pawnFace.rectTransform.offsetMax = new Vector2(-4, 0);
+        NeonTheme.StyleFilled(pawnFace, NeonTheme.Yellow, NeonTheme.Pink);
+        RawImage icon = NewRaw("Pawn", pawnFace.transform, NeonIcons.Pawn, NeonTheme.Ground);
+        Place(icon.rectTransform, new Vector2(0, 0.5f), new Vector2(20, 20), new Vector2(18, 0));
+        panel.pawnLabel = NewText("Text", pawnFace.transform, "", 15, NeonTheme.Ground, TextAlignmentOptions.Center);
+        panel.pawnLabel.rectTransform.anchorMin = Vector2.zero;
+        panel.pawnLabel.rectTransform.anchorMax = Vector2.one;
+        panel.pawnLabel.rectTransform.offsetMin = new Vector2(28, 0);
+        panel.pawnLabel.rectTransform.offsetMax = new Vector2(-4, 0);
+        Button pawnBuy = pawnFace.gameObject.AddComponent<Button>();
+        NeonTheme.NeutralTint(pawnBuy);
+        pawnBuy.onClick.AddListener(UnlockWithPawns);
+        panel.pawnButton = pawnFace;
+
+        Image dollarFace = NewImage("Money", box, NeonTheme.Cyan);
+        dollarFace.sprite = NeonTheme.RoundedOutline;
+        dollarFace.type = Image.Type.Sliced;
+        dollarFace.rectTransform.anchorMin = new Vector2(0.62f, 1);
+        dollarFace.rectTransform.anchorMax = new Vector2(1, 1);
+        dollarFace.rectTransform.pivot = new Vector2(1, 1);
+        dollarFace.rectTransform.offsetMin = new Vector2(4, -40);
+        dollarFace.rectTransform.offsetMax = new Vector2(0, 0);
+        panel.dollarLabel = NewText("Text", dollarFace.transform, "", 15, NeonTheme.Cyan, TextAlignmentOptions.Center);
+        Stretch(panel.dollarLabel.rectTransform);
+        Button dollarBuy = dollarFace.gameObject.AddComponent<Button>();
+        NeonTheme.NeutralTint(dollarBuy);
+        // Money purchases need the App Store set up (StoreKit): not yet
+        dollarBuy.onClick.AddListener(() => { Haptics.Selection(); ShowToast("Buying with money is coming soon. Pawns work now!"); });
+
+        panel.note = NewText("Note", box, "", 12, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
+        panel.note.fontStyle = FontStyles.Normal;
+        panel.note.enableWordWrapping = true;
+        panel.note.rectTransform.anchorMin = new Vector2(0, 0);
+        panel.note.rectTransform.anchorMax = new Vector2(1, 1);
+        panel.note.rectTransform.offsetMin = Vector2.zero;
+        panel.note.rectTransform.offsetMax = new Vector2(0, -46);
+        panel.root.SetActive(false);
+        return panel;
+    }
+
+    private void ShowUnlock(UnlockPanel panel, int pawns, string dollars)
+    {
+        panel.root.SetActive(true);
+        panel.pawnLabel.text = $"Unlock {pawns:N0}";
+        panel.dollarLabel.text = dollars;
+        int have = PawnBank.Total;
+        bool enough = have >= pawns;
+        panel.pawnButton.color = enough ? NeonTheme.Yellow : NeonTheme.Muted;
+        panel.note.text = enough ? $"You have {have:N0} pawns." : $"You have {have:N0} pawns: {pawns - have:N0} more to go.";
+    }
+
+    private void UnlockWithPawns()
+    {
+        bool pieces = tab == CustomizeTab.Pieces;
+        string id; int price;
+        if (pieces && PieceShapes.Showing.HasValue) { id = Store.Id(PieceShapes.Showing.Value); price = Store.PieceSetPawns; }
+        else if (!pieces && showingBackdrop.HasValue) { id = Store.Id(showingBackdrop.Value); price = Store.BackdropPawns; }
+        else return;
+        if (!Store.BuyWithPawns(id, price))
         {
-            (PieceSets.DisplayName(a), () => PieceSets.Current = a, () => PieceSets.Current == a, () => true),
-            (PieceSets.DisplayName(b), () => PieceSets.Current = b, () => PieceSets.Current == b, () => true),
-        }, NeonTheme.Lime, 12);
+            ShowToast($"Not enough pawns yet: you need {price - PawnBank.Total:N0} more.");
+            return;
+        }
+        Haptics.Selection();
+        // Unlocked: put it to use straight away
+        if (pieces) { PieceShapes.Current = PieceShapes.Showing.Value; PieceShapes.Showing = null; }
+        else { Backdrops.Current = showingBackdrop.Value; showingBackdrop = null; }
+        ShowToast("Unlocked!");
+        BuildCards();
+        Refresh();
+        StartPreviewForTab();
+    }
+
+    // A row of finish chips; picking one shows the set turning in it
+    private GameObject LookRow(RectTransform parent, PieceSets.Kind a, PieceSets.Kind? b)
+    {
+        var items = new List<(string, System.Action, System.Func<bool>, System.Func<bool>)> { FinishChip(a) };
+        if (b.HasValue) items.Add(FinishChip(b.Value));
+        ChipRow(parent, items.ToArray(), NeonTheme.Lime, 12);
         RectTransform row = (RectTransform)parent.GetChild(parent.childCount - 1);
         row.GetComponent<LayoutElement>().preferredHeight = 24;
         row.GetComponent<HorizontalLayoutGroup>().spacing = 5;
+        return row.gameObject;
+    }
+
+    private (string, System.Action, System.Func<bool>, System.Func<bool>) FinishChip(PieceSets.Kind k)
+    {
+        System.Func<bool> on = k == PieceSets.Kind.SetColors ? (System.Func<bool>)(() => PieceSets.UsesSetColors) : () => !PieceSets.UsesSetColors && PieceSets.Effective == k;
+        return (PieceSets.DisplayName(k), () => { PieceSets.Current = k; StartPreviewForTab(); }, on, () => true);
     }
 
     private RectTransform PreviewColumn(Transform parent, string name)
@@ -440,7 +571,9 @@ public partial class NeonMenu
                 foreach (PieceShapes.Kind k in PieceShapes.All)
                 {
                     PieceShapes.Kind kind = k;
-                    AddCard(PieceShapes.DisplayName(k), Thumb("Pieces_" + k), () => PieceShapes.Current == kind, () => PieceShapes.Current = kind);
+                    AddCard(PieceShapes.DisplayName(k), Thumb("Pieces_" + k), () => PieceShapes.Current == kind, () => PieceShapes.Active == kind,
+                        () => { PieceShapes.Showing = Store.Owns(kind) ? (PieceShapes.Kind?)null : kind; if (Store.Owns(kind)) PieceShapes.Current = kind; },
+                        Store.Owns(kind) ? 0 : Store.PieceSetPawns);
                 }
                 break;
             case CustomizeTab.Backdrop:
@@ -448,7 +581,9 @@ public partial class NeonMenu
                 foreach (Backdrops.Kind k in Backdrops.All)
                 {
                     Backdrops.Kind kind = k;
-                    AddCard(Backdrops.DisplayName(k), Thumb("Backdrop_" + k), () => Backdrops.Current == kind, () => Backdrops.Current = kind);
+                    AddCard(Backdrops.DisplayName(k), Thumb("Backdrop_" + k), () => Backdrops.Current == kind, () => ShownBackdrop == kind,
+                        () => { showingBackdrop = Store.Owns(kind) ? (Backdrops.Kind?)null : kind; if (Store.Owns(kind)) Backdrops.Current = kind; },
+                        Store.Owns(kind) ? 0 : Store.BackdropPawns);
                 }
                 break;
             case CustomizeTab.Board:
@@ -459,14 +594,17 @@ public partial class NeonMenu
                 foreach (PromotionStyle.Kind k in System.Enum.GetValues(typeof(PromotionStyle.Kind)))
                 {
                     PromotionStyle.Kind kind = k;
-                    AddCard(PromotionStyle.DisplayName(k), Thumb("Promo_" + k), () => PromotionStyle.Current == kind, () => PromotionStyle.Current = kind);
+                    AddCard(PromotionStyle.DisplayName(k), Thumb("Promo_" + k), () => PromotionStyle.Current == kind, () => PromotionStyle.Current == kind, () => PromotionStyle.Current = kind);
                 }
                 break;
         }
     }
 
-    /// <summary>A picture card. price above 0 shows a yellow Shop tag with the pawn price (store not built yet).</summary>
-    private void AddCard(string name, Texture2D picture, System.Func<bool> equipped, System.Action use, int price = 0)
+    /// <summary>
+    /// A picture card. price above 0 means it's locked: a yellow Shop tag and the pawn price;
+    /// tapping it shows it in the preview card with the unlock buttons.
+    /// </summary>
+    private void AddCard(string name, Texture2D picture, System.Func<bool> equipped, System.Func<bool> shown, System.Action use, int price = 0)
     {
         Image face = NewImage(name, gridContent, CardFill);
         face.sprite = NeonTheme.Rounded;
@@ -494,6 +632,10 @@ public partial class NeonMenu
 
         if (price > 0)
         {
+            label.rectTransform.offsetMax = new Vector2(-56, 24);
+            RawImage costIcon = NewRaw("Pawn", face.transform, NeonIcons.Pawn, NeonTheme.Yellow);
+            costIcon.raycastTarget = false;
+            Place(costIcon.rectTransform, new Vector2(1, 0), new Vector2(13, 13), new Vector2(-50, 13));
             TextMeshProUGUI cost = NewText("Price", face.transform, $"{price:N0}", 12, NeonTheme.Yellow, TextAlignmentOptions.Right);
             cost.rectTransform.anchorMin = new Vector2(0, 0);
             cost.rectTransform.anchorMax = new Vector2(1, 0);
@@ -526,14 +668,13 @@ public partial class NeonMenu
         NeonTheme.NeutralTint(b);
         b.onClick.AddListener(() =>
         {
-            if (price > 0) return; // the store will sell these
             use();
             Haptics.Selection();
             Refresh();
-            if (tab == CustomizeTab.Pieces) StartPreviewForTab();    // show the new set turning
+            if (tab == CustomizeTab.Pieces || tab == CustomizeTab.Backdrop) StartPreviewForTab();    // show the new set or scene
             if (tab == CustomizeTab.Effects) b.StartCoroutine(PlayAfterPick());
         });
-        pickCards.Add(new PickCard { equipped = equipped, border = border, check = check });
+        pickCards.Add(new PickCard { equipped = equipped, shown = shown, border = border, check = check });
     }
 
     // Picking an animation plays it in the preview card
@@ -594,9 +735,9 @@ public partial class NeonMenu
         Color accent = Accent(tab);
         foreach (PickCard c in pickCards)
         {
-            bool on = c.equipped();
+            bool on = c.shown();
             c.border.color = on ? accent : CardEdge;
-            c.check.gameObject.SetActive(on);
+            c.check.gameObject.SetActive(c.equipped());
             var glow = c.border.GetComponent<Outline>();
             if (glow == null) glow = c.border.gameObject.AddComponent<Outline>();
             glow.effectColor = new Color(accent.r, accent.g, accent.b, 0.45f);
@@ -606,17 +747,20 @@ public partial class NeonMenu
 
         pawnBalance.text = $"{PawnBank.Total:N0}";
 
-        PieceShapes.Kind set = PieceShapes.Current;
+        PieceShapes.Kind set = PieceShapes.Active;
+        bool setLocked = PieceShapes.Showing.HasValue;
+        finishBox.SetActive(!setLocked);
+        if (setLocked) ShowUnlock(piecesUnlock, Store.PieceSetPawns, Store.PieceSetDollars); else piecesUnlock.root.SetActive(false);
         piecesName.text = PieceShapes.DisplayName(set);
         piecesBlurb.text = PieceShapes.Description(set);
-        lookBox.SetActive(set == PieceShapes.Kind.Cyberpunk); // Looks only recolor the cyberpunk pieces
+        setColorsRow.SetActive(PieceShapes.OwnColors(set)); // the cyberpunk pieces' own colors are Neon Glow
         PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
-        for (int i = 0; i < teamDots.Length; i++) teamDots[i].color = PieceSets.Tint(PieceSets.Current, sides[i]);
+        for (int i = 0; i < teamDots.Length; i++) teamDots[i].color = PieceSets.Tint(PieceSets.Effective, sides[i]);
 
-        backdropPicture.texture = Thumb("Backdrop_" + Backdrops.Current);
-        Cover(backdropPicture);
-        backdropName.text = Backdrops.DisplayName(Backdrops.Current);
-        backdropBlurb.text = Backdrops.Description(Backdrops.Current);
+        if (backdropLoop == null) { backdropPicture.texture = Thumb("Backdrop_" + ShownBackdrop); Cover(backdropPicture); }
+        backdropName.text = Backdrops.DisplayName(ShownBackdrop);
+        backdropBlurb.text = Backdrops.Description(ShownBackdrop);
+        if (showingBackdrop.HasValue) ShowUnlock(backdropUnlock, Store.BackdropPawns, Store.BackdropDollars); else backdropUnlock.root.SetActive(false);
 
         effectsName.text = PromotionStyle.DisplayName(PromotionStyle.Current);
         effectsBlurb.text = PromotionStyle.Description(PromotionStyle.Current);
@@ -631,6 +775,61 @@ public partial class NeonMenu
         }
         boardPicture.texture = NeonIcons.CubeDiagram(BoardLook.SolidFloors, !BoardLook.HideVerticalLines);
         Cover(boardPicture);
+    }
+
+    // ───────── Backdrop preview: a camera slowly circling the chosen scene ─────────
+
+    private Camera backdropCamera;
+    private RenderTexture backdropTexture;
+    private Coroutine backdropLoop;
+    private readonly List<Camera> pausedCameras = new List<Camera>();
+
+    private RenderTexture StartBackdropPreview()
+    {
+        StopBackdropPreview();
+        if (backdropTexture == null) backdropTexture = new RenderTexture(640, 400, 24) { name = "Backdrop Preview" };
+        // The scenes' sun, moon and drips follow Camera.main: make the preview camera the main one
+        // while it runs (the menu draws over everything, so its own camera isn't needed meanwhile)
+        foreach (Camera c in Camera.allCameras)
+            if (c.CompareTag("MainCamera")) { c.enabled = false; pausedCameras.Add(c); }
+        var go = new GameObject("Backdrop Preview Camera") { tag = "MainCamera" };
+        backdropCamera = go.AddComponent<Camera>();
+        backdropCamera.fieldOfView = 55f;
+        backdropCamera.nearClipPlane = 0.3f;
+        backdropCamera.farClipPlane = 2000f;
+        backdropCamera.targetTexture = backdropTexture;
+        backdropLoop = StartCoroutine(CircleBackdrop(ShownBackdrop));
+        return backdropTexture;
+    }
+
+    private System.Collections.IEnumerator CircleBackdrop(Backdrops.Kind kind)
+    {
+        float angle = 200f;
+        bool applied = false;
+        while (true)
+        {
+            angle += Time.unscaledDeltaTime * 9f; // a full turn in 40 seconds
+            float a = angle * Mathf.Deg2Rad;
+            backdropCamera.transform.position = new Vector3(Mathf.Cos(a) * 34f, 9f, Mathf.Sin(a) * 34f);
+            backdropCamera.transform.LookAt(new Vector3(0f, -3f, 0f));
+            if (!applied) applied = Backdrops.Apply(backdropCamera, kind);
+            Backdrops.Drift(0.4f);
+            yield return null;
+        }
+    }
+
+    private void StopBackdropPreview()
+    {
+        if (backdropLoop != null) StopCoroutine(backdropLoop);
+        backdropLoop = null;
+        if (backdropCamera != null)
+        {
+            Scenery.Clear();
+            Destroy(backdropCamera.gameObject);
+        }
+        backdropCamera = null;
+        foreach (Camera c in pausedCameras) if (c != null) c.enabled = true;
+        pausedCameras.Clear();
     }
 
     // ───────── Helpers ─────────

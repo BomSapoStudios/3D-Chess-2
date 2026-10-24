@@ -16,7 +16,34 @@ public static class PieceModels
     private static readonly Dictionary<string, GameObject> cache = new Dictionary<string, GameObject>();
     private static readonly Dictionary<string, Texture2D> details = new Dictionary<string, Texture2D>();
 
-    private static string Folder => PieceShapes.Folder(PieceShapes.Current);
+    private static string Folder => PieceShapes.Folder(PieceShapes.Active);
+
+    private static readonly Dictionary<string, Texture2D> finishDetails = new Dictionary<string, Texture2D>();
+
+    /// <summary>
+    /// The detail map lifted so its darkest parts are mid-grey: under a finish (which multiplies
+    /// by it) the carving shows without the piece going black. Null if the set has no detail map.
+    /// </summary>
+    public static Texture2D FinishDetail(ChessPieceType type)
+    {
+        string path = "Pieces/" + Folder + "/" + type + "_Detail";
+        if (finishDetails.TryGetValue(path, out Texture2D lifted)) return lifted;
+        Texture2D source = Detail(type);
+        if (source != null && source.isReadable)
+        {
+            Color32[] px = source.GetPixels32();
+            for (int i = 0; i < px.Length; i++)
+            {
+                byte v = (byte)(115 + px[i].r * 140 / 255);
+                px[i] = new Color32(v, v, v, 255);
+            }
+            lifted = new Texture2D(source.width, source.height, TextureFormat.RGBA32, true);
+            lifted.SetPixels32(px);
+            lifted.Apply(true, true);
+        }
+        finishDetails[path] = lifted;
+        return lifted;
+    }
 
     /// <summary>The chosen set's detail map for a piece (grayscale; the material tints it), if it has one</summary>
     public static Texture2D Detail(ChessPieceType type)

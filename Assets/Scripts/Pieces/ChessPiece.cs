@@ -148,9 +148,9 @@ public abstract class ChessPiece : MonoBehaviour
     {
         if (meshRenderer == null) return;
 
-        // Inspector-assigned materials win only for the Classic set
+        // Inspector-assigned materials win only for the Classic finish
         Material targetMaterial = null;
-        if (PieceSets.Current == PieceSets.Kind.Classic)
+        if (PieceSets.Effective == PieceSets.Kind.Classic)
         {
             if (pieceColor == PieceColor.White) targetMaterial = whiteMaterial;
             else if (pieceColor == PieceColor.Black) targetMaterial = blackMaterial;
@@ -160,12 +160,26 @@ public abstract class ChessPiece : MonoBehaviour
         {
             targetMaterial = modeled ? PieceSets.CreateBodyMaterial(pieceColor) : PieceSets.CreateMaterial(pieceColor);
         }
-        // Abyss Glow and Mushroom Grove bring their own colors, whatever the Look
-        if (modeled && PieceShapes.OwnColors(PieceShapes.Current))
+        // The textured sets: their own two-tone colors, or the chosen finish over their carved detail
+        if (modeled && PieceShapes.OwnColors(PieceShapes.Active))
         {
-            targetMaterial = PieceSets.CreateShapeMaterial(PieceShapes.Current, pieceColor);
-            Texture2D detail = PieceModels.Detail(PieceModels.TypeOf(this));
-            if (detail != null && targetMaterial.HasProperty("_DetailTex")) targetMaterial.SetTexture("_DetailTex", detail);
+            ChessPieceType type = PieceModels.TypeOf(this);
+            if (PieceSets.UsesSetColors)
+            {
+                targetMaterial = PieceSets.CreateShapeMaterial(PieceShapes.Active, pieceColor);
+                Texture2D detail = PieceModels.Detail(type);
+                if (detail != null && targetMaterial.HasProperty("_DetailTex")) targetMaterial.SetTexture("_DetailTex", detail);
+            }
+            else
+            {
+                targetMaterial = PieceSets.CreateMaterial(pieceColor); // glowing all over: these models have no light strips
+                Texture2D shade = PieceModels.FinishDetail(type);
+                if (shade != null)
+                {
+                    targetMaterial.mainTexture = shade;
+                    if (targetMaterial.HasProperty("_EmissionMap") && targetMaterial.IsKeywordEnabled("_EMISSION")) targetMaterial.SetTexture("_EmissionMap", shade);
+                }
+            }
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
         PieceModels.Face(this);

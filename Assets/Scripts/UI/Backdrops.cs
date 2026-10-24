@@ -24,9 +24,14 @@ public static class Backdrops
 
     private const string PrefKey = "Backdrop";
 
+    /// <summary>The backdrop in use: the one picked, if it's unlocked (Store), else Neon Glow</summary>
     public static Kind Current
     {
-        get => (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.DeepSpace);
+        get
+        {
+            var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.NeonGlow);
+            return Store.Owns(picked) ? picked : Kind.NeonGlow;
+        }
         set
         {
             PlayerPrefs.SetInt(PrefKey, (int)value);
