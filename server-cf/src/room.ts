@@ -482,7 +482,7 @@ export class Room extends DurableObject<Env> {
     const walkouts = meta.walkouts ?? [];
     const result: GameResult = {
       roomCode: meta.code,
-      rated: this.gameOver.reason !== 'abandoned',
+      rated: this.gameOver.reason !== 'abandoned' && isRankedConfig(engine.config),
       players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => {
         const mine = state.moveHistory.filter(m => m.isCapture && m.playerColor === color);
         const takenTypes: Record<string, number> = {};
@@ -854,6 +854,7 @@ export class Room extends DurableObject<Env> {
     const state = this.engine!.getState();
     return {
       ...state,
+      ranked: isRankedConfig(state.config),
       winner: this.gameOver?.winner ?? null,
       endReason: this.gameOver?.reason ?? null,
       drawOfferFrom: this.engine!.drawOfferFrom,
@@ -895,6 +896,14 @@ function eventKey(seq: number): string {
 }
 
 /** Only accept known settings, within the game's limits */
+/**
+ * Ranked games (they change ratings) always run on a clock, Speed round or Take your time's day
+ * per move, and never use Chaos Mode. Anything else is still played and kept, just unranked.
+ */
+export function isRankedConfig(config: Partial<GameConfig>): boolean {
+  return (config.timedMode === true || config.pace === 'slow') && config.chaosMode !== true;
+}
+
 export function sanitizeConfig(input: Partial<GameConfig> = {}): Partial<GameConfig> {
   const config: Partial<GameConfig> = {};
   if (input.boardSize === '4x4x4' || input.boardSize === '6x6x6' || input.boardSize === '8x8x8') config.boardSize = input.boardSize;

@@ -48,6 +48,7 @@ public partial class NeonMenu : MonoBehaviour
     private RectTransform paceKnob;
     private GameObject paceRow, timedRow, clockRow;
     private bool ClockOn => timedPlay && !(setupOnline && slowPace);
+    private TextMeshProUGUI rankedNote;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Install()
@@ -102,6 +103,7 @@ public partial class NeonMenu : MonoBehaviour
         // 3 (Customize), or Customize's tabs: 5 Pieces, 7 Backdrop, 8 Board, 4 Effects
         int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
         if (debugStats == 1) ShowProfile(null, ShowOnline);
+        else if (debugStats == 12) ShowOnlineSetup();
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 4) { ShowCustomize(); SelectTab(CustomizeTab.Effects); }
@@ -508,6 +510,9 @@ public partial class NeonMenu : MonoBehaviour
         }, NeonTheme.Yellow, 14);
         clockRow = right.GetChild(right.childCount - 1).gameObject;
         SwitchRow(right, "Take your time", out paceNote, out paceSwitch, out paceKnob, () => { slowPace = !slowPace; Refresh(); });
+        // Online: whether this game will count for ratings (the server decides the same way)
+        rankedNote = NewText("Ranked", right, "", 15, NeonTheme.Lime, TextAlignmentOptions.Left);
+        rankedNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
         timedRow = right.Find("Speed round").gameObject;
         paceRow = right.Find("Take your time").gameObject;
 
@@ -692,6 +697,16 @@ public partial class NeonMenu : MonoBehaviour
         // Online only: Take your time games replace the speed clock with a day per move
         if (paceRow == null) return;
         paceRow.SetActive(setupOnline);
+        if (rankedNote != null)
+        {
+            // Ranked: two or more people, on a clock (Speed round or Take your time), no Chaos Mode
+            int people = 0;
+            for (int i = 0; i < playerCount && i < playerTypes.Count; i++) if (playerTypes[i] == PlayerType.Human) people++;
+            string why = people < 2 ? "needs two or more people" : chaosMode ? "Chaos Mode is on" : !(timedPlay || slowPace) ? "turn on Speed round or Take your time to rank it" : null;
+            rankedNote.gameObject.SetActive(setupOnline);
+            rankedNote.text = why == null ? "Ranked game: counts toward your rating" : $"Unranked: {why}";
+            rankedNote.color = why == null ? NeonTheme.Lime : NeonTheme.Lavender;
+        }
         timedRow.SetActive(!(setupOnline && slowPace));
         clockRow.SetActive(!(setupOnline && slowPace)); // always shown (greyed out until Speed round is on), like Chaos's chips
         SetSwitch(paceSwitch, paceKnob, slowPace);
@@ -1090,7 +1105,7 @@ public partial class NeonMenu : MonoBehaviour
             yield break;
         }
         ListenForStart();
-        SetSearching("Finding you an opponent…");
+        SetSearching("Finding you a ranked game (10 minutes each)…");
         OnlineClient.Instance.FindMatch("4x4x4",
             code => { SetSearching("Opponent found!"); OnlineClient.Instance.JoinRoom(code); },
             error => { SetSearching(null); SetOnlineStatus(error); onlineBusy = false; });

@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Ratings, stats and walk-outs, kept in the Accounts object's SQLite.
 //
-// • Every finished online game with at least two people in it is recorded and rated.
+// • Every finished ranked online game with at least two people in it is recorded and rated.
+//   Ranked means on a clock (Speed round or Take your time) without Chaos Mode (room.ts isRankedConfig).
 // • Two Elo ratings per player, starting at 1000: Duel (2 players) and Melee (4 and 6).
 //   Melee scores every pair of players by finishing order, averaged over the opponents.
 // • K is 40 for a player's first 10 games in a mode, 20 after. The same two players only

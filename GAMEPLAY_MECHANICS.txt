@@ -419,6 +419,7 @@ ACCOUNT
 PLAY ANYONE — Find Match
   • Choose board size and player count; you're matched with others who
     asked for the same. Nobody waits in the queue more than 5 minutes.
+  • Always ranked: a 10-minute clock each, no Chaos Mode.
   • Paused for a while if you keep walking out of games (section 14).
 
 PLAY A FRIEND
@@ -456,7 +457,12 @@ ON THE PHONE
 14. RANKINGS & STATS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Online games against other people are rated (Elo, starting at 1000).
+Ranked online games against other people are rated (Elo, starting at 1000).
+
+A game is ranked when it has two or more people, runs on a clock (Speed round
+or Take your time), and has Chaos Mode off. Any other online game, Chaos Mode
+included, is played the same way but doesn't change ratings. The online setup
+screen says which it will be.
 
 Two ladders:
   Duel   — 2-player games.
@@ -534,9 +540,11 @@ These are cosmetic only and never change the rules.
                                                 Chaos, no clock
   On this iPhone        2, 4, 6   4³ / 6³ / 8³  Any mix of You and Robot
                                                 seats (pass-and-play)
-  Play anyone (online)  2, 4, 6   4³ / 6³ / 8³  Find Match; rated
+  Play anyone (online)  2, 4, 6   4³ / 6³ / 8³  Find Match; ranked (10 min
+                                                clock, no Chaos)
   Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
-                                                Robots allowed; rated
+                                                Robots allowed; ranked if
+                                                timed and no Chaos
   Zombie Survival       1         8³            Pea / Walnut / Galaxy
   Queen Blitz           1         4³ / 6³       Ten puzzles; pawns on first clear
   Chaos Mode            any       any           Add to any chess game
