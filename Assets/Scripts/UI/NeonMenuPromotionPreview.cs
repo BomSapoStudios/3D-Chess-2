@@ -55,7 +55,7 @@ public partial class NeonMenu
         NeonTheme.ApplyFont(previewTitle, display: true);
         Place(previewTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(420, 36), new Vector2(0, -28));
 
-        previewTexture = new RenderTexture(640, 400, 16) { name = "Promotion Preview" };
+        EnsurePreviewTexture();
         previewImage = new GameObject("Picture", typeof(RectTransform)).AddComponent<RawImage>();
         previewImage.transform.SetParent(card.transform, false);
         previewImage.texture = previewTexture;
@@ -69,6 +69,40 @@ public partial class NeonMenu
         TextMeshProUGUI hint = NewText("Hint", card.transform, "Tap anywhere to close", 12, NeonTheme.Muted, TextAlignmentOptions.Center);
         Place(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(420, 18), new Vector2(0, 12));
         previewPopup.SetActive(false);
+    }
+
+    private void EnsurePreviewTexture()
+    {
+        if (previewTexture == null) previewTexture = new RenderTexture(640, 400, 16) { name = "Piece Preview" };
+    }
+
+    // ───────── Live previews inside the Customize screen's preview card ─────────
+
+    /// <summary>Play a set's turntable, or a promotion animation, into the preview texture (no pop-up)</summary>
+    private RenderTexture PlayInlineShapes()
+    {
+        EnsurePreviewTexture();
+        StopInlinePreview();
+        previewLoop = StartCoroutine(ShapeLoop());
+        return previewTexture;
+    }
+
+    private RenderTexture PlayInlinePromotion(PromotionStyle.Kind kind)
+    {
+        EnsurePreviewTexture();
+        StopInlinePreview();
+        previewLoop = StartCoroutine(PreviewLoop(kind));
+        return previewTexture;
+    }
+
+    private void StopInlinePreview()
+    {
+        if (previewLoop != null) StopCoroutine(previewLoop);
+        previewLoop = null;
+        PieceEffects.ClearAround(StagePosition, 60f, null);
+        if (previewStage != null) Destroy(previewStage);
+        previewStage = null;
+        PieceEffects.PreviewCamera = null;
     }
 
     private void ClosePromotionPreview()
@@ -175,10 +209,12 @@ public partial class NeonMenu
         previewCamera.transform.LookAt(look);
         while (true)
         {
-            turntable.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.5f) * 35f, 0f);
+            turntable.localRotation = Quaternion.Euler(0f, freezeTurntable ? 16f : Mathf.Sin(Time.time * 0.5f) * 35f, 0f);
             yield return null;
         }
     }
+
+    private bool freezeTurntable; // a still pose, for thumbnails
 
     private ChessPiece StagePiece<T>() where T : ChessPiece => StagePiece(typeof(T), PieceColor.White);
 

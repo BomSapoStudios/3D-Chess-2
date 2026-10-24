@@ -98,14 +98,19 @@ public partial class NeonMenu : MonoBehaviour
         // Games still going (say the app was closed mid-game): show them on the Online Game button
         yield return RefreshGames();
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
-        // Simulator checks: `defaults write BomSapo.Chess3D DebugOpenStats -int 1` (your stats), 2 (leaderboard) or 3 (Customize)
+        // Simulator checks: `defaults write BomSapo.Chess3D DebugOpenStats -int 1` (your stats), 2 (leaderboard),
+        // 3 (Customize), or Customize's tabs: 5 Pieces, 7 Backdrop, 8 Board, 4 Effects
         int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
         if (debugStats == 1) ShowProfile(null, ShowOnline);
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
-        else if (debugStats == 4) { ShowCustomize(); ShowPromotionPreview(PromotionStyle.Current); }
-        else if (debugStats == 5) { ShowCustomize(); ShowShapePreview(PieceShapes.Current); }
-        else if (debugStats == 5)
+        else if (debugStats == 4) { ShowCustomize(); SelectTab(CustomizeTab.Effects); }
+        else if (debugStats == 5) { ShowCustomize(); SelectTab(CustomizeTab.Pieces); }
+        else if (debugStats == 7) { ShowCustomize(); SelectTab(CustomizeTab.Backdrop); }
+        else if (debugStats == 8) { ShowCustomize(); SelectTab(CustomizeTab.Board); }
+        // `DebugCapture -int 1`: render the Customize thumbnails for piece sets and promotions (NeonMenuThumbs)
+        if (PlayerPrefs.GetInt("DebugCapture", 0) == 1) StartCoroutine(CaptureMenuThumbs());
+        else if (debugStats == 6)
         {
             // Switch animations mid-play: nothing from the first may stay behind
             ShowCustomize();
@@ -697,166 +702,6 @@ public partial class NeonMenu : MonoBehaviour
         knob.anchorMin = knob.anchorMax = new Vector2(on ? 1f : 0f, 0.5f);
         knob.anchoredPosition = new Vector2(on ? -18f : 18f, 0f);
         knob.GetComponent<Image>().color = on ? NeonTheme.Ground : NeonTheme.Lavender;
-    }
-
-    // ───────────────────────── Customize ─────────────────────────
-
-    private GameObject customizeScreen;
-    private TextMeshProUGUI pieceSetNote, backdropNote;
-    private Image[] swatches;
-
-    private void BuildCustomizeScreen()
-    {
-        customizeScreen = NewRect("Customize Screen", safeRoot).gameObject;
-        RectTransform root = customizeScreen.GetComponent<RectTransform>();
-        Stretch(root);
-
-        RectTransform header = NewRect("Header", root);
-        header.anchorMin = new Vector2(0, 1);
-        header.anchorMax = new Vector2(1, 1);
-        header.pivot = new Vector2(0.5f, 1);
-        header.offsetMin = new Vector2(16, -64);
-        header.offsetMax = new Vector2(-24, -12);
-
-        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowMenu);
-        Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
-
-        TextMeshProUGUI title = NewText("Title", header, "MAKE IT YOURS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
-        NeonTheme.ApplyFont(title, display: true);
-        title.rectTransform.anchorMin = new Vector2(0, 0);
-        title.rectTransform.anchorMax = new Vector2(1, 1);
-        title.rectTransform.offsetMin = new Vector2(70, 0);
-        title.rectTransform.offsetMax = new Vector2(-180, 0);
-        title.rectTransform.localEulerAngles = new Vector3(0, 0, -1);
-
-        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowMenu);
-        Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
-
-        RectTransform left = Card(root, "Pieces Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
-        RectTransform right = Card(root, "Backdrop Card", NeonTheme.Pink, new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(8, 14), new Vector2(-24, -74));
-
-        // Which pieces: tapping one also shows the whole set on a turntable
-        SectionLabel(left, "Piece set", NeonTheme.Cyan);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            ShapeChip(PieceShapes.Kind.Cyberpunk),
-            ShapeChip(PieceShapes.Kind.AbyssGlow),
-        }, NeonTheme.Lime, 15);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            ShapeChip(PieceShapes.Kind.MushroomGrove),
-            ShapeChip(PieceShapes.Kind.WildKingdom),
-        }, NeonTheme.Lime, 15);
-
-        SectionLabel(left, "Look (cyberpunk pieces)", NeonTheme.Cyan);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            PieceSetChip(PieceSets.Kind.NeonGlow),
-            PieceSetChip(PieceSets.Kind.Chrome),
-            PieceSetChip(PieceSets.Kind.Crystal),
-            PieceSetChip(PieceSets.Kind.Classic),
-        }, NeonTheme.Lime, 13);
-        pieceSetNote = NewText("Note", left, "", 15, NeonTheme.Lavender, TextAlignmentOptions.Left);
-        pieceSetNote.fontStyle = FontStyles.Normal;
-        pieceSetNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
-
-        // Colour swatches for the six sides in the chosen set
-        RectTransform swatchRow = NewRect("Swatches", left);
-        var swatchSize = swatchRow.gameObject.AddComponent<LayoutElement>();
-        swatchSize.preferredHeight = 30;
-        swatchSize.flexibleHeight = 0;
-        var swatchLayout = swatchRow.gameObject.AddComponent<HorizontalLayoutGroup>();
-        swatchLayout.spacing = 10;
-        swatchLayout.childControlWidth = false;
-        swatchLayout.childControlHeight = false;
-        swatchLayout.childForceExpandWidth = false;
-        swatchLayout.childAlignment = TextAnchor.MiddleLeft;
-        swatches = new Image[6];
-        for (int i = 0; i < 6; i++)
-        {
-            swatches[i] = NewImage(ColorNames[i], swatchRow, Color.white);
-            swatches[i].sprite = NeonTheme.Circle;
-            swatches[i].rectTransform.sizeDelta = new Vector2(26, 26);
-        }
-
-        SectionLabel(left, "Promotion animation", NeonTheme.Cyan);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            PromotionChip(PromotionStyle.Kind.GlitchRebuild),
-            PromotionChip(PromotionStyle.Kind.SpinMorph),
-        }, NeonTheme.Lime, 15);
-        ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            PromotionChip(PromotionStyle.Kind.Coronation),
-            PromotionChip(PromotionStyle.Kind.BlackHole),
-        }, NeonTheme.Lime, 15);
-        // (tapping one shows it playing, with its description, so there's no note here)
-
-        SectionLabel(right, "Backdrop the board floats in", NeonTheme.PinkSoft);
-        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            BackdropChip(Backdrops.Kind.DeepSpace),
-            BackdropChip(Backdrops.Kind.EarthOrbit),
-            BackdropChip(Backdrops.Kind.NeonDesert),
-        }, NeonTheme.Cyan, 14);
-        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            BackdropChip(Backdrops.Kind.CyberCity),
-            BackdropChip(Backdrops.Kind.NeonJungle),
-            BackdropChip(Backdrops.Kind.MeltingClocks),
-        }, NeonTheme.Cyan, 14);
-        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            BackdropChip(Backdrops.Kind.DeepSea),
-            BackdropChip(Backdrops.Kind.NeonGlow),
-        }, NeonTheme.Cyan, 14);
-        backdropNote = NewText("Note", right, "", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
-        backdropNote.fontStyle = FontStyles.Normal;
-        backdropNote.enableWordWrapping = true;
-        backdropNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
-
-        // Board: switches, each on or off
-        SectionLabel(right, "Board", NeonTheme.PinkSoft);
-        ChipRow(right, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
-        {
-            ("Solid floors", () => BoardLook.SolidFloors = !BoardLook.SolidFloors, () => BoardLook.SolidFloors, () => true),
-            ("No vertical lines", () => BoardLook.HideVerticalLines = !BoardLook.HideVerticalLines, () => BoardLook.HideVerticalLines, () => true),
-        }, NeonTheme.Yellow, 14);
-
-    }
-
-    private (string, System.Action, System.Func<bool>, System.Func<bool>) BackdropChip(Backdrops.Kind kind)
-    {
-        return (Backdrops.DisplayName(kind), () => Backdrops.Current = kind, () => Backdrops.Current == kind, () => true);
-    }
-
-    private TextMeshProUGUI promotionNote;
-
-    private (string, System.Action, System.Func<bool>, System.Func<bool>) ShapeChip(PieceShapes.Kind kind)
-    {
-        // Picking one also shows the set
-        return (PieceShapes.DisplayName(kind), () => { PieceShapes.Current = kind; ShowShapePreview(kind); }, () => PieceShapes.Current == kind, () => true);
-    }
-
-    private (string, System.Action, System.Func<bool>, System.Func<bool>) PromotionChip(PromotionStyle.Kind kind)
-    {
-        // Picking one also shows it playing
-        return (PromotionStyle.DisplayName(kind), () => { PromotionStyle.Current = kind; ShowPromotionPreview(kind); }, () => PromotionStyle.Current == kind, () => true);
-    }
-
-    private (string, System.Action, System.Func<bool>, System.Func<bool>) PieceSetChip(PieceSets.Kind kind)
-    {
-        return (PieceSets.DisplayName(kind), () => PieceSets.Current = kind, () => PieceSets.Current == kind, () => true);
-    }
-
-    private void RefreshCustomize()
-    {
-        if (pieceSetNote == null) return;
-        pieceSetNote.text = PieceSets.Description(PieceSets.Current);
-        PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
-        for (int i = 0; i < swatches.Length; i++) swatches[i].color = PieceSets.Tint(PieceSets.Current, sides[i]);
-        backdropNote.text = Backdrops.Description(Backdrops.Current);
-        if (promotionNote != null) promotionNote.text = PromotionStyle.Description(PromotionStyle.Current);
     }
 
     // ───────────────────────── Online ─────────────────────────
