@@ -461,10 +461,11 @@ ON THE PHONE
 
 Ranked online games against other people are rated (Elo, starting at 1000).
 
-A game is ranked when it has two or more people, runs on a clock (Speed round
-or Take your time), and has Chaos Mode off. Any other online game, Chaos Mode
-included, is played the same way but doesn't change ratings. The online setup
-screen says which it will be.
+Only Find Match games are ranked: random opponents, a 10-minute clock each and
+no Chaos Mode, so friends can't trade rating points. Games with friends (a room
+code, a challenge or a rematch) are unranked: they can use Chaos Mode or no
+clock, and still count in your win/loss record and head-to-head, but don't
+change ratings.
 
 Two ladders:
   Duel   — 2-player games.
@@ -545,8 +546,8 @@ These are cosmetic only and never change the rules.
   Play anyone (online)  2, 4, 6   4³ / 6³ / 8³  Find Match; ranked (10 min
                                                 clock, no Chaos)
   Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
-                                                Robots allowed; ranked if
-                                                timed and no Chaos
+                                                Robots allowed; unranked
+                                                (win/loss still recorded)
   Zombie Survival       1         8³            Pea / Walnut / Galaxy
   Queen Blitz           1         4³ / 6³       Ten puzzles; pawns on first clear
   Chaos Mode            any       any           Add to any chess game

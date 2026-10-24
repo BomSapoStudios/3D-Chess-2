@@ -52,6 +52,8 @@ export interface Env {
   ROOM_TIME_SCALE?: string;
   /** Local tests only: multiply friend request expiry by this */
   REQUEST_TIME_SCALE?: string;
+  /** Local tests only ('1'): POST /rooms may ask for a ranked room as if Find Match had made it */
+  TEST_MATCHED?: string;
   /** Apple push: the .p8 key's contents (secret), its key id, the team id and the app's bundle id */
   APNS_KEY?: string;
   APNS_KEY_ID?: string;
@@ -74,13 +76,13 @@ function newCode(): string {
 }
 
 /** Create a room with a fresh code (retrying on the rare collision) */
-export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean, reserved?: Record<string, PlayerColor>): Promise<{ code: string; config: GameConfig }> {
+export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean, reserved?: Record<string, PlayerColor>, matched = false): Promise<{ code: string; config: GameConfig }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = newCode();
     const stub = env.ROOM.get(env.ROOM.idFromName(code));
     const res = await stub.fetch('https://room/init', {
       method: 'POST',
-      body: JSON.stringify({ code, hostUserId, isPublic, config, reserved }),
+      body: JSON.stringify({ code, hostUserId, isPublic, config, reserved, matched }),
     });
     if (res.ok) return await res.json() as { code: string; config: GameConfig };
   }
@@ -198,7 +200,8 @@ export default {
 
     if (path === '/rooms' && request.method === 'POST') {
       if (!user) return json({ error: 'Sign in first' }, 401);
-      const room = await createRoom(env, user.userId, (body.config as Partial<GameConfig>) ?? {}, body.isPublic === true);
+      const matched = env.TEST_MATCHED === '1' && body.matched === true; // never in production
+      const room = await createRoom(env, user.userId, (body.config as Partial<GameConfig>) ?? {}, body.isPublic === true, undefined, matched);
       return json(room);
     }
 

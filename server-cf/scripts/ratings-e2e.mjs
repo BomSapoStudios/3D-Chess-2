@@ -1,5 +1,5 @@
 // Ratings, stats and walk-out checks: results are rated, stats and leaderboards add up, walking out three times pauses Find Match.
-//   npx wrangler dev --var ROOM_TIME_SCALE:0.0002 --var REQUEST_TIME_SCALE:0.000001   then   node scripts/ratings-e2e.mjs
+//   npx wrangler dev --var ROOM_TIME_SCALE:0.0002 --var REQUEST_TIME_SCALE:0.000001 --var TEST_MATCHED:1   then   node scripts/ratings-e2e.mjs
 import WebSocket from 'ws';
 
 const BASE = process.argv[2] ?? 'http://localhost:8787';
@@ -79,8 +79,9 @@ const join = async (code, who) => { const c = await client(`${WS_BASE}/rooms/${c
 const get = (path, who) => fetch(BASE + path, { headers: { Authorization: `Bearer ${who.token}` } }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }));
 
 /** Start a 2-player game between host and guest; returns both sockets once play begins */
-async function playing(host, guestP, extra = { timedMode: true, timePerPlayerSeconds: 1800 }) {
-  const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, ...extra } }, host.token)).body;
+// Ranked games are Find Match games; TEST_MATCHED lets a test room count as one
+async function playing(host, guestP, extra = { timedMode: true, timePerPlayerSeconds: 1800 }, matched = true) {
+  const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, ...extra }, matched }, host.token)).body;
   const [a] = await join(room.code, host);
   const [b] = await join(room.code, guestP);
   await fillRest(a, 4, 'White'); await fillRest(b, 4, 'Black');
@@ -103,15 +104,21 @@ const alice = await guest('Alice'), bob = await guest('Bob');
 }
 
 // 1b. Unranked games (no clock, or Chaos Mode) don't change ratings
-for (const [label, extra] of [['an untimed game', {}], ['a Chaos Mode game', { timedMode: true, timePerPlayerSeconds: 1800, chaosMode: true }]]) {
+for (const [label, extra, matched] of [
+  ['an untimed game', {}, true],
+  ['a Chaos Mode game', { timedMode: true, timePerPlayerSeconds: 1800, chaosMode: true }, true],
+  ['a game with a friend (not Find Match)', { timedMode: true, timePerPlayerSeconds: 1800 }, false],
+]) {
   const x = await guest('Xena'), y = await guest('Yuri');
-  const { room, a, b } = await playing(x, y, extra);
+  const { room, a, b } = await playing(x, y, extra, matched);
   const st = (await a.request({ type: 'room:state' })).state;
   check(st.ranked === false, `${label} is marked unranked`);
   await a.request({ type: 'game:resign' });
   await b.wait(m => m.type === 'game:over', 8000);
   await sleep(300);
   check(!b.inbox.some(m => m.type === 'game:rated'), `${label} changes nobody's rating`);
+  const ys = (await get('/stats', y)).body;
+  check(ys.games === 1 && ys.wins === 1 && ys.duel.rating === 1000, `${label} still counts in the win/loss record (${ys.games} games, ${ys.wins} wins, rating ${ys.duel.rating})`);
   a.close(); b.close();
 }
 
@@ -161,7 +168,7 @@ for (const [label, extra] of [['an untimed game', {}], ['a Chaos Mode game', { t
 // 5. Melee: places by finishing order, robots left out
 {
   const p = [await guest('P1'), await guest('P2'), await guest('P3')];
-  const room = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Purple'], timedMode: true, timePerPlayerSeconds: 1800 } }, p[0].token)).body;
+  const room = (await post('/rooms', { config: { boardSize: '6x6x6', playerCount: 4, aiColors: ['Purple'], timedMode: true, timePerPlayerSeconds: 1800 }, matched: true }, p[0].token)).body;
   const c = [];
   for (const who of p) c.push((await join(room.code, who))[0]);
   for (const [i, color] of [[0, 'White'], [1, 'Black'], [2, 'Green']]) { await fillRest(c[i], 6, color); await c[i].request({ type: 'game:ready' }); }

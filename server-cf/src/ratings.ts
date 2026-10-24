@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Ratings, stats and walk-outs, kept in the Accounts object's SQLite.
 //
-// • Every finished ranked online game with at least two people in it is recorded and rated.
-//   Ranked means on a clock (Speed round or Take your time) without Chaos Mode (room.ts isRankedConfig).
+// • Every finished online game with at least two people in it is recorded (win/loss records,
+//   head to head). Only ranked ones move ratings: Find Match games on a clock without Chaos Mode.
 // • Two Elo ratings per player, starting at 1000: Duel (2 players) and Melee (4 and 6).
 //   Melee scores every pair of players by finishing order, averaged over the opponents.
 // • K is 40 for a player's first 10 games in a mode, 20 after. The same two players only
@@ -99,16 +99,28 @@ function bestTier(sql: SqlStorage, userId: string): string {
 export function recordGame(sql: SqlStorage, r: GameResult, now: number): Record<string, RatingChange> {
   const players = r.players.filter(p => p.userId && !p.userId.startsWith('ai:'));
   for (const p of players) if (p.walkout) recordWalkout(sql, p.userId, now);
-  const rated = r.rated && players.length >= 2;
-  if (!rated) return {};
+  if (players.length < 2 || r.endReason === 'abandoned') return {}; // nobody played it out: not kept
+  const rated = r.rated;
 
   const mode: Mode = r.playerCount === 2 ? 'duel' : 'melee';
   const draw = DRAWS.has(r.endReason);
   sql.exec(
-    'INSERT INTO games_played (room_code, ended_at, mode, board, player_count, pace, end_reason, moves, duration_ms, rated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
-    r.roomCode, now, mode, r.boardSize, r.playerCount, r.pace, r.endReason, r.moves, r.durationMs,
+    'INSERT INTO games_played (room_code, ended_at, mode, board, player_count, pace, end_reason, moves, duration_ms, rated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    r.roomCode, now, mode, r.boardSize, r.playerCount, r.pace, r.endReason, r.moves, r.durationMs, rated ? 1 : 0,
   );
   const gameId = sql.exec('SELECT last_insert_rowid() AS id').one().id as number;
+
+  if (!rated) {
+    // Unranked (games with friends, untimed or Chaos games): kept for win/loss records and
+    // head to head, but nobody's rating moves
+    for (const p of players) {
+      const current = ratingOf(sql, p.userId, mode).rating;
+      const result = draw && p.place === 1 ? 'draw' : p.place === 1 ? 'win' : 'loss';
+      sql.exec('INSERT OR REPLACE INTO player_games (account_id, game_id, color, place, result, walkout, rating_before, rating_after, taken, lost, taken_types) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        p.userId, gameId, p.color, p.place, result, p.walkout ? 1 : 0, current, current, p.taken ?? 0, p.lost ?? 0, JSON.stringify(p.takenTypes ?? {}));
+    }
+    return {};
+  }
 
   // Elo, pair by pair
   const before = new Map(players.map(p => [p.userId, ratingOf(sql, p.userId, mode)]));

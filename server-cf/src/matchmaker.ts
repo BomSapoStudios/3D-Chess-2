@@ -104,7 +104,7 @@ export class Matchmaker extends DurableObject<Env> {
 
     const players = queue.slice(0, needed);
     const host = players[0].deserializeAttachment() as Waiting;
-    const { code } = await createRoom(this.env, host.userId, first.config, false);
+    const { code } = await createRoom(this.env, host.userId, first.config, false, undefined, true); // matched by Find Match: ranked
     for (const ws of players) {
       ws.send(JSON.stringify({ type: 'matchmaking:found', roomCode: code }));
       ws.close(1000, 'Matched');

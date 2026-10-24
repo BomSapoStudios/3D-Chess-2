@@ -700,13 +700,10 @@ public partial class NeonMenu : MonoBehaviour
         paceRow.SetActive(setupOnline);
         if (rankedNote != null)
         {
-            // Ranked: two or more people, on a clock (Speed round or Take your time), no Chaos Mode
-            int people = 0;
-            for (int i = 0; i < playerCount && i < playerTypes.Count; i++) if (playerTypes[i] == PlayerType.Human) people++;
-            string why = people < 2 ? "needs two or more people" : chaosMode ? "Chaos Mode is on" : !(timedPlay || slowPace) ? "turn on Speed round or Take your time to rank it" : null;
+            // Only Find Match games are ranked; games made here still count in your win/loss record
             rankedNote.gameObject.SetActive(setupOnline);
-            rankedNote.text = why == null ? "Ranked game: counts toward your rating" : $"Unranked: {why}";
-            rankedNote.color = why == null ? NeonTheme.Lime : NeonTheme.Lavender;
+            rankedNote.text = "Unranked: counts in your record, not your rating";
+            rankedNote.color = NeonTheme.Lavender;
         }
         timedRow.SetActive(!(setupOnline && slowPace));
         clockRow.SetActive(!(setupOnline && slowPace)); // always shown (greyed out until Speed round is on), like Chaos's chips

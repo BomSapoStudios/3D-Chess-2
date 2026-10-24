@@ -24,6 +24,8 @@ interface RoomMeta {
   code: string;
   hostUserId: string;
   isPublic: boolean;
+  /** Made by Find Match (random opponents): only these games are ranked */
+  matched?: boolean;
   createdAt: number;
   /** Lobby closes at this time if the game hasn't started (the host can extend it) */
   expiresAt?: number;
@@ -120,11 +122,11 @@ export class Room extends DurableObject<Env> {
 
     if (url.pathname === '/init' && request.method === 'POST') {
       if (this.meta) return Response.json({ error: 'exists' }, { status: 409 });
-      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig>; reserved?: Record<string, PlayerColor> };
+      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig>; reserved?: Record<string, PlayerColor>; matched?: boolean };
       const now = Date.now();
       this.engine = new GameEngine(body.code, sanitizeConfig(body.config));
       const lobbyMs = this.engine.config.pace === 'slow' ? this.t(LOBBY_SLOW_MS) : this.t(LOBBY_LIVE_MS);
-      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null, reserved: body.reserved ?? null };
+      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null, reserved: body.reserved ?? null, matched: body.matched === true };
       // Robot seats are filled now; the host's device plays them
       for (const color of this.engine.config.aiColors ?? []) {
         const robotId = `ai:${color}`;
@@ -487,7 +489,7 @@ export class Room extends DurableObject<Env> {
     const walkouts = meta.walkouts ?? [];
     const result: GameResult = {
       roomCode: meta.code,
-      rated: this.gameOver.reason !== 'abandoned' && isRankedConfig(engine.config),
+      rated: this.gameOver.reason !== 'abandoned' && this.isRanked(),
       players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => {
         const mine = state.moveHistory.filter(m => m.isCapture && m.playerColor === color);
         const takenTypes: Record<string, number> = {};
@@ -856,6 +858,11 @@ export class Room extends DurableObject<Env> {
     }
   }
 
+  /** Ranked: a Find Match game (random opponents, so no rating farming between friends) on a clock without Chaos */
+  private isRanked(): boolean {
+    return this.meta?.matched === true && this.engine != null && isRankedConfig(this.engine.config);
+  }
+
   // ── Private setup ────────────────────────────────────────────────────────────
   // While pieces are being placed nobody sees anyone else's: placements go only to the player
   // who made them (and the host, for the robot seats their device plays). When everyone is
@@ -899,7 +906,7 @@ export class Room extends DurableObject<Env> {
     }
     return {
       ...state,
-      ranked: isRankedConfig(state.config),
+      ranked: this.isRanked(),
       winner: this.gameOver?.winner ?? null,
       endReason: this.gameOver?.reason ?? null,
       drawOfferFrom: this.engine!.drawOfferFrom,
@@ -945,8 +952,9 @@ function eventKey(seq: number): string {
 
 /** Only accept known settings, within the game's limits */
 /**
- * Ranked games (they change ratings) always run on a clock, Speed round or Take your time's day
- * per move, and never use Chaos Mode. Anything else is still played and kept, just unranked.
+ * The settings a ranked game needs: a clock (Speed round, or Take your time's day per move) and
+ * no Chaos Mode. Only Find Match games are ranked at all (RoomMeta.matched); everything else is
+ * still played and kept in win/loss records, just unranked.
  */
 export function isRankedConfig(config: Partial<GameConfig>): boolean {
   return (config.timedMode === true || config.pace === 'slow') && config.chaosMode !== true;
