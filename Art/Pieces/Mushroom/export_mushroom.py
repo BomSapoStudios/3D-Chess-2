@@ -1,6 +1,8 @@
 """
-Imports the Mushroom Grove pieces (GLB files, untextured) and exports each to an FBX that
-Unity loads from Resources/Pieces/Mushroom/<Piece>.fbx. The game colors each side solid.
+Imports the Mushroom Grove pieces (GLB files) and exports each to an FBX that Unity loads from
+Resources/Pieces/Mushroom/<Piece>.fbx, plus a 1024px grayscale detail map <Piece>_Detail.png
+(the base-color texture's luminance, its 5th to 95th percentile stretched to 0..1 so every piece
+uses the full range; the game maps it between each side's two tints).
 Pieces are sized to the cyberpunk set (king 2.26 units tall, heights relative to the king
 below), stand on z=0 centred on their base, and face +X like the other models.
 Run:  Blender -b --python export_mushroom.py -- <glb_dir> <out_dir>
@@ -50,7 +52,7 @@ for name, file in FILES.items():
         img.scale(1024, 1024)
         px = np.array(img.pixels[:], dtype=np.float32).reshape(-1, 4)
         lum = 0.2126 * px[:, 0] + 0.7152 * px[:, 1] + 0.0722 * px[:, 2]
-        lo, hi = np.percentile(lum, 2), np.percentile(lum, 98)
+        lo, hi = np.percentile(lum, 5), np.percentile(lum, 95)
         lum = np.clip((lum - lo) / max(hi - lo, 1e-4), 0, 1)  # stretch so every piece uses the full range
         out = bpy.data.images.new(f"{name}_Detail", 1024, 1024)
         out.pixels[:] = np.repeat(lum[:, None], 4, axis=1).clip(0, 1).flatten() * np.tile([1, 1, 1, 0], 1024 * 1024) + np.tile([0, 0, 0, 1], 1024 * 1024)

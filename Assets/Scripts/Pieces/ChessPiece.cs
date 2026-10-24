@@ -164,8 +164,8 @@ public abstract class ChessPiece : MonoBehaviour
         if (modeled && PieceShapes.OwnColors(PieceShapes.Current))
         {
             targetMaterial = PieceSets.CreateShapeMaterial(PieceShapes.Current, pieceColor);
-            if (PieceShapes.Current == PieceShapes.Kind.AbyssGlow && targetMaterial.HasProperty("_DetailTex"))
-                targetMaterial.SetTexture("_DetailTex", PieceModels.Detail(PieceModels.TypeOf(this)));
+            Texture2D detail = PieceModels.Detail(PieceModels.TypeOf(this));
+            if (detail != null && targetMaterial.HasProperty("_DetailTex")) targetMaterial.SetTexture("_DetailTex", detail);
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
         PieceModels.Face(this);

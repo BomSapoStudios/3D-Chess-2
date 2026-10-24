@@ -1,8 +1,8 @@
 """
 Renders the Mushroom Grove bench/promotion icons exactly like the cyberpunk ones (render_icons.py):
 same scene, lights, camera angle and framing, transparent background. Each piece is the
-Unity FBX (Resources/Pieces/Mushroom) with a Blender copy of the in-game material: one solid
-color per side, plus a rim glow.
+Unity FBX (Resources/Pieces/Mushroom) with a Blender copy of the in-game material: the grayscale
+detail map between the side's two tints, plus a rim glow.
 Output: Resources/PieceIcons/Mushroom/<Light|Dark>_<Piece>.png
 Run:  Blender -b ../cyberpunk_pieces.blend --python render_mushroom_icons.py -- <mushroom_dir> <out_dir>
 """
@@ -15,8 +15,8 @@ UNITY_SCALE = 1.6  # export_unity.py scaled the cyberpunk pieces by this; undo i
 def lin(c): return tuple(x ** 2.2 for x in c) + (1.0,)  # the game's colors are sRGB
 
 TEAMS = {
-    "Light": (lin((0.9, 0.95, 0.93)), lin((0.16, 0.94, 1.0))),
-    "Dark": (lin((0.18, 0.08, 0.28)), lin((1.0, 0.2, 0.8))),
+    "Light": (lin((0.5, 0.58, 0.56)), lin((0.95, 0.98, 0.96)), lin((0.16, 0.94, 1.0))),
+    "Dark": (lin((0.03, 0.01, 0.05)), lin((0.28, 0.12, 0.4)), lin((1.0, 0.2, 0.8))),
 }
 
 scene = bpy.context.scene
@@ -31,10 +31,16 @@ for o in scene.objects:
     if o.type == 'MESH': o.hide_render = True
 
 def material(team, piece):
-    color, rim = TEAMS[team]
+    dark, light, rim = TEAMS[team]
     m = bpy.data.materials.new(f"Mushroom_{team}_{piece}"); m.use_nodes = True
     nt = m.node_tree; p = nt.nodes["Principled BSDF"]
-    p.inputs["Base Color"].default_value = color
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = bpy.data.images.load(os.path.join(SRC, f"{piece}_Detail.png"))
+    tex.image.colorspace_settings.name = 'Non-Color'
+    mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = 'RGBA'
+    mix.inputs[6].default_value = dark; mix.inputs[7].default_value = light
+    nt.links.new(tex.outputs["Color"], mix.inputs[0])
+    nt.links.new(mix.outputs[2], p.inputs["Base Color"])
     p.inputs["Metallic"].default_value = 0.2
     p.inputs["Roughness"].default_value = 0.45
     # Rim glow: facing ratio, tightened, drives the emission strength

@@ -14,17 +14,18 @@ public static class PieceModels
     public const string StripName = "NeonStrip";
 
     private static readonly Dictionary<string, GameObject> cache = new Dictionary<string, GameObject>();
-    private static readonly Dictionary<ChessPieceType, Texture2D> details = new Dictionary<ChessPieceType, Texture2D>();
+    private static readonly Dictionary<string, Texture2D> details = new Dictionary<string, Texture2D>();
 
     private static string Folder => PieceShapes.Folder(PieceShapes.Current);
 
-    /// <summary>The Abyss Glow detail map for a piece (grayscale; the material tints it)</summary>
+    /// <summary>The chosen set's detail map for a piece (grayscale; the material tints it), if it has one</summary>
     public static Texture2D Detail(ChessPieceType type)
     {
-        if (!details.TryGetValue(type, out Texture2D tex))
+        string path = "Pieces/" + Folder + "/" + type + "_Detail";
+        if (!details.TryGetValue(path, out Texture2D tex))
         {
-            tex = Resources.Load<Texture2D>("Pieces/Abyss/" + type + "_Detail");
-            details[type] = tex;
+            tex = Resources.Load<Texture2D>(path);
+            details[path] = tex;
         }
         return tex;
     }
