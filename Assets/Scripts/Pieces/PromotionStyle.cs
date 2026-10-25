@@ -6,10 +6,10 @@ using UnityEngine;
 /// </summary>
 public static class PromotionStyle
 {
-    public enum Kind { GlitchRebuild, SpinMorph, Coronation, BlackHole, Splat, Fade }
+    public enum Kind { GlitchRebuild, SpinMorph, Coronation, BlackHole, Splat, Fade, GraveRise }
 
     /// <summary>The order they're shown in</summary>
-    public static readonly Kind[] All = { Kind.Fade, Kind.GlitchRebuild, Kind.SpinMorph, Kind.Coronation, Kind.BlackHole, Kind.Splat };
+    public static readonly Kind[] All = { Kind.Fade, Kind.GlitchRebuild, Kind.SpinMorph, Kind.Coronation, Kind.BlackHole, Kind.Splat, Kind.GraveRise };
 
     private const string PrefKey = "PromotionStyle";
 
@@ -28,9 +28,11 @@ public static class PromotionStyle
         }
     }
 
-    public static string DisplayName(Kind kind) => kind == Kind.Fade ? "Fade" : kind == Kind.Splat ? "Splat" : kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : kind == Kind.BlackHole ? "Black hole" : "Glitch rebuild";
+    public static string DisplayName(Kind kind) => kind == Kind.GraveRise ? "Grave Rise" : kind == Kind.Fade ? "Fade" : kind == Kind.Splat ? "Splat" : kind == Kind.SpinMorph ? "Spin morph" : kind == Kind.Coronation ? "Coronation" : kind == Kind.BlackHole ? "Black hole" : "Glitch rebuild";
 
-    public static string Description(Kind kind) => kind == Kind.Fade
+    public static string Description(Kind kind) => kind == Kind.GraveRise
+        ? "The pawn crumbles to dust and the new piece claws its way up out of the dirt."
+        : kind == Kind.Fade
         ? "The pawn fades away as the new piece fades in."
         : kind == Kind.Splat
         ? "The new piece comes flying in and squashes the pawn with a big splat of paint."

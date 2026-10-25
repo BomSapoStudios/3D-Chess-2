@@ -30,7 +30,7 @@ public partial class NeonMenu
         foreach (PromotionStyle.Kind k in System.Enum.GetValues(typeof(PromotionStyle.Kind)))
         {
             ShowPromotionPreview(k);
-            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : k == PromotionStyle.Kind.Splat ? 0.95f : k == PromotionStyle.Kind.Fade ? 0.6f : 0.75f); // mid-animation, where each looks most like itself
+            yield return new WaitForSeconds(k == PromotionStyle.Kind.BlackHole ? 1.0f : k == PromotionStyle.Kind.Splat ? 0.95f : k == PromotionStyle.Kind.Fade ? 0.6f : k == PromotionStyle.Kind.GraveRise ? 1.75f : 0.75f); // mid-animation, where each looks most like itself
             ThumbCapture.Save(previewTexture, "Promo_" + k);
         }
         ClosePromotionPreview();

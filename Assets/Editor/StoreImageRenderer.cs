@@ -43,6 +43,7 @@ public static class StoreImageRenderer
             case PromotionStyle.Kind.Coronation: return 1.1f;      // the shockwave
             case PromotionStyle.Kind.BlackHole: return 1.3f;       // the black ball becoming the queen
             case PromotionStyle.Kind.Splat: return 1.7f;           // the paint splash
+            case PromotionStyle.Kind.GraveRise: return 1.75f;      // the piece climbing out of the mound
             default: return 0.75f;
         }
     }
