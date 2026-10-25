@@ -256,12 +256,13 @@ public class GraveMist : MonoBehaviour
         main.startLifetime = new ParticleSystem.MinMaxCurve(14f, 22f);
         main.startSpeed = 0f;
         main.startSize = new ParticleSystem.MinMaxCurve(14f, 26f);
-        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.6f, 0.7f, 0.75f, 0.16f), new Color(0.55f, 0.5f, 0.75f, 0.12f));
-        main.maxParticles = 160;
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.62f, 0.72f, 0.78f, 0.22f), new Color(0.58f, 0.52f, 0.8f, 0.18f));
+        main.maxParticles = 220;
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.prewarm = true;
         var emission = ps.emission;
-        emission.rateOverTime = 8f;
+        emission.rateOverTime = 11f;
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Donut;
         shape.radius = 75f;
@@ -271,9 +272,26 @@ public class GraveMist : MonoBehaviour
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(0.4f, 1.2f);
-        vel.y = new ParticleSystem.MinMaxCurve(0f, 0f);
-        vel.z = new ParticleSystem.MinMaxCurve(-0.3f, 0.3f);
+        // Rolling: the whole bank circles slowly round the board, with a light breeze across it
+        vel.x = new ParticleSystem.MinMaxCurve(1.5f, 3f);
+        vel.y = new ParticleSystem.MinMaxCurve(0f, 0.15f);
+        vel.z = new ParticleSystem.MinMaxCurve(-0.8f, 0.8f);
+        vel.orbitalX = new ParticleSystem.MinMaxCurve(0f, 0f);   // all three orbital curves must use the same mode
+        vel.orbitalY = new ParticleSystem.MinMaxCurve(0.05f, 0.09f);
+        vel.orbitalZ = new ParticleSystem.MinMaxCurve(0f, 0f);
+        // Swirls and eddies within it
+        var noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = 2.5f;
+        noise.frequency = 0.08f;
+        noise.scrollSpeed = 0.15f;
+        // Each puff slowly turns and swells as it drifts
+        var spin = ps.rotationOverLifetime;
+        spin.enabled = true;
+        spin.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
+        var grow = ps.sizeOverLifetime;
+        grow.enabled = true;
+        grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 1.4f));
         var fade = ps.colorOverLifetime;
         fade.enabled = true;
         var g = new Gradient();

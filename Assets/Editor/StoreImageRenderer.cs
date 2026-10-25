@@ -25,6 +25,7 @@ public static class StoreImageRenderer
     private const string QuitKey = "StoreImageRenderer.Quit";
     private const string PrefsKey = "StoreImageRenderer.SavedPrefs";
     private const string CandidatesKey = "StoreImageRenderer.Candidates";
+    private const string NewOnlyKey = "StoreImageRenderer.NewOnly";
     private static bool timingCandidates;
     private const string ProductPrefix = "BomSapo.Chess3D.";
     private const int PromoSize = 1024;
@@ -52,9 +53,27 @@ public static class StoreImageRenderer
 
     public static string ProductId(string storeId) => ProductPrefix + storeId.ToLowerInvariant();
 
-    [MenuItem("Tools/Store Images/Render All")]
-    public static void RenderAll()
+    /// <summary>Tools > Store Images > New Items Only: only items without images yet (new backdrops, sets, promotions)</summary>
+    [MenuItem("Tools/Store Images/New Items Only")]
+    public static void RenderNew()
     {
+        SessionState.SetBool(NewOnlyKey, true);
+        RenderAll(keepNewOnly: true);
+    }
+
+    /// <summary>Command line: Unity -projectPath . -executeMethod StoreImageRenderer.RunNewFromCommandLine</summary>
+    public static void RunNewFromCommandLine()
+    {
+        SessionState.SetBool(QuitKey, true);
+        RenderNew();
+    }
+
+    [MenuItem("Tools/Store Images/Render All")]
+    public static void RenderAllMenu() => RenderAll();
+
+    public static void RenderAll(bool keepNewOnly = false)
+    {
+        if (!keepNewOnly) SessionState.SetBool(NewOnlyKey, false);
         if (EditorApplication.isPlaying || EditorApplication.isCompiling) { Debug.LogWarning("STORE IMAGES: stop Play mode (and wait for compiling) first"); return; }
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
 
@@ -179,9 +198,13 @@ public static class StoreImageRenderer
         }
     }
 
-    private static IEnumerable<PieceShapes.Kind> LockedSets => PieceShapes.All.Where(k => !Store.Free(k));
-    private static IEnumerable<Backdrops.Kind> LockedBackdrops => Backdrops.All.Where(k => !Store.Free(k));
-    private static IEnumerable<PromotionStyle.Kind> LockedPromotions => PromotionStyle.All.Where(k => !Store.Free(k));
+    private static IEnumerable<PieceShapes.Kind> LockedSets => PieceShapes.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
+    private static IEnumerable<Backdrops.Kind> LockedBackdrops => Backdrops.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
+    private static IEnumerable<PromotionStyle.Kind> LockedPromotions => PromotionStyle.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
+
+    // "New Items Only": just the items with no promo image in the output folder yet
+    private static bool Wanted(string storeId) =>
+        !SessionState.GetBool(NewOnlyKey, false) || !File.Exists(Path.Combine(OutputFolder, ProductId(storeId) + ".png"));
 
     // ───────── Piece sets: the six pieces in a row on the menu's violet ─────────
 
