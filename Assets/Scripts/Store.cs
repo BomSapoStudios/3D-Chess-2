@@ -10,8 +10,8 @@ public static class Store
     // ── Prices (change these to retune) ──
     public static int PieceSetPawns => PawnBank.PieceSetPrice;   // 4,500
     public const string PieceSetDollars = "$2.99";
-    public const int BackdropPawns = 1500;                        // placeholder until Brandon confirms
-    public const string BackdropDollars = "$0.99";                // placeholder until Brandon confirms
+    public const int BackdropPawns = 3000;
+    public const string BackdropDollars = "$1.99";
 
     public const int PromotionPawns = 1000;                       // placeholder until Brandon confirms
     public const string PromotionDollars = "$0.99";               // placeholder until Brandon confirms
