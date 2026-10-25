@@ -27,6 +27,8 @@ public static class QueenBlitz
         public string tip;
         public bool ice;                 // ice floor: every move slides to the edge or a block
         public BoardPosition[] line;     // one par solution: the queen's start, then each square she stops on
+        public int score;                // difficulty 1-100 from the pipeline (0 for hand-made puzzles)
+        public string tier;
     }
 
     // ───────────────────────── Packs ─────────────────────────
@@ -46,6 +48,8 @@ public static class QueenBlitz
         public string tip;
         public bool ice;
         public int[] line;
+        public int score;
+        public string tier;
     }
 
     [System.Serializable]
@@ -57,28 +61,130 @@ public static class QueenBlitz
         public PuzzleData[] puzzles;
     }
 
-    /// <summary>The pack being played. Only the free Starter pack so far.</summary>
-    public const string PackId = "starter";
-
-    private static Puzzle[] puzzles;
-
-    public static Puzzle[] Puzzles
+    /// <summary>A pack the menu can show. Its puzzles are in Resources/QueenBlitz/{id}.json.</summary>
+    public class PackInfo
     {
-        get
-        {
-            if (puzzles == null) puzzles = LoadPack(PackId);
-            return puzzles;
-        }
+        public string id;
+        public string name;
+        public bool free;
+        public int pawnPrice;        // 0: can't be bought with pawns
+        public bool review;          // puzzles waiting for Brandon's playtest (see Reviewer)
     }
+
+    public const int ChapterSize = 10;
+    /// <summary>Clears in a chapter that open the next one</summary>
+    public const int ChapterUnlock = 7;
+    public const int PackPawnPrice = 4500;
+
+    // Every pack in menu order; ones without a file yet are skipped (see Available)
+    private static readonly PackInfo[] Catalog =
+    {
+        new PackInfo { id = "starter", name = "Starter", free = true },
+        new PackInfo { id = "cube-run", name = "Cube Run", pawnPrice = PackPawnPrice },
+        new PackInfo { id = "deep-freeze", name = "Deep Freeze", pawnPrice = PackPawnPrice },
+        new PackInfo { id = "blockade", name = "Blockade", pawnPrice = PackPawnPrice },
+        new PackInfo { id = "feast", name = "Feast", pawnPrice = PackPawnPrice },
+        new PackInfo { id = "review", name = "Review", free = true, review = true },
+    };
+
+    /// <summary>The packs that exist in this build, in menu order</summary>
+    public static List<PackInfo> Available()
+    {
+        var list = new List<PackInfo>();
+        foreach (PackInfo p in Catalog)
+        {
+            if (p.review && !Reviewer) continue;
+            if (PuzzlesOf(p.id).Length > 0) list.Add(p);
+        }
+        return list;
+    }
+
+    /// <summary>Brandon's playtest switch: shows the Review pack. Always on in development builds;
+    /// in other builds, tap "Your pawns" in the Queen Blitz picker five times.</summary>
+    public static bool Reviewer
+    {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+        get => true;
+#else
+        get => PlayerPrefs.GetInt("QueenBlitzReviewer", 0) == 1;
+#endif
+        set { PlayerPrefs.SetInt("QueenBlitzReviewer", value ? 1 : 0); PlayerPrefs.Save(); }
+    }
+
+    public static PackInfo Info(string id)
+    {
+        foreach (PackInfo p in Catalog) if (p.id == id) return p;
+        return Catalog[0];
+    }
+
+    private static string packId = "starter";
+
+    /// <summary>The pack being played (the menu sets it before a puzzle starts)</summary>
+    public static string PackId
+    {
+        get => packId;
+        set => packId = string.IsNullOrEmpty(value) ? "starter" : value;
+    }
+
+    public static PackInfo CurrentPack => Info(PackId);
+
+    private static readonly Dictionary<string, Puzzle[]> loaded = new Dictionary<string, Puzzle[]>();
+
+    public static Puzzle[] Puzzles => PuzzlesOf(PackId);
+
+    public static Puzzle[] PuzzlesOf(string id)
+    {
+        if (!loaded.TryGetValue(id, out Puzzle[] list))
+        {
+            list = LoadPack(id);
+            loaded[id] = list;
+        }
+        return list;
+    }
+
+    // ───────────────────────── Owning packs and opening chapters ─────────────────────────
+
+    public static bool Owns(PackInfo pack) => pack.free || PlayerPrefs.GetInt("QueenBlitzOwned." + pack.id, 0) == 1;
+
+    /// <summary>Unlock a pack: after an App Store purchase or restore, or with pawns</summary>
+    public static void Grant(string id)
+    {
+        PlayerPrefs.SetInt("QueenBlitzOwned." + id, 1);
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>Buy a pack with pawns. False if there aren't enough.</summary>
+    public static bool BuyWithPawns(PackInfo pack)
+    {
+        if (Owns(pack) || pack.pawnPrice <= 0 || !PawnBank.Spend(pack.pawnPrice)) return false;
+        Grant(pack.id);
+        return true;
+    }
+
+    public static int Chapters(string id) => Mathf.Max(1, (PuzzlesOf(id).Length + ChapterSize - 1) / ChapterSize);
+
+    public static int ClearedCount(string id, int first, int count)
+    {
+        int n = 0;
+        for (int i = first; i < first + count && i < PuzzlesOf(id).Length; i++) if (EverCleared(i, id)) n++;
+        return n;
+    }
+
+    public static int ClearedCount(string id) => ClearedCount(id, 0, PuzzlesOf(id).Length);
+
+    /// <summary>Chapter 1 is always open; each later one opens after 7 clears in the one before</summary>
+    public static bool ChapterOpen(string id, int chapter)
+    {
+        if (chapter <= 0 || Info(id).review) return true;
+        return ClearedCount(id, (chapter - 1) * ChapterSize, ChapterSize) >= ChapterUnlock;
+    }
+
+    public static bool PuzzleOpen(string id, int index) => Owns(Info(id)) && ChapterOpen(id, index / ChapterSize);
 
     private static Puzzle[] LoadPack(string id)
     {
         TextAsset file = Resources.Load<TextAsset>("QueenBlitz/" + id);
-        if (file == null)
-        {
-            Debug.LogError($"Queen Blitz: no pack file Resources/QueenBlitz/{id}.json");
-            return new Puzzle[0];
-        }
+        if (file == null) return new Puzzle[0]; // a pack not made yet
         PackData pack = JsonUtility.FromJson<PackData>(file.text);
         var list = new List<Puzzle>();
         foreach (PuzzleData d in pack.puzzles)
@@ -90,7 +196,7 @@ public static class QueenBlitz
                 name = d.name, size = d.size, par = d.par, tip = d.tip, ice = d.ice,
                 queen = queen.Length > 0 ? queen[0] : (BoardPosition?)null,
                 best = best.Length > 0 ? best[0] : default,
-                pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line),
+                pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line), score = d.score, tier = d.tier,
             });
         }
         return list.ToArray();
@@ -105,8 +211,11 @@ public static class QueenBlitz
     }
 
     /// <summary>Saved progress for a puzzle. Starter keeps the keys it had before packs existed.</summary>
-    private static string Key(string kind, int index) =>
-        PackId == "starter" ? $"QueenBlitz{kind}.{index}" : $"QueenBlitz{kind}.{PackId}.{index}";
+    private static string Key(string kind, int index, string pack = null)
+    {
+        pack = pack ?? PackId;
+        return pack == "starter" ? $"QueenBlitz{kind}.{index}" : $"QueenBlitz{kind}.{pack}.{index}";
+    }
 
     /// <summary>The current game is a Queen Blitz puzzle</summary>
     public static bool Active { get; set; }
@@ -139,8 +248,8 @@ public static class QueenBlitz
     /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
     public static int Reward(int index) => Puzzles[index].pawns.Length;
 
-    public static bool EverCleared(int index) => PlayerPrefs.GetInt(Key("Cleared", index), 0) == 1;
-    public static int BestMoves(int index) => PlayerPrefs.GetInt(Key("Best", index), 0);
+    public static bool EverCleared(int index, string pack = null) => PlayerPrefs.GetInt(Key("Cleared", index, pack), 0) == 1;
+    public static int BestMoves(int index, string pack = null) => PlayerPrefs.GetInt(Key("Best", index, pack), 0);
 
     /// <summary>Record a clear: pay the pawns if this puzzle still pays, keep the fewest moves.
     /// Returns the pawns paid, and whether the moves are a new best.</summary>

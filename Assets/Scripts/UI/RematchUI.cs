@@ -223,13 +223,16 @@ public class RematchUI : MonoBehaviour
         if (QueenBlitz.Active)
         {
             // Puzzles: try again, or on to the next one
-            bool more = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
+            bool exists = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
+            bool more = exists && QueenBlitz.PuzzleOpen(QueenBlitz.PackId, QueenBlitz.Index + 1);
             if (TouchGUI.NeonButton(new Rect(x, rowY, 120, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
             GUI.enabled = more;
             if (TouchGUI.NeonButton(new Rect(x + 132, rowY, 150, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
             GUI.enabled = true;
             if (TouchGUI.NeonButton(new Rect(x + 294, rowY, 110, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
-            string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}" : "That's every puzzle so far!";
+            string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}"
+                : exists ? $"Clear {QueenBlitz.ChapterUnlock} in this chapter to open the next one"
+                : "That's every puzzle in this pack!";
             GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), next, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
             TouchGUI.End();
             return;

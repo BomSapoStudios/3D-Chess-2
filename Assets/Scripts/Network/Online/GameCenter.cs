@@ -114,8 +114,8 @@ public class GameCenter : MonoBehaviour
     /// <summary>After a Queen Blitz clear: every free puzzle done?</summary>
     public static void CheckPuzzles()
     {
-        int free = Mathf.Min(FreePuzzles, QueenBlitz.Puzzles.Length);
-        for (int i = 0; i < free; i++) if (!QueenBlitz.EverCleared(i)) return;
+        int free = Mathf.Min(FreePuzzles, QueenBlitz.PuzzlesOf("starter").Length);
+        for (int i = 0; i < free; i++) if (!QueenBlitz.EverCleared(i, "starter")) return;
         Achieve(FreePuzzlesAchievement);
     }
 

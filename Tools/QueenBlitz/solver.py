@@ -79,6 +79,24 @@ class Board:
                 break
         return None, None, None
 
+    def solve_from(self, at, left, limit):
+        """Fewest moves to clear the pawns in mask `left` with the queen on `at` (None past limit)"""
+        if left == 0:
+            return 0
+        frontier, seen = {(at, left)}, {(at, left)}
+        for depth in range(1, limit + 1):
+            nxt = set()
+            for (a, l) in frontier:
+                for to, swept, _, _ in self.moves(a):
+                    state = (to, l & ~swept)
+                    if state[1] == 0:
+                        return depth
+                    if state not in seen:
+                        seen.add(state)
+                        nxt.add(state)
+            frontier = nxt
+        return None
+
     def greedy(self, start=None, limit=20):
         """Moves a player taking the biggest bite each time would need. With nothing in reach it
         repositions to the cell with the biggest bite next. Best over all allowed starts."""
