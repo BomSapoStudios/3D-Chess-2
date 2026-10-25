@@ -397,6 +397,7 @@ public class CameraController : MonoBehaviour
         float yaw = Mathf.Atan2(-v.x, -v.z) * Mathf.Rad2Deg;
         float pitch = Mathf.Asin(Mathf.Clamp(v.y, -1f, 1f)) * Mathf.Rad2Deg;
         StopCoroutine(nameof(SnapRoutine));
+        if (AccessibilityPrefs.ReduceMotion) seconds = 0f; // Reduce Motion: cut straight to the new view
         StartCoroutine(SnapRoutine(yaw, Mathf.Clamp(pitch, -80f, 80f), seconds));
     }
 

@@ -235,7 +235,9 @@ public static class ChessNotationConverter
     /// <summary>
     /// Get Unity Color for a piece color (for text color-coding)
     /// </summary>
-    public static Color GetPieceDisplayColor(PieceColor color)
+    public static Color GetPieceDisplayColor(PieceColor color) => PlayerSymbols.Nudge(color, BaseDisplayColor(color));
+
+    private static Color BaseDisplayColor(PieceColor color)
     {
         return color switch
         {

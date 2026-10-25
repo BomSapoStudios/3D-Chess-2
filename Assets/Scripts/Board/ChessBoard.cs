@@ -1504,6 +1504,13 @@ public class ChessBoard : MonoBehaviour
 
         float elapsed = 0f;
 
+        // Reduce Motion: no sweeping round the cube; each piece fades out and back in at its new square
+        if (AccessibilityPrefs.ReduceMotion)
+        {
+            yield return PieceEffects.FadeHop(piece.transform, endLocalPos, duration);
+            elapsed = duration;
+        }
+
         while (elapsed < duration)
         {
             float t = elapsed / duration;

@@ -278,6 +278,7 @@ public abstract class ChessPiece : MonoBehaviour
                 break;
         }
 
+        material.color = PlayerSymbols.Nudge(pieceColor, material.color); // Color-Blind Symbols spreads Green, Yellow and Orange
         Debug.Log($"ChessPiece: Created default material for {pieceColor} piece using shader {shader.name}");
 
         return material;
@@ -521,13 +522,15 @@ public abstract class ChessPiece : MonoBehaviour
             yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;
             isMoving = false;
+            Haptics.Medium(); // she comes to rest
             if (GameStateManager.Instance != null) GameStateManager.Instance.ClearAnimationCache();
             OnMoveComplete();
             yield break;
         }
 
         // Board moves hop: a quick crouch, an arc through the air, then a squash on landing
-        bool hop = boardMove;
+        // (Reduce Motion: a plain glide along the board, taking the same time)
+        bool hop = boardMove && !AccessibilityPrefs.ReduceMotion;
         float cell = ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
         if (hop)
         {
@@ -585,6 +588,7 @@ public abstract class ChessPiece : MonoBehaviour
         transform.localPosition = endPos;
         isMoving = false;
         if (hop) PieceEffects.Land(this);
+        if (boardMove && !OnlineSession.Replaying) Haptics.Medium(); // a move lands
         
         Debug.Log($"✅ Animation Complete: {pieceColor} {pieceType} reached {targetPosition}");
         
@@ -617,6 +621,7 @@ public abstract class ChessPiece : MonoBehaviour
             // Ice: a fast push that glides on; floor: ease in and out
             float k = ice ? 1f - (1f - t) * (1f - t) : t * t * (3f - 2f * t);
             transform.localPosition = Vector3.Lerp(startPos, endPos, k);
+            if (AccessibilityPrefs.ReduceMotion) { yield return null; continue; } // no lean or spray
             float speed = ice ? 2f * (1f - t) : 6f * t * (1f - t);
             // Squash low and long while moving fast
             PieceEffects.SetSquash(transform, 1f + 0.06f * speed, 1f - 0.08f * speed);

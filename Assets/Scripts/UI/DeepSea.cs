@@ -157,10 +157,10 @@ public class SeaLife : MonoBehaviour
         t.transform.SetParent(transform, false);
         tentacle = t.AddComponent<SeaTentacle>();
 
-        nextHunt = Time.time + 8f;
-        nextTentacle = Time.time + 40f + (float)rng.NextDouble() * 20f; // the first one comes fairly soon, then it's rare
+        nextHunt = AccessibilityPrefs.AmbientTime + 8f;
+        nextTentacle = AccessibilityPrefs.AmbientTime + 40f + (float)rng.NextDouble() * 20f; // the first one comes fairly soon, then it's rare
 #if DEVELOPMENT_BUILD
-        if (PlayerPrefs.GetInt("DebugTentacle", 0) == 1) nextTentacle = Time.time + 6f;
+        if (PlayerPrefs.GetInt("DebugTentacle", 0) == 1) nextTentacle = AccessibilityPrefs.AmbientTime + 6f;
 #endif
     }
 
@@ -176,15 +176,15 @@ public class SeaLife : MonoBehaviour
 
     private void Update()
     {
-        if (Time.time >= nextHunt)
+        if (AccessibilityPrefs.AmbientTime >= nextHunt)
         {
-            nextHunt = Time.time + 9f + (float)rng.NextDouble() * 12f;
+            nextHunt = AccessibilityPrefs.AmbientTime + 9f + (float)rng.NextDouble() * 12f;
             StartHunt();
         }
-        if (Time.time >= nextTentacle && !tentacle.Busy)
+        if (AccessibilityPrefs.AmbientTime >= nextTentacle && !tentacle.Busy)
         {
-            if (StartTentacle()) nextTentacle = Time.time + 90f + (float)rng.NextDouble() * 80f;
-            else nextTentacle = Time.time + 5f;
+            if (StartTentacle()) nextTentacle = AccessibilityPrefs.AmbientTime + 90f + (float)rng.NextDouble() * 80f;
+            else nextTentacle = AccessibilityPrefs.AmbientTime + 5f;
         }
     }
 
@@ -398,7 +398,7 @@ public class SeaFish : MonoBehaviour
 
     private void Update()
     {
-        float t = Time.time, dt = Time.deltaTime;
+        float t = AccessibilityPrefs.AmbientTime, dt = AccessibilityPrefs.AmbientDelta;
         if (eaten) return;
 
         // Tail beat (faster while chasing), and jellyfish pulsing
@@ -459,7 +459,7 @@ public class SeaFish : MonoBehaviour
         }
         // Jellyfish drift upward with each pulse instead of swimming forward
         if (kind == Kind.Jellyfish)
-            transform.position += (transform.forward * 0.4f + Vector3.up * Mathf.Max(0f, Mathf.Sin(Time.time * 1.6f + phase))) * spd * dt;
+            transform.position += (transform.forward * 0.4f + Vector3.up * Mathf.Max(0f, Mathf.Sin(AccessibilityPrefs.AmbientTime * 1.6f + phase))) * spd * dt;
         else
             transform.position += transform.forward * spd * dt;
         if (kind == Kind.Jellyfish && transform.position.y > 22f) transform.position = new Vector3(transform.position.x, -30f, transform.position.z);
@@ -515,14 +515,14 @@ public class SeaTentacle : MonoBehaviour
         Vector3 p = fish.transform.position;
         Vector3 outward = new Vector3(p.x, 0f, p.z).normalized;
         basePos = new Vector3(p.x, DeepSeaScenery.FloorY - 14f, p.z) + outward * 25f; // out of the dark, beyond the fish
-        started = Time.time;
+        started = AccessibilityPrefs.AmbientTime;
         gameObject.SetActive(true);
     }
 
     private void Update()
     {
         if (victim == null) { gameObject.SetActive(false); return; }
-        float t = Time.time - started;
+        float t = AccessibilityPrefs.AmbientTime - started;
         const float rise = 3.2f, coil = 1.0f, hold = 0.6f, pull = 2.8f;
 
         Vector3 fishPos = victim.transform.position;
@@ -534,7 +534,7 @@ public class SeaTentacle : MonoBehaviour
         }
         else if (t < rise + coil + hold)
         {
-            if (t - rise < Time.deltaTime * 1.5f) { grabPos = fishPos; victim.Hold(true); life.bubbles.Burst(fishPos, 18); }
+            if (t - rise < AccessibilityPrefs.AmbientDelta * 1.5f) { grabPos = fishPos; victim.Hold(true); life.bubbles.Burst(fishPos, 18); }
             reach = 1f; curl = Ease(Mathf.Clamp01((t - rise) / coil));
         }
         else if (t < rise + coil + hold + pull)
@@ -543,7 +543,7 @@ public class SeaTentacle : MonoBehaviour
             reach = 1f - k * 0.9f; curl = 1f;
             // Drag the fish down with the coil
             victim.transform.position = Vector3.Lerp(grabPos, basePos + Vector3.up * 6f, k);
-            victim.transform.rotation *= Quaternion.Euler(0f, 0f, 200f * Time.deltaTime);
+            victim.transform.rotation *= Quaternion.Euler(0f, 0f, 200f * AccessibilityPrefs.AmbientDelta);
         }
         else
         {
@@ -553,7 +553,7 @@ public class SeaTentacle : MonoBehaviour
             return;
         }
         if (t >= rise) fishPos = victim.transform.position;
-        Shape(fishPos, reach, curl, Time.time);
+        Shape(fishPos, reach, curl, AccessibilityPrefs.AmbientTime);
     }
 
     // Lay the spheres along a curve from the base up toward the fish; the last third coils round it
@@ -701,8 +701,8 @@ public class SeaBubbles : MonoBehaviour
 
     private void Update()
     {
-        if (ps == null || Time.time < next) return;
-        next = Time.time + 0.18f;
+        if (ps == null || AccessibilityPrefs.AmbientTime < next) return;
+        next = AccessibilityPrefs.AmbientTime + 0.18f;
         Vector3 v = vents[rng.Next(vents.Length)];
         Emit(v + new Vector3((float)rng.NextDouble() - 0.5f, 0f, (float)rng.NextDouble() - 0.5f), 0.3f + (float)rng.NextDouble() * 0.6f, 4f + (float)rng.NextDouble() * 2f, 12f);
     }

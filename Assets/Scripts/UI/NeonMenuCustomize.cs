@@ -893,7 +893,7 @@ public partial class NeonMenu
         bool applied = false;
         while (true)
         {
-            angle += Time.unscaledDeltaTime * 9f; // a full turn in 40 seconds
+            angle += Time.unscaledDeltaTime * 9f * AccessibilityPrefs.AmbientSpeed; // a full turn in 40 seconds (nearly still with Reduce Motion)
             float a = angle * Mathf.Deg2Rad;
             backdropCamera.transform.position = new Vector3(Mathf.Cos(a) * 34f, 9f, Mathf.Sin(a) * 34f);
             backdropCamera.transform.LookAt(new Vector3(0f, -3f, 0f));

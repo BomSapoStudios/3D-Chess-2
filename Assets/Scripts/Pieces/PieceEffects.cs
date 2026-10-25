@@ -178,16 +178,17 @@ public partial class PieceEffects : MonoBehaviour
 
         float cell = Cell;
         const float duration = 0.45f;
+        bool still = AccessibilityPrefs.ReduceMotion; // Reduce Motion: the ring fades without spreading
         for (float t = 0; t < duration; t += Time.deltaTime)
         {
             float k = t / duration;
-            float radius = Mathf.Lerp(0.15f, 0.55f, 1f - (1f - k) * (1f - k)) * cell;
+            float radius = (still ? 0.42f : Mathf.Lerp(0.15f, 0.55f, 1f - (1f - k) * (1f - k))) * cell;
             for (int i = 0; i < 48; i++)
             {
                 float a = i / 48f * Mathf.PI * 2f;
                 line.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, 0, Mathf.Sin(a) * radius));
             }
-            line.widthMultiplier = Mathf.Lerp(0.18f, 0.03f, k);
+            line.widthMultiplier = still ? 0.08f : Mathf.Lerp(0.18f, 0.03f, k);
             Color c = color;
             c.a = 1f - k;
             line.startColor = line.endColor = c;
@@ -230,6 +231,12 @@ public partial class PieceEffects : MonoBehaviour
             yield return null;
         }
 
+        Haptics.Heavy(); // a capture
+        if (AccessibilityPrefs.ReduceMotion)
+        {
+            yield return FadeAwayRoutine(copy, 0.3f); // Reduce Motion: no flying shards, it just fades
+            yield break;
+        }
         Destroy(copy);
         Transform container = PiecesContainer;
         Vector3 up = container != null ? container.up : Vector3.up;
@@ -348,6 +355,14 @@ public partial class PieceEffects : MonoBehaviour
         Vector3 up = container != null ? container.up : Vector3.up;
         float cell = Cell;
 
+        if (AccessibilityPrefs.ReduceMotion)
+        {
+            // Reduce Motion: the king fades, then every piece changes colour where it stands, no orbs flying
+            if (e.kingCopy != null) yield return FadeAwayRoutine(e.kingCopy, 0.4f);
+            foreach (ChessPiece piece in e.pieces) if (piece != null) piece.ApplyMaterial();
+            yield break;
+        }
+
         // The king flickers between the two colours, then gives way
         if (e.kingCopy != null)
         {
@@ -450,6 +465,12 @@ public partial class PieceEffects : MonoBehaviour
         if (copy != null) copy.transform.SetPositionAndRotation(promoted.transform.position, copy.transform.rotation);
         Color color = GlowColor(promoted.pieceColor);
         PromotionStyle.Kind kind = style ?? PromotionStyle.Current;
+        if (style == null)
+        {
+            // In a game (not Customize's preview): Reduce Motion swaps the show for a short fade
+            if (AccessibilityPrefs.ReduceMotion) kind = PromotionStyle.Kind.Fade;
+            Haptics.Success();
+        }
         if (kind == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.BlackHole) Runner.StartCoroutine(Runner.BlackHoleRoutine(copy, promoted, color));
@@ -991,6 +1012,7 @@ public partial class PieceEffects : MonoBehaviour
 
     private IEnumerator LandRoutine(Transform t)
     {
+        if (AccessibilityPrefs.ReduceMotion) yield break; // no bounce
         const float duration = 0.28f;
         for (float time = 0; time < duration && t != null; time += Time.deltaTime)
         {
@@ -1012,6 +1034,7 @@ public partial class PieceEffects : MonoBehaviour
 
     private IEnumerator PulseRoutine(Transform t)
     {
+        if (AccessibilityPrefs.ReduceMotion) yield break; // no swell
         const float duration = 0.35f;
         for (float time = 0; time < duration && t != null; time += Time.deltaTime)
         {

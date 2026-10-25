@@ -169,6 +169,7 @@ public static class Backdrops
         else if (kind == Kind.DeepSea) Scenery.BuildDeepSea(cam);
         else if (kind == Kind.Graveyard) Scenery.BuildGraveyard(cam);
         else Scenery.Clear();
+        Scenery.FollowReduceMotion();
 
         RefreshReflections();
         return true;
@@ -216,7 +217,7 @@ public static class Backdrops
     {
         if (skies.TryGetValue(Kind.DeepSpace, out Material space) && space != null && RenderSettings.skybox == space)
         {
-            space.SetFloat("_Rotation", (Time.time * degreesPerSecond) % 360f);
+            space.SetFloat("_Rotation", (AccessibilityPrefs.AmbientTime * degreesPerSecond) % 360f);
         }
     }
 }
@@ -233,6 +234,12 @@ public static class Scenery
         new System.Collections.Generic.Dictionary<Light, (Color, float, Quaternion)>();
     private static Color savedAmbient;
     private static bool changed;
+
+    /// <summary>Reduce Motion: the scenery's particles (dust, snow, fog, bubbles) slow to nearly still too</summary>
+    public static void FollowReduceMotion()
+    {
+        if (root != null && root.GetComponent<AmbientParticles>() == null) root.AddComponent<AmbientParticles>();
+    }
 
     public static void Clear()
     {
@@ -545,13 +552,13 @@ public class DesertDunes : MonoBehaviour
     private void Update()
     {
         // Ripples creep with the wind every frame (cheap)
-        if (material != null) material.mainTextureOffset = new Vector2(0f, Time.time * 0.012f);
+        if (material != null) material.mainTextureOffset = new Vector2(0f, AccessibilityPrefs.AmbientTime * 0.012f);
 
         // Dune shapes shift a little several times a second
-        if (Time.time >= nextUpdate)
+        if (AccessibilityPrefs.AmbientTime >= nextUpdate)
         {
-            nextUpdate = Time.time + 0.1f;
-            Shape(Time.time);
+            nextUpdate = AccessibilityPrefs.AmbientTime + 0.1f;
+            Shape(AccessibilityPrefs.AmbientTime);
         }
     }
 
@@ -1114,6 +1121,36 @@ public static class SpaceSky
             h = (h ^ (h >> 13)) * 1274126177;
             h ^= h >> 16;
             return (h & 0xFFFFFF) / (float)0xFFFFFF;
+        }
+    }
+}
+
+/// <summary>
+/// Keeps a backdrop's particle systems at AccessibilityPrefs.AmbientSpeed: their normal speed,
+/// or nearly still while Reduce Motion is on
+/// </summary>
+public class AmbientParticles : MonoBehaviour
+{
+    private readonly System.Collections.Generic.Dictionary<ParticleSystem, float> normal = new System.Collections.Generic.Dictionary<ParticleSystem, float>();
+    private float nextCheck;
+    private float applied = 1f;
+
+    private void Update()
+    {
+        if (Time.unscaledTime < nextCheck) return;
+        nextCheck = Time.unscaledTime + 0.5f; // new particle systems appear as the scenery builds
+        float speed = AccessibilityPrefs.AmbientSpeed;
+        bool changed = !Mathf.Approximately(speed, applied);
+        applied = speed;
+        foreach (ParticleSystem ps in GetComponentsInChildren<ParticleSystem>(true))
+        {
+            bool known = normal.TryGetValue(ps, out float baseSpeed);
+            if (!known) { baseSpeed = ps.main.simulationSpeed; normal[ps] = baseSpeed; }
+            if (!known || changed)
+            {
+                var main = ps.main;
+                main.simulationSpeed = baseSpeed * speed;
+            }
         }
     }
 }

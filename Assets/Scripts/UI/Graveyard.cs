@@ -349,7 +349,7 @@ public class GraveWisps : MonoBehaviour
     private void LateUpdate()
     {
         Camera cam = Camera.main;
-        float t = Time.time;
+        float t = AccessibilityPrefs.AmbientTime;
         foreach (var w in wisps)
         {
             Vector3 p = w.home + new Vector3(Mathf.Sin(t * w.speed + w.phase) * 6f, Mathf.Sin(t * 1.3f + w.phase) * 1.5f, Mathf.Cos(t * w.speed * 0.8f + w.phase) * 6f);
@@ -387,12 +387,12 @@ public class GraveBats : MonoBehaviour
             bats.Add((body, Wing(-1f), Wing(1f), i * 0.7f));
             body.gameObject.SetActive(false);
         }
-        next = Time.time + 6f;
+        next = AccessibilityPrefs.AmbientTime + 6f;
     }
 
     private void Update()
     {
-        float t = Time.time;
+        float t = AccessibilityPrefs.AmbientTime;
         if (!flying)
         {
             if (t < next) return;
@@ -474,7 +474,7 @@ public class GraveLanterns : MonoBehaviour
     private void LateUpdate()
     {
         Camera cam = Camera.main;
-        float t = Time.time;
+        float t = AccessibilityPrefs.AmbientTime;
         foreach (var l in lanterns)
         {
             // Candle flicker
@@ -533,7 +533,7 @@ public class GraveRavens : MonoBehaviour
             int perch;
             do perch = rng.Next(perches.Count); while (taken.Contains(perch));
             taken.Add(perch);
-            var r = new Raven { perch = perch, nextLook = Time.time + (float)rng.NextDouble() * 4f };
+            var r = new Raven { perch = perch, nextLook = AccessibilityPrefs.AmbientTime + (float)rng.NextDouble() * 4f };
             r.body = new GameObject("Raven").transform;
             r.body.SetParent(transform, false);
             r.body.localScale = Vector3.one * 4f; // big enough to read at the fence
@@ -562,7 +562,7 @@ public class GraveRavens : MonoBehaviour
             ravens.Add(r);
             Perch(r);
         }
-        nextFlight = Time.time + 5f;
+        nextFlight = AccessibilityPrefs.AmbientTime + 5f;
     }
 
     private void Perch(Raven r)
@@ -577,7 +577,7 @@ public class GraveRavens : MonoBehaviour
 
     private void Update()
     {
-        float t = Time.time;
+        float t = AccessibilityPrefs.AmbientTime;
         // Every so often one raven takes off for another perch
         if (t >= nextFlight)
         {
@@ -620,7 +620,7 @@ public class GraveRavens : MonoBehaviour
                 r.nextLook = t + Random.Range(1.5f, 4f);
                 r.look = Quaternion.Euler(Random.Range(-15f, 20f), Random.Range(-70f, 70f), Random.Range(-15f, 15f));
             }
-            r.head.localRotation = Quaternion.Slerp(r.head.localRotation, r.look, Time.deltaTime * 8f);
+            r.head.localRotation = Quaternion.Slerp(r.head.localRotation, r.look, AccessibilityPrefs.AmbientDelta * 8f);
         }
     }
 }

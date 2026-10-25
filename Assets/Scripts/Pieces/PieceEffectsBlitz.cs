@@ -35,6 +35,12 @@ public partial class PieceEffects
             yield return null;
         }
         if (copy == null) yield break;
+        Haptics.Tick(); // a light tick per pawn swept (bunched up ones are dropped)
+        if (AccessibilityPrefs.ReduceMotion)
+        {
+            yield return FadeAwayRoutine(copy, 0.25f); // Reduce Motion: it fades where it stood
+            yield break;
+        }
 
         Transform container = PiecesContainer;
         Vector3 up = container != null ? container.up : Vector3.up;
@@ -44,7 +50,6 @@ public partial class PieceEffects
         float cell = Cell;
 
         Puff(square, up, ice, 10, cell);
-        Haptics.Selection();
 
         // Flung ahead and up, veering to one side, spinning end over end
         Vector3 v = (dir * Random.Range(7f, 10f) + up * Random.Range(5f, 8f) + side * Random.Range(-3f, 3f)) * (cell / 2.8f);

@@ -708,7 +708,7 @@ public class JungleFrog : MonoBehaviour
         throatScale = parts.throat.localScale;
         throatGlow = parts.throatMaterial.GetColor("_EmissionColor");
         Settle();
-        float now = Time.time;
+        float now = AccessibilityPrefs.AmbientTime;
         nextCroak = now + 1f + (float)rng.NextDouble() * 4f;
         nextBlink = now + 2f + (float)rng.NextDouble() * 3f;
         nextHop = now + 6f + (float)rng.NextDouble() * 8f;
@@ -748,13 +748,13 @@ public class JungleFrog : MonoBehaviour
     {
         bug.gameObject.SetActive(true);
         bugFrom = transform.position + new Vector3((float)rng.NextDouble() - 0.5f, 0.4f, (float)rng.NextDouble() - 0.5f).normalized * 25f + Vector3.up * 8f;
-        bugArrives = Time.time + 3f;
+        bugArrives = AccessibilityPrefs.AmbientTime + 3f;
     }
 
     private void MoveBug()
     {
         if (bug == null || !bug.gameObject.activeSelf || (tongue != null && tongue.gameObject.activeSelf)) return;
-        float now = Time.time;
+        float now = AccessibilityPrefs.AmbientTime;
         Vector3 spot = BugSpot(now) + new Vector3(Mathf.Sin(now * 23f), Mathf.Sin(now * 31f), 0) * 0.08f; // buzzing jitter
         float k = Mathf.Clamp01(1f - (bugArrives - now) / 3f);
         Vector3 pos = Vector3.Lerp(bugFrom, spot, Mathf.SmoothStep(0f, 1f, k));
@@ -786,7 +786,7 @@ public class JungleFrog : MonoBehaviour
     {
         eating = true;
         // Eyes lock on, a little wiggle of anticipation
-        for (float t = 0; t < 0.3f; t += Time.deltaTime) { parts.body.localScale = new Vector3(1.04f, 0.94f, 1.04f); MoveBug(); yield return null; }
+        for (float t = 0; t < 0.3f; t += AccessibilityPrefs.AmbientDelta) { parts.body.localScale = new Vector3(1.04f, 0.94f, 1.04f); MoveBug(); yield return null; }
         parts.body.localScale = Vector3.one;
 
         // Thwip: out to the bug
@@ -795,13 +795,13 @@ public class JungleFrog : MonoBehaviour
 #endif
         tongue.gameObject.SetActive(true);
         Vector3 target = bug.position;
-        for (float t = 0; t < 0.1f; t += Time.deltaTime)
+        for (float t = 0; t < 0.1f; t += AccessibilityPrefs.AmbientDelta)
         {
             PlaceTongue(Vector3.Lerp(Mouth(), target, t / 0.1f));
             yield return null;
         }
         // Back in with the bug stuck to the tip
-        for (float t = 0; t < 0.14f; t += Time.deltaTime)
+        for (float t = 0; t < 0.14f; t += AccessibilityPrefs.AmbientDelta)
         {
             Vector3 tip = Vector3.Lerp(target, Mouth(), t / 0.14f);
             PlaceTongue(tip);
@@ -812,7 +812,7 @@ public class JungleFrog : MonoBehaviour
         bug.gameObject.SetActive(false);
 
         // Gulp: the throat bulges and the eyes squeeze shut
-        for (float t = 0; t < 0.45f; t += Time.deltaTime)
+        for (float t = 0; t < 0.45f; t += AccessibilityPrefs.AmbientDelta)
         {
             float k = Mathf.Sin(t / 0.45f * Mathf.PI);
             parts.throat.localScale = throatScale * (1f + k * 0.6f);
@@ -821,7 +821,7 @@ public class JungleFrog : MonoBehaviour
         }
         parts.throat.localScale = throatScale;
         eating = false;
-        nextSnack = Time.time + 10f + (float)rng.NextDouble() * 14f;
+        nextSnack = AccessibilityPrefs.AmbientTime + 10f + (float)rng.NextDouble() * 14f;
         // Another bug wanders over a little later
         yield return new WaitForSeconds(2f + (float)rng.NextDouble() * 3f);
         SpawnBug();
@@ -847,7 +847,7 @@ public class JungleFrog : MonoBehaviour
 
     private void Update()
     {
-        float now = Time.time;
+        float now = AccessibilityPrefs.AmbientTime;
 
         // Breathing
         if (!hopping && !eating)
@@ -897,20 +897,20 @@ public class JungleFrog : MonoBehaviour
             float d = Vector3.Distance(p.localPosition, pad.localPosition);
             if (p != pad && d > 4f && d < 16f) target = p;
         }
-        if (target == null) { hopping = false; nextHop = Time.time + 5f; yield break; }
+        if (target == null) { hopping = false; nextHop = AccessibilityPrefs.AmbientTime + 5f; yield break; }
 
         Vector3 from = transform.localPosition, to = target.localPosition + Vector3.up * 0.12f;
         Vector3 dir = to - from; dir.y = 0f;
 
         // Turn toward the target
         Quaternion start = transform.localRotation, facing = Quaternion.LookRotation(dir);
-        for (float t = 0; t < 0.35f; t += Time.deltaTime) { transform.localRotation = Quaternion.Slerp(start, facing, t / 0.35f); yield return null; }
+        for (float t = 0; t < 0.35f; t += AccessibilityPrefs.AmbientDelta) { transform.localRotation = Quaternion.Slerp(start, facing, t / 0.35f); yield return null; }
         // Crouch
-        for (float t = 0; t < 0.15f; t += Time.deltaTime) { parts.body.localScale = new Vector3(1.08f, 1f - 0.2f * t / 0.15f, 1.08f); yield return null; }
+        for (float t = 0; t < 0.15f; t += AccessibilityPrefs.AmbientDelta) { parts.body.localScale = new Vector3(1.08f, 1f - 0.2f * t / 0.15f, 1.08f); yield return null; }
         // Leap in an arc, stretched
         float duration = 0.55f + dir.magnitude * 0.03f;
         float arc = 3f + dir.magnitude * 0.35f;
-        for (float t = 0; t < duration; t += Time.deltaTime)
+        for (float t = 0; t < duration; t += AccessibilityPrefs.AmbientDelta)
         {
             float k = t / duration;
             transform.localPosition = Vector3.Lerp(from, to, k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * arc;
@@ -921,15 +921,15 @@ public class JungleFrog : MonoBehaviour
         pad = target;
         // Land: squash and a ring of light on the water
         PieceEffects.LandingRing(transform.position, new Color(0.55f, 1f, 0.3f));
-        for (float t = 0; t < 0.2f; t += Time.deltaTime) { parts.body.localScale = new Vector3(1.12f, 0.85f + 0.15f * t / 0.2f, 1.12f); yield return null; }
+        for (float t = 0; t < 0.2f; t += AccessibilityPrefs.AmbientDelta) { parts.body.localScale = new Vector3(1.12f, 0.85f + 0.15f * t / 0.2f, 1.12f); yield return null; }
         parts.body.localScale = Vector3.one;
         // Turn back toward the board
         start = transform.localRotation;
         Vector3 toBoard = -new Vector3(to.x, 0, to.z);
         Quaternion settle = Quaternion.LookRotation(toBoard);
-        for (float t = 0; t < 0.6f; t += Time.deltaTime) { transform.localRotation = Quaternion.Slerp(start, settle, t / 0.6f); yield return null; }
+        for (float t = 0; t < 0.6f; t += AccessibilityPrefs.AmbientDelta) { transform.localRotation = Quaternion.Slerp(start, settle, t / 0.6f); yield return null; }
         hopping = false;
-        nextHop = Time.time + 8f + (float)rng.NextDouble() * 10f;
+        nextHop = AccessibilityPrefs.AmbientTime + 8f + (float)rng.NextDouble() * 10f;
     }
 }
 
@@ -954,7 +954,7 @@ public class JungleButterfly : MonoBehaviour
 
     private void Update()
     {
-        float t = Time.time;
+        float t = AccessibilityPrefs.AmbientTime;
         float a = phase + t * speed * Mathf.PI * 2f;
         float r = radius + Mathf.Sin(t * 0.37f + wobble) * 6f;
         Vector3 pos = new Vector3(Mathf.Cos(a) * r, height + Mathf.Sin(t * 0.9f + wobble) * 2.5f, Mathf.Sin(a) * r);
@@ -976,22 +976,22 @@ public class JungleEyes : MonoBehaviour
 
     public void Init(int seed) => rng = new System.Random(seed);
 
-    private void Start() => next = Time.time + (float)rng.NextDouble() * 6f;
+    private void Start() => next = AccessibilityPrefs.AmbientTime + (float)rng.NextDouble() * 6f;
 
     private void Update()
     {
-        if (Time.time < next) return;
+        if (AccessibilityPrefs.AmbientTime < next) return;
         if (open)
         {
             // Blink, or close and vanish for a while
             bool vanish = rng.NextDouble() < 0.3;
             SetOpen(false);
-            next = Time.time + (vanish ? 4f + (float)rng.NextDouble() * 8f : 0.15f);
+            next = AccessibilityPrefs.AmbientTime + (vanish ? 4f + (float)rng.NextDouble() * 8f : 0.15f);
         }
         else
         {
             SetOpen(true);
-            next = Time.time + 2f + (float)rng.NextDouble() * 6f;
+            next = AccessibilityPrefs.AmbientTime + 2f + (float)rng.NextDouble() * 6f;
         }
     }
 
@@ -1008,18 +1008,18 @@ public class JungleHeadTurn : MonoBehaviour
     private Quaternion from, to;
     private float start, next;
 
-    private void Start() { from = to = transform.localRotation; next = Time.time + 2f; }
+    private void Start() { from = to = transform.localRotation; next = AccessibilityPrefs.AmbientTime + 2f; }
 
     private void Update()
     {
-        if (Time.time >= next)
+        if (AccessibilityPrefs.AmbientTime >= next)
         {
             from = transform.localRotation;
             to = Quaternion.Euler(UnityEngine.Random.Range(-15f, 20f), UnityEngine.Random.Range(-60f, 60f), UnityEngine.Random.Range(-15f, 15f));
-            start = Time.time;
-            next = Time.time + 1.5f + UnityEngine.Random.value * 3f;
+            start = AccessibilityPrefs.AmbientTime;
+            next = AccessibilityPrefs.AmbientTime + 1.5f + UnityEngine.Random.value * 3f;
         }
-        transform.localRotation = Quaternion.Slerp(from, to, Mathf.SmoothStep(0f, 1f, (Time.time - start) / 0.25f));
+        transform.localRotation = Quaternion.Slerp(from, to, Mathf.SmoothStep(0f, 1f, (AccessibilityPrefs.AmbientTime - start) / 0.25f));
     }
 }
 
@@ -1030,7 +1030,7 @@ public class JungleSway : MonoBehaviour
     public void Init(float p, float deg) { phase = p; degrees = deg; }
     private void Update()
     {
-        float t = Time.time * 0.6f + phase;
+        float t = AccessibilityPrefs.AmbientTime * 0.6f + phase;
         transform.localRotation = Quaternion.Euler(Mathf.Sin(t) * degrees, 0, Mathf.Sin(t * 0.7f + 1f) * degrees);
     }
 }
@@ -1212,7 +1212,7 @@ public class JungleMoon : MonoBehaviour
             t.rotation = Quaternion.LookRotation(pos - cam.transform.position, Vector3.up);
         }
         // The moon path shimmers
-        if (pathMat != null) pathMat.color = new Color(0.8f, 0.97f, 1f, 0.4f + 0.08f * Mathf.Sin(Time.time * 1.7f) * Mathf.Sin(Time.time * 0.6f));
+        if (pathMat != null) pathMat.color = new Color(0.8f, 0.97f, 1f, 0.4f + 0.08f * Mathf.Sin(AccessibilityPrefs.AmbientTime * 1.7f) * Mathf.Sin(AccessibilityPrefs.AmbientTime * 0.6f));
     }
 
     // Full moon: pale disc with soft grey maria and a slightly darker rim

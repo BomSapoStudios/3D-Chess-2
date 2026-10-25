@@ -63,7 +63,9 @@ public static class PieceSets
     /// <summary>
     /// The player's color in this set. Sides must stay easy to tell apart.
     /// </summary>
-    public static Color Tint(Kind kind, PieceColor player)
+    public static Color Tint(Kind kind, PieceColor player) => PlayerSymbols.Nudge(player, BaseTint(kind, player));
+
+    private static Color BaseTint(Kind kind, PieceColor player)
     {
         if (kind == Kind.Classic)
         {

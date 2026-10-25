@@ -73,8 +73,16 @@ public partial class NeonMenu : MonoBehaviour
         BuildOnlineScreen();
         BuildFriendsScreen();
         BuildNotifyScreen();
+        BuildAccessScreen();
         BuildStatsScreen();
+        FitScreensForTextSize();
         ShowMenu();
+        if (reopenAccessibility)
+        {
+            // Rebuilt for a new text size from the Accessibility screen: go back to it
+            reopenAccessibility = false;
+            ShowAccess();
+        }
 
         // Game Center: Apple's sign-in banner, then link the player and copy ratings across
         GameCenter.Restored += OnGameCenterRestored;
@@ -231,7 +239,7 @@ public partial class NeonMenu : MonoBehaviour
         canvas.sortingOrder = 100;
         CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(844, 390);
+        scaler.referenceResolution = new Vector2(844, 390) / AccessibilityPrefs.TextScale; // Larger Text zooms the whole menu
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 1f;
         gameObject.AddComponent<GraphicRaycaster>();
@@ -344,12 +352,21 @@ public partial class NeonMenu : MonoBehaviour
             lowerLayout.childControlWidth = false;
             lowerLayout.childControlHeight = false;
             lowerLayout.childForceExpandWidth = false;
-            NeonButton(lower, "Customize", new Vector2(178, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
-            NeonButton(lower, "Notifications", new Vector2(178, 44), NeonTheme.Lavender, NeonTheme.Pink, -0.5f, 16, ShowNotify);
+            NeonButton(lower, "Customize", new Vector2(112, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 15, ShowCustomize);
+            NeonButton(lower, "Notifications", new Vector2(124, 44), NeonTheme.Lavender, NeonTheme.Pink, -0.5f, 15, ShowNotify);
+            NeonButton(lower, "Accessibility", new Vector2(124, 44), NeonTheme.PinkSoft, NeonTheme.Cyan, 0.8f, 15, ShowAccess);
         }
         else
         {
-            NeonButton(column, "Customize: pieces & backdrops", new Vector2(370, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
+            RectTransform lower = NewRect("Row", column);
+            lower.sizeDelta = new Vector2(370, 44);
+            var lowerLayout = lower.gameObject.AddComponent<HorizontalLayoutGroup>();
+            lowerLayout.spacing = 14;
+            lowerLayout.childControlWidth = false;
+            lowerLayout.childControlHeight = false;
+            lowerLayout.childForceExpandWidth = false;
+            NeonButton(lower, "Customize", new Vector2(178, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
+            NeonButton(lower, "Accessibility", new Vector2(178, 44), NeonTheme.PinkSoft, NeonTheme.Cyan, -0.5f, 16, ShowAccess);
         }
 
         // Every home screen button rocks gently, each on its own beat
@@ -963,6 +980,7 @@ public partial class NeonMenu : MonoBehaviour
     private void ShowOnline()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
@@ -1649,6 +1667,7 @@ public partial class NeonMenu : MonoBehaviour
     private void OnDestroy()
     {
         GameCenter.Restored -= OnGameCenterRestored;
+        AccessibilityPrefs.Changed -= RefreshAccess;
         Purchases.PricesLoaded -= RefreshCustomize;
         Purchases.Owned -= OnPurchased;
     }
@@ -1786,6 +1805,7 @@ public partial class NeonMenu : MonoBehaviour
     private void ShowNotify()
     {
         if (statsScreen != null) statsScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         menuScreen.SetActive(false);
         notifyScreen.SetActive(true);
         shownPushStatus = null;
@@ -1853,6 +1873,7 @@ public partial class NeonMenu : MonoBehaviour
     private void ShowMenu()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(true);
         setupScreen.SetActive(false);
@@ -1864,6 +1885,7 @@ public partial class NeonMenu : MonoBehaviour
     private void ShowCustomize()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
@@ -1890,6 +1912,7 @@ public partial class NeonMenu : MonoBehaviour
     private void ShowSetupScreen()
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         customizeScreen.SetActive(false);

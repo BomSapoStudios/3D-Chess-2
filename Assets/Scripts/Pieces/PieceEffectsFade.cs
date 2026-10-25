@@ -34,6 +34,41 @@ public partial class PieceEffects
         foreach (var f in incoming) if (f.renderer != null) f.renderer.sharedMaterials = f.original;
     }
 
+    /// <summary>
+    /// Reduce Motion: in place of travelling, a piece fades out where it is, appears at its new
+    /// spot and fades back in, taking the same time the move would have
+    /// </summary>
+    public static IEnumerator FadeHop(Transform piece, Vector3 endLocalPosition, float duration)
+    {
+        if (piece == null) yield break;
+        var fading = SeeThrough(piece.gameObject);
+        bool moved = false;
+        for (float time = 0; time < duration && piece != null; time += Time.deltaTime)
+        {
+            float k = time / duration;
+            if (!moved && k >= 0.5f) { piece.localPosition = endLocalPosition; moved = true; }
+            SetAlpha(fading, k < 0.5f ? 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k / 0.4f))
+                                      : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((k - 0.6f) / 0.4f)));
+            yield return null;
+        }
+        if (piece == null) yield break;
+        piece.localPosition = endLocalPosition;
+        foreach (var f in fading) if (f.renderer != null) f.renderer.sharedMaterials = f.original;
+    }
+
+    /// <summary>Reduce Motion: a copy of a piece fades out where it stands, then is removed</summary>
+    private IEnumerator FadeAwayRoutine(GameObject copy, float duration)
+    {
+        if (copy == null) yield break;
+        var fading = SeeThrough(copy);
+        for (float time = 0; time < duration && copy != null; time += Time.deltaTime)
+        {
+            SetAlpha(fading, 1f - time / duration);
+            yield return null;
+        }
+        if (copy != null) Destroy(copy);
+    }
+
     private class Fading { public Renderer renderer; public Material[] original, faded; }
 
     // Swap each part's materials for see-through copies with the same colour and texture

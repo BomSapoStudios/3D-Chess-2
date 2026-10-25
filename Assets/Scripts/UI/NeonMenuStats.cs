@@ -114,6 +114,7 @@ public partial class NeonMenu
         onlineScreen.SetActive(false);
         friendsScreen.SetActive(false);
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (accessScreen != null) accessScreen.SetActive(false);
         statsScreen.SetActive(true);
         Clear(statsLeft, keep: 0);
         Clear(statsList, keep: 0);

@@ -457,7 +457,7 @@ public class BlinkLight : MonoBehaviour
     private void Start() => r = GetComponent<Renderer>();
     private void Update()
     {
-        if (r != null) r.enabled = Mathf.Repeat(Time.time + phase, 2.4f) < 1.2f;
+        if (r != null) r.enabled = Mathf.Repeat(AccessibilityPrefs.AmbientTime + phase, 2.4f) < 1.2f;
     }
 }
 
@@ -507,9 +507,9 @@ public class CityTraffic : MonoBehaviour
         for (int i = 0; i < cars.Count; i++)
         {
             Car c = cars[i];
-            c.angle += c.speed * Time.deltaTime;
+            c.angle += c.speed * AccessibilityPrefs.AmbientDelta;
             cars[i] = c;
-            Vector3 p = new Vector3(Mathf.Cos(c.angle) * c.radius, c.height + Mathf.Sin(Time.time * 0.3f + c.bob) * 1.5f, Mathf.Sin(c.angle) * c.radius);
+            Vector3 p = new Vector3(Mathf.Cos(c.angle) * c.radius, c.height + Mathf.Sin(AccessibilityPrefs.AmbientTime * 0.3f + c.bob) * 1.5f, Mathf.Sin(c.angle) * c.radius);
             Vector3 tangent = new Vector3(-Mathf.Sin(c.angle), 0f, Mathf.Cos(c.angle)) * Mathf.Sign(c.speed);
             c.t.position = p;
             c.t.rotation = Quaternion.LookRotation(tangent);

@@ -21,6 +21,11 @@ public class Swivel : MonoBehaviour
 
     private void Update()
     {
+        if (AccessibilityPrefs.ReduceMotion)
+        {
+            transform.localEulerAngles = new Vector3(0f, 0f, baseAngle); // Reduce Motion: holds still at its tilt
+            return;
+        }
         float angle = baseAngle + Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / seconds + phase) * degrees;
         transform.localEulerAngles = new Vector3(0f, 0f, angle);
     }

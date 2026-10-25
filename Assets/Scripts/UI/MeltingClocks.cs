@@ -617,8 +617,8 @@ public class DreamFloatingClock : MonoBehaviour
     private void Update()
     {
         if (mesh == null) return;
-        float t = Time.time;
-        angle += orbitSpeed * Time.deltaTime;
+        float t = AccessibilityPrefs.AmbientTime;
+        angle += orbitSpeed * AccessibilityPrefs.AmbientDelta;
         float a = angle * Mathf.Deg2Rad;
         Transform holder = transform.parent;
         holder.localPosition = new Vector3(Mathf.Cos(a) * radius, height + Mathf.Sin(t * 0.3f + phase) * 2f, Mathf.Sin(a) * radius);
@@ -745,7 +745,7 @@ public class DreamDrips : MonoBehaviour
 
     public void Add(Transform clock, Vector3[] verts, float size, bool moving)
     {
-        var src = new Source { clock = clock, verts = verts, size = size, moving = moving, next = Time.time + (float)rng.NextDouble() * 2f };
+        var src = new Source { clock = clock, verts = verts, size = size, moving = moving, next = AccessibilityPrefs.AmbientTime + (float)rng.NextDouble() * 2f };
         if (!moving) src.tips = LowestPoints(src);
         sources.Add(src);
     }
@@ -768,7 +768,7 @@ public class DreamDrips : MonoBehaviour
 
     private void Update()
     {
-        float now = Time.time, dt = Time.deltaTime;
+        float now = AccessibilityPrefs.AmbientTime, dt = AccessibilityPrefs.AmbientDelta;
         foreach (var src in sources)
         {
             if (src.clock == null || now < src.next) continue;

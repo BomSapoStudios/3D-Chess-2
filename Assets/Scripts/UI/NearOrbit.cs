@@ -152,7 +152,7 @@ public class OrbitEarth : MonoBehaviour
     private void Update()
     {
         // Spins slowly enough to feel huge, quickly enough to see it turn
-        globe.Rotate(0f, -1.2f * Time.deltaTime, 0f, Space.Self);
+        globe.Rotate(0f, -1.2f * AccessibilityPrefs.AmbientDelta, 0f, Space.Self);
 
         if (texture == null && texTask != null && texTask.IsCompleted)
         {
@@ -370,9 +370,9 @@ public class OrbitSky : MonoBehaviour
             t.position = sun;
             t.rotation = Quaternion.LookRotation(sun - eye, Vector3.up);
         }
-        sunFlare.rotation *= Quaternion.Euler(0f, 0f, Time.time * 2f);
+        sunFlare.rotation *= Quaternion.Euler(0f, 0f, AccessibilityPrefs.AmbientTime * 2f);
         moon.position = eye + OrbitScenery.MoonDirection * 900f;
-        moon.Rotate(0f, 0.5f * Time.deltaTime, 0f);
+        moon.Rotate(0f, 0.5f * AccessibilityPrefs.AmbientDelta, 0f);
     }
 
     // Soft round glow; `sharp` above 1 gives a tighter core
@@ -522,11 +522,11 @@ public class OrbitSatellite : MonoBehaviour
 
     private void Update()
     {
-        travelled += velocity.magnitude * Time.deltaTime;
+        travelled += velocity.magnitude * AccessibilityPrefs.AmbientDelta;
         if (travelled > length) NewPass(first: false);
         transform.localPosition = start + velocity.normalized * travelled;
-        if (spin != 0f) transform.Rotate(0f, 0f, spin * Time.deltaTime, Space.Self);
-        if (blink != null) blink.gameObject.SetActive(Mathf.Repeat(Time.time + transform.GetInstanceID() * 0.37f, 1.2f) < 0.15f);
+        if (spin != 0f) transform.Rotate(0f, 0f, spin * AccessibilityPrefs.AmbientDelta, Space.Self);
+        if (blink != null) blink.gameObject.SetActive(Mathf.Repeat(AccessibilityPrefs.AmbientTime + transform.GetInstanceID() * 0.37f, 1.2f) < 0.15f);
     }
 
     // Solar cells: deep blue squares with thin silver lines between them
@@ -625,7 +625,7 @@ public class OrbitPlanets : MonoBehaviour
         foreach (var p in placed)
         {
             p.t.position = eye + p.dir * Distance;
-            p.t.Rotate(0f, 0.6f * Time.deltaTime, 0f, Space.Self);
+            p.t.Rotate(0f, 0.6f * AccessibilityPrefs.AmbientDelta, 0f, Space.Self);
         }
     }
 
@@ -712,7 +712,7 @@ public class OrbitComets : MonoBehaviour
         glow = Quad("Comet Glow", glowMat);
         head = Quad("Comet", headMat);
         SetAlpha(0f);
-        next = Time.time + 4f; // the first one soon after the scene opens
+        next = AccessibilityPrefs.AmbientTime + 4f; // the first one soon after the scene opens
     }
 
     private Transform Quad(string name, Material mat)
@@ -746,22 +746,22 @@ public class OrbitComets : MonoBehaviour
         if (cam == null) return;
         if (!flying)
         {
-            if (Time.time < next) return;
+            if (AccessibilityPrefs.AmbientTime < next) return;
             // A slow pass across part of the sky
             from = RandomSkyDirection();
             Vector3 drift = Vector3.Cross(from, UnityEngine.Random.onUnitSphere).normalized;
             to = Quaternion.AngleAxis(UnityEngine.Random.Range(25f, 45f), drift) * from;
             if (to.y < 0.15f) to = new Vector3(to.x, 0.15f, to.z).normalized;
             duration = UnityEngine.Random.Range(14f, 22f);
-            started = Time.time;
+            started = AccessibilityPrefs.AmbientTime;
             flying = true;
         }
-        float k = (Time.time - started) / duration;
+        float k = (AccessibilityPrefs.AmbientTime - started) / duration;
         if (k >= 1f)
         {
             flying = false;
             SetAlpha(0f);
-            next = Time.time + UnityEngine.Random.Range(10f, 25f);
+            next = AccessibilityPrefs.AmbientTime + UnityEngine.Random.Range(10f, 25f);
             return;
         }
         SetAlpha(Mathf.Clamp01(k / 0.15f) * Mathf.Clamp01((1f - k) / 0.15f));

@@ -22,7 +22,15 @@ public class BlobGraphic : MaskableGraphic
         omega = Mathf.PI * 2f / Random.Range(minSeconds, maxSeconds); // this button's own rhythm
     }
 
-    private void Update() => SetVerticesDirty();
+    private bool still; // Reduce Motion: a fixed blob shape
+
+    private void Update()
+    {
+        bool reduce = AccessibilityPrefs.ReduceMotion;
+        if (reduce && still) return;
+        still = reduce;
+        SetVerticesDirty();
+    }
 
     protected override void OnPopulateMesh(VertexHelper vh)
     {
@@ -33,7 +41,7 @@ public class BlobGraphic : MaskableGraphic
         // Inset so the bulges reach, but don't pass, the button's edge
         float a = r.width / 2f - amp, b = r.height / 2f - amp;
         Vector2 c = r.center;
-        float t = Application.isPlaying ? Time.unscaledTime * omega : 0f;
+        float t = Application.isPlaying && !still ? Time.unscaledTime * omega : 0f;
 
         UIVertex v = UIVertex.simpleVert;
         v.color = color;
