@@ -33,6 +33,11 @@ public static class OrbitScenery
         sky.transform.SetParent(root, false);
         sky.AddComponent<OrbitSky>();
 
+        var planets = new GameObject("Planets and Comets");
+        planets.transform.SetParent(root, false);
+        planets.AddComponent<OrbitPlanets>();
+        planets.AddComponent<OrbitComets>();
+
         var sats = new GameObject("Satellites").transform;
         sats.SetParent(root, false);
         for (int i = 0; i < 6; i++)
@@ -347,11 +352,12 @@ public class OrbitSky : MonoBehaviour
         if (cam == null) return;
         if (cam.farClipPlane < 1600f) cam.farClipPlane = 1600f;
 #if DEVELOPMENT_BUILD
-        // Dev only: `defaults write BomSapo.Chess3D DebugOrbitView -int 1` (sun) or 2 (moon) points the camera at it
+        // Dev only: `defaults write BomSapo.Chess3D DebugOrbitView -int 1` (sun), 2 (moon), 3 (Mars and Jupiter)
+        // or 4 (Saturn) points the camera at it
         int view = PlayerPrefs.GetInt("DebugOrbitView", 0);
         if (view > 0)
         {
-            Vector3 target = view == 1 ? OrbitScenery.SunDirection : OrbitScenery.MoonDirection;
+            Vector3 target = view == 1 ? OrbitScenery.SunDirection : view == 2 ? OrbitScenery.MoonDirection : OrbitPlanets.Ecliptic(view == 3 ? 118f : -105f);
             Vector3 from = -new Vector3(target.x, 0f, target.z).normalized * 30f + Vector3.up * 6f;
             cam.transform.position = from;
             cam.transform.rotation = Quaternion.LookRotation(target * 900f - from);
@@ -536,6 +542,282 @@ public class OrbitSatellite : MonoBehaviour
             Color c = line ? new Color(0.7f, 0.72f, 0.78f) : Color.Lerp(new Color(0.06f, 0.12f, 0.4f), new Color(0.12f, 0.25f, 0.6f), (float)y / size);
             c.a = 1f;
             px[y * size + x] = c;
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+}
+
+/// <summary>
+/// The other planets, strung along the ecliptic (the line the sun sits on): Mercury and Venus
+/// close to the sun, the outer planets spread across the sky. Lit by the sun, so each shows the
+/// right phase; Saturn has its rings. Like the moon, they stay put wherever the camera goes.
+/// </summary>
+public class OrbitPlanets : MonoBehaviour
+{
+    private struct Planet { public string name; public float along, size; public Color a, b; public int bands; public bool rings; }
+
+    // along: degrees from the sun along the ecliptic; size: world units at 1100 away
+    private static readonly Planet[] Planets =
+    {
+        new Planet { name = "Mercury", along = 17f,  size = 10f, a = new Color(0.62f, 0.58f, 0.55f), b = new Color(0.45f, 0.42f, 0.4f) },
+        new Planet { name = "Venus",   along = -38f, size = 20f, a = new Color(0.98f, 0.9f, 0.7f),  b = new Color(0.9f, 0.8f, 0.58f), bands = 3 },
+        new Planet { name = "Mars",    along = 95f,  size = 15f, a = new Color(0.85f, 0.42f, 0.25f), b = new Color(0.6f, 0.28f, 0.18f) },
+        new Planet { name = "Jupiter", along = 140f, size = 62f, a = new Color(0.92f, 0.84f, 0.7f), b = new Color(0.72f, 0.52f, 0.38f), bands = 9 },
+        new Planet { name = "Saturn",  along = -105f, size = 48f, a = new Color(0.95f, 0.87f, 0.62f), b = new Color(0.8f, 0.68f, 0.45f), bands = 6, rings = true },
+        new Planet { name = "Uranus",  along = 60f,  size = 24f, a = new Color(0.62f, 0.9f, 0.92f), b = new Color(0.52f, 0.82f, 0.86f), bands = 2 },
+        new Planet { name = "Neptune", along = -150f, size = 23f, a = new Color(0.3f, 0.48f, 0.95f), b = new Color(0.2f, 0.35f, 0.8f), bands = 3 },
+    };
+    private const float Distance = 1100f;
+
+    private readonly System.Collections.Generic.List<(Transform t, Vector3 dir)> placed = new System.Collections.Generic.List<(Transform, Vector3)>();
+
+    /// <summary>A direction on the ecliptic, `degrees` from the sun; kept above the Earth's edge</summary>
+    public static Vector3 Ecliptic(float degrees)
+    {
+        // The ecliptic: a great circle through the sun, leaning 35° from the vertical
+        Vector3 sun = OrbitScenery.SunDirection;
+        Vector3 axis = Quaternion.AngleAxis(35f, sun) * Vector3.Cross(sun, Vector3.up).normalized;
+        Vector3 d = Quaternion.AngleAxis(degrees, axis) * sun;
+        if (d.y < 0.08f) d = new Vector3(d.x, 0.08f + Mathf.Abs(d.y) * 0.3f, d.z).normalized; // the Earth would hide it
+        return d;
+    }
+
+    private void Start()
+    {
+        foreach (Planet p in Planets)
+        {
+            var body = GameObject.CreatePrimitive(PrimitiveType.Sphere).transform;
+            Destroy(body.GetComponent<Collider>());
+            body.name = p.name;
+            body.SetParent(transform, false);
+            body.localScale = Vector3.one * p.size * 2.4f; // bigger than life, so they read on a phone
+            body.localRotation = Quaternion.Euler(UnityEngine.Random.Range(-15f, 15f), UnityEngine.Random.Range(0f, 360f), UnityEngine.Random.Range(-15f, 15f));
+            body.GetComponent<MeshFilter>().sharedMesh = OrbitScenery.Sphere(48, 24);
+            var r = body.GetComponent<MeshRenderer>();
+            r.sharedMaterial = OrbitScenery.Lit(Color.white, new Color(0.04f, 0.04f, 0.05f), 0f, 0.15f, Banded(p));
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (p.rings)
+            {
+                var ring = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
+                Destroy(ring.GetComponent<Collider>());
+                ring.name = "Rings";
+                ring.SetParent(body, false);
+                ring.localScale = Vector3.one * 2.4f;
+                ring.localRotation = Quaternion.Euler(72f, 0f, 18f);
+                var rr = ring.GetComponent<MeshRenderer>();
+                rr.sharedMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = RingTexture(), color = new Color(0.95f, 0.88f, 0.7f, 0.9f) };
+                rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                // Seen from both sides: a second quad facing the other way
+                var back = Instantiate(ring.gameObject, body).transform;
+                back.localRotation = ring.localRotation * Quaternion.Euler(0f, 180f, 0f);
+            }
+            placed.Add((body, Ecliptic(p.along)));
+        }
+    }
+
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        Vector3 eye = cam.transform.position;
+        foreach (var p in placed)
+        {
+            p.t.position = eye + p.dir * Distance;
+            p.t.Rotate(0f, 0.6f * Time.deltaTime, 0f, Space.Self);
+        }
+    }
+
+    // Soft bands of cloud, with a little noise, between the planet's two colours
+    private static Texture2D Banded(Planet p)
+    {
+        const int w = 256, h = 128;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp };
+        var px = new Color32[w * h];
+        float seed = p.size * 3.7f;
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float u = (float)x / w, v = (float)y / h;
+            float k;
+            if (p.bands > 0)
+            {
+                float wobble = 0.03f * Mathf.Sin(u * Mathf.PI * 2f * 3f + v * 9f + seed);
+                k = 0.5f + 0.5f * Mathf.Sin((v + wobble) * Mathf.PI * p.bands * 2f);
+                k = Mathf.Lerp(k, Mathf.PerlinNoise(u * 12f + seed, v * 30f), 0.25f);
+            }
+            else k = Mathf.PerlinNoise(u * 10f + seed, v * 6f) * 0.8f + Mathf.PerlinNoise(u * 30f, v * 18f + seed) * 0.2f; // rocky
+            Color c = Color.Lerp(p.b, p.a, k);
+            if (p.name == "Jupiter")
+            {
+                // The Great Red Spot
+                float du = Mathf.Min(Mathf.Abs(u - 0.3f), 1f - Mathf.Abs(u - 0.3f)) / 0.05f, dv = (v - 0.36f) / 0.035f;
+                if (du * du + dv * dv < 1f) c = Color.Lerp(c, new Color(0.78f, 0.36f, 0.24f), 0.85f);
+            }
+            if (p.name == "Mars" && (v < 0.08f || v > 0.92f)) c = Color.Lerp(c, Color.white, 0.8f); // ice caps
+            px[y * w + x] = c;
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+
+    // Saturn's rings: bands of pale ice with the Cassini gap
+    private static Texture2D RingTexture()
+    {
+        const int size = 256;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+            float d = Mathf.Sqrt(u * u + v * v);
+            float a = 0f;
+            if (d > 0.5f && d < 0.98f)
+            {
+                a = 0.55f + 0.35f * Mathf.Sin(d * 90f) * 0.5f;
+                if (d > 0.78f && d < 0.81f) a = 0.05f;           // Cassini division
+                a *= Mathf.Clamp01((0.98f - d) / 0.04f) * Mathf.Clamp01((d - 0.5f) / 0.03f);
+            }
+            px[y * size + x] = new Color(1f, 1f, 1f, a);
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+}
+
+/// <summary>
+/// Now and then a comet drifts across the sky: a bright head with a long glowing tail that
+/// always points away from the sun, fading in and out as it passes.
+/// </summary>
+public class OrbitComets : MonoBehaviour
+{
+    private Transform head, glow, tail;
+    private Material headMat, glowMat, tailMat;
+    private float started, duration, next;
+    private Vector3 from, to;
+    private bool flying;
+    private const float Distance = 1000f;
+
+    private void Start()
+    {
+        Shader sprite = Shader.Find("Sprites/Default");
+        headMat = new Material(sprite) { mainTexture = Dot(), renderQueue = 2904 };
+        glowMat = new Material(sprite) { mainTexture = Dot(), renderQueue = 2903 };
+        tailMat = new Material(sprite) { mainTexture = TailTexture(), renderQueue = 2903 };
+        tail = Quad("Comet Tail", tailMat);
+        glow = Quad("Comet Glow", glowMat);
+        head = Quad("Comet", headMat);
+        SetAlpha(0f);
+        next = Time.time + 4f; // the first one soon after the scene opens
+    }
+
+    private Transform Quad(string name, Material mat)
+    {
+        var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(q.GetComponent<Collider>());
+        q.name = name;
+        q.transform.SetParent(transform, false);
+        var r = q.GetComponent<MeshRenderer>();
+        r.sharedMaterial = mat;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return q.transform;
+    }
+
+    private void SetAlpha(float a)
+    {
+        headMat.color = new Color(0.9f, 1f, 1f, a);
+        glowMat.color = new Color(0.55f, 0.85f, 1f, 0.5f * a);
+        tailMat.color = new Color(0.7f, 0.9f, 1f, 0.7f * a);
+    }
+
+    private static Vector3 RandomSkyDirection()
+    {
+        float yaw = UnityEngine.Random.Range(0f, 360f), pitch = UnityEngine.Random.Range(15f, 70f);
+        return Quaternion.Euler(-pitch, yaw, 0f) * Vector3.forward;
+    }
+
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        if (!flying)
+        {
+            if (Time.time < next) return;
+            // A slow pass across part of the sky
+            from = RandomSkyDirection();
+            Vector3 drift = Vector3.Cross(from, UnityEngine.Random.onUnitSphere).normalized;
+            to = Quaternion.AngleAxis(UnityEngine.Random.Range(25f, 45f), drift) * from;
+            if (to.y < 0.15f) to = new Vector3(to.x, 0.15f, to.z).normalized;
+            duration = UnityEngine.Random.Range(14f, 22f);
+            started = Time.time;
+            flying = true;
+        }
+        float k = (Time.time - started) / duration;
+        if (k >= 1f)
+        {
+            flying = false;
+            SetAlpha(0f);
+            next = Time.time + UnityEngine.Random.Range(10f, 25f);
+            return;
+        }
+        SetAlpha(Mathf.Clamp01(k / 0.15f) * Mathf.Clamp01((1f - k) / 0.15f));
+
+        Vector3 eye = cam.transform.position;
+        Vector3 dir = Vector3.Slerp(from, to, k).normalized;
+        Vector3 pos = eye + dir * Distance;
+        Quaternion face = Quaternion.LookRotation(pos - eye, Vector3.up);
+        head.SetPositionAndRotation(pos, face);
+        head.localScale = Vector3.one * 7f;
+        glow.SetPositionAndRotation(pos, face);
+        glow.localScale = Vector3.one * 26f;
+
+        // The tail streams away from the sun, drawn across the view
+        Vector3 away = Vector3.ProjectOnPlane(dir - OrbitScenery.SunDirection, dir).normalized;
+        if (away.sqrMagnitude < 0.01f) away = Vector3.up;
+        const float length = 120f;
+        tail.position = pos + away * (length * 0.5f);
+        tail.rotation = Quaternion.LookRotation(pos - eye, away); // the quad's up runs along the tail
+        tail.localScale = new Vector3(14f, length, 1f);
+    }
+
+    // A soft round dot
+    private static Texture2D Dot()
+    {
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+            float a = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Sqrt(u * u + v * v)), 2f);
+            px[y * size + x] = new Color(1f, 1f, 1f, a);
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+
+    // Bright at the head (bottom), widening and fading to nothing at the end
+    private static Texture2D TailTexture()
+    {
+        const int w = 64, h = 256;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            float t = (float)y / (h - 1);                    // 0 at the head, 1 at the end
+            float width = Mathf.Lerp(0.15f, 1f, Mathf.Sqrt(t));
+            for (int x = 0; x < w; x++)
+            {
+                float u = Mathf.Abs((x + 0.5f) / w * 2f - 1f) / width;
+                float a = Mathf.Clamp01(1f - u * u) * Mathf.Pow(1f - t, 1.6f);
+                px[y * w + x] = new Color(1f, 1f, 1f, a);
+            }
         }
         tex.SetPixels32(px);
         tex.Apply(true);

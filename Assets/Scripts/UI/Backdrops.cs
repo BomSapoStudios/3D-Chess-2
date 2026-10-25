@@ -63,7 +63,7 @@ public static class Backdrops
             case Kind.CyberCity: return "High above a rainy neon megacity at night, with flying traffic";
             case Kind.NeonJungle: return "A glowing night jungle above a frog pond, with robot critters";
             case Kind.MeltingClocks: return "A dreamy golden dusk where soft clocks droop from branches and drift past the board";
-            case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the sun, the moon and satellites whizzing by";
+            case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the planets, passing comets and satellites whizzing by";
             case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
             default: return "Clean violet glow, easy on the eyes";
         }
@@ -83,7 +83,7 @@ public static class Backdrops
             case Kind.CyberCity: return () => CitySky.Generate(SkyWidth, SkyHeight, 2077);
             case Kind.NeonJungle: return () => JungleSky.Generate(SkyWidth, SkyHeight, 1066);
             case Kind.MeltingClocks: return () => DreamSky.Generate(SkyWidth, SkyHeight, 1931);
-            case Kind.EarthOrbit: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 1957);
+            case Kind.EarthOrbit: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 1957, galaxies: 1);
             case Kind.DeepSea: return () => DeepSeaSky.Generate(SkyWidth, SkyHeight, 4040);
             default: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 20261006);
         }
@@ -897,7 +897,7 @@ public static class DesertSky
 /// </summary>
 public static class SpaceSky
 {
-    public static Color32[] Generate(int width, int height, int seed)
+    public static Color32[] Generate(int width, int height, int seed, int galaxies = 5)
     {
         var rng = new System.Random(seed);
         var pixels = new float[width * height * 3];
@@ -943,7 +943,6 @@ public static class SpaceSky
         }
 
         // Spiral galaxies, kept away from the poles where the map stretches
-        int galaxies = 5;
         for (int k = 0; k < galaxies; k++)
         {
             float cu = (float)rng.NextDouble();
