@@ -184,6 +184,45 @@ def candidate(recipe, rng):
     return (start if given else None), pawns, blocks
 
 
+TIP_POOLS = {
+    "trap": ["The biggest sweep is a trap.", "Don't grab the most pawns first.", "A greedy first move costs you later.",
+             "Think about where each move leaves her.", "The obvious opening is the wrong one.",
+             "Count the moves before you take the big line.", "Sometimes a small sweep sets up a big one."],
+    "starts": ["Where she starts is half the puzzle.", "Try a few starting squares in your head first.",
+               "Very few squares reach par. Find one.", "Start where two lines meet."],
+    "diag": ["Look for the corner-to-corner lines.", "Some pawns line up through the middle of the cube.",
+             "Turn the cube: a diagonal is hiding."],
+    "plain": ["Plan the whole route before the first move.", "Finish one line where the next one begins.",
+              "Every move should take at least two pawns.", "You don't have to ride a line to the edge."],
+    "devious": ["Nothing here is what it looks like.", "Par is possible. It just isn't obvious.",
+                "If it feels easy, look again.", "Every pawn is a clue."],
+}
+
+
+def tip_kind(p):
+    if p.get("score", 0) > 80:
+        return "devious"
+    if p.get("trap", 0) >= 0.5:
+        return "trap"
+    if not p["queen"] and p.get("starts", 9) <= 2:
+        return "starts"
+    if any(all(a[i] != b[i] for i in range(3)) for a, b in zip(packs.triples(p["line"]), packs.triples(p["line"])[1:])):
+        return "diag"
+    return "plain"
+
+
+def vary_tips(puzzles):
+    """Ice and block tips stay; the rest cycle through their pool so no two neighbours repeat"""
+    used = {}
+    for p in puzzles:
+        if p.get("ice") or p.get("blocks"):
+            continue
+        kind = tip_kind(p)
+        pool = TIP_POOLS[kind]
+        p["tip"] = pool[used.get(kind, 0) % len(pool)]
+        used[kind] = used.get(kind, 0) + 1
+
+
 def describe(m):
     """A one-line tip from what makes the puzzle tick"""
     if m["ice"] and m["blocks"]:
@@ -274,6 +313,7 @@ if __name__ == "__main__":
             candidates += json.load(open(f, encoding="utf-8"))["puzzles"]
         names = [l.strip() for l in open(names_path, encoding="utf-8") if l.strip()]
         chosen = assemble(candidates)
+        vary_tips(chosen)
         for i, p in enumerate(chosen):
             p["name"] = names[i] if i < len(names) else f"Puzzle {i + 1}"
         print(packs.write({"id": pack_id, "name": name, "free": False, "puzzles": chosen}, out))
