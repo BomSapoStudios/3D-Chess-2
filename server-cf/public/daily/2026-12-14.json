@@ -1,0 +1,1 @@
+{"name": "Daily #44", "size": 4, "queen": [], "best": [3, 3, 1], "pawns": [1, 3, 1, 2, 2, 2, 2, 3, 1, 3, 1, 3], "blocks": [], "par": 2, "tip": "Sometimes a small sweep sets up a big one.", "ice": false, "line": [3, 3, 1, 1, 3, 1, 3, 1, 3], "score": 30, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.8, "date": "2026-12-14", "number": 44}

@@ -1,0 +1,1 @@
+{"name": "Daily #115", "size": 4, "queen": [], "best": [2, 2, 0], "pawns": [1, 0, 1, 1, 1, 0, 2, 0, 2, 3, 0, 3], "blocks": [], "par": 2, "tip": "The biggest sweep is a trap.", "ice": false, "line": [2, 2, 0, 0, 0, 0, 3, 0, 3], "score": 35, "tier": "Easy", "recipe": "easy-4", "greedy": 3, "starts": 2, "trap": 1.0, "date": "2027-02-23", "number": 115}

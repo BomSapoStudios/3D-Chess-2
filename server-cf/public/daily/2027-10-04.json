@@ -1,0 +1,1 @@
+{"name": "Daily #338", "size": 4, "queen": [], "best": [0, 0, 3], "pawns": [1, 1, 2, 3, 1, 0, 3, 2, 0, 3, 3, 0], "blocks": [], "par": 2, "tip": "Some pawns line up through the middle of the cube.", "ice": false, "line": [0, 0, 3, 3, 3, 0, 3, 1, 0], "score": 18, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 3, "trap": 0.0, "date": "2027-10-04", "number": 338}

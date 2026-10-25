@@ -1,0 +1,1 @@
+{"name": "Daily #359", "size": 4, "queen": [1, 2, 3], "best": [1, 2, 3], "pawns": [1, 0, 1, 2, 0, 1, 2, 1, 2, 3, 0, 1], "blocks": [], "par": 2, "tip": "Look for the corner-to-corner lines.", "ice": false, "line": [1, 2, 3, 3, 0, 1, 1, 0, 1], "score": 10, "tier": "Warm-up", "recipe": "warmup-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-10-25", "number": 359}

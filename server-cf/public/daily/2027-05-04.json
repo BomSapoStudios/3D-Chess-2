@@ -1,0 +1,1 @@
+{"name": "Daily #185", "size": 4, "queen": [], "best": [2, 3, 0], "pawns": [2, 0, 0, 2, 1, 0, 2, 1, 1, 2, 2, 0, 2, 2, 2], "blocks": [], "par": 2, "tip": "Very few squares reach par. Find one.", "ice": false, "line": [2, 3, 0, 2, 0, 0, 2, 2, 2], "score": 18, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 2, "trap": 0.0, "date": "2027-05-04", "number": 185}

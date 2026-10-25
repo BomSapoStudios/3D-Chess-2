@@ -1,0 +1,1 @@
+{"name": "Daily #52", "size": 4, "queen": [], "best": [3, 3, 1], "pawns": [0, 0, 1, 0, 1, 2, 0, 2, 3, 1, 1, 1, 2, 2, 1], "blocks": [], "par": 2, "tip": "Very few squares reach par. Find one.", "ice": false, "line": [3, 3, 1, 0, 0, 1, 0, 2, 3], "score": 20, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2026-12-22", "number": 52}

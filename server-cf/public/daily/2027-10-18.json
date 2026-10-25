@@ -1,0 +1,1 @@
+{"name": "Daily #352", "size": 4, "queen": [], "best": [0, 2, 3], "pawns": [0, 2, 0, 0, 2, 2, 1, 2, 0, 2, 2, 0, 3, 2, 0], "blocks": [], "par": 2, "tip": "Where she starts is half the puzzle.", "ice": false, "line": [0, 2, 3, 0, 2, 0, 3, 2, 0], "score": 20, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-10-18", "number": 352}

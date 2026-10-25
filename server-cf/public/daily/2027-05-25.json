@@ -1,0 +1,1 @@
+{"name": "Daily #206", "size": 4, "queen": [], "best": [0, 2, 2], "pawns": [1, 1, 1, 2, 0, 0, 2, 1, 1, 2, 2, 2, 2, 3, 3], "blocks": [], "par": 2, "tip": "Count the moves before you take the big line.", "ice": false, "line": [0, 2, 2, 2, 0, 0, 2, 3, 3], "score": 30, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.89, "date": "2027-05-25", "number": 206}

@@ -1,0 +1,1 @@
+{"name": "Daily #233", "size": 4, "queen": [2, 3, 0], "best": [2, 3, 0], "pawns": [0, 3, 2, 1, 2, 2, 2, 1, 2, 3, 0, 2], "blocks": [], "par": 2, "tip": "A greedy first move costs you later.", "ice": false, "line": [2, 3, 0, 0, 3, 2, 3, 0, 2], "score": 22, "tier": "Easy", "recipe": "warmup-4", "greedy": 3, "starts": 1, "trap": 0.67, "date": "2027-06-21", "number": 233}

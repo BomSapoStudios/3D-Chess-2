@@ -1,0 +1,1 @@
+{"name": "Daily #208", "size": 6, "queen": [], "best": [4, 3, 3], "pawns": [0, 3, 1, 1, 4, 1, 2, 1, 3, 2, 5, 1, 3, 0, 4, 3, 4, 2], "blocks": [], "par": 3, "tip": "Start where two lines meet.", "ice": false, "line": [4, 3, 3, 2, 5, 1, 0, 3, 1, 3, 0, 4], "score": 43, "tier": "Medium", "recipe": "medium-6", "greedy": 3, "starts": 2, "trap": 0.33, "date": "2027-05-27", "number": 208}

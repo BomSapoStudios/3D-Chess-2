@@ -1,0 +1,1 @@
+{"name": "Daily #38", "size": 4, "queen": [], "best": [2, 0, 3], "pawns": [0, 0, 3, 1, 0, 2, 2, 0, 1, 2, 0, 2], "blocks": [], "par": 2, "tip": "Think about where each move leaves her.", "ice": false, "line": [2, 0, 3, 2, 0, 1, 0, 0, 3], "score": 30, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 1.0, "date": "2026-12-08", "number": 38}

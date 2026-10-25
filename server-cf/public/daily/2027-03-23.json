@@ -1,0 +1,1 @@
+{"name": "Daily #143", "size": 4, "queen": [], "best": [1, 2, 1], "pawns": [1, 0, 3, 1, 1, 2, 2, 0, 3, 3, 0, 3], "blocks": [], "par": 2, "tip": "The obvious opening is the wrong one.", "ice": false, "line": [1, 2, 1, 1, 0, 3, 3, 0, 3], "score": 25, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 4, "trap": 1.0, "date": "2027-03-23", "number": 143}

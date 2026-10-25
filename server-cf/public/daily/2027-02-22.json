@@ -1,0 +1,1 @@
+{"name": "Daily #114", "size": 4, "queen": [], "best": [2, 3, 0], "pawns": [2, 0, 0, 2, 1, 0, 2, 2, 0, 2, 2, 2, 2, 3, 3], "blocks": [], "par": 2, "tip": "Very few squares reach par. Find one.", "ice": false, "line": [2, 3, 0, 2, 0, 0, 2, 3, 3], "score": 20, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-02-22", "number": 114}

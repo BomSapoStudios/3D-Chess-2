@@ -1,0 +1,1 @@
+{"name": "Daily #177", "size": 4, "queen": [2, 2, 2], "best": [2, 2, 2], "pawns": [0, 0, 2, 0, 1, 2, 0, 2, 2, 1, 2, 2], "blocks": [], "par": 2, "tip": "Plan the whole route before the first move.", "ice": false, "line": [2, 2, 2, 0, 2, 2, 0, 0, 2], "score": 8, "tier": "Warm-up", "recipe": "warmup-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-04-26", "number": 177}

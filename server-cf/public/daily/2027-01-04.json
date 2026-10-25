@@ -1,0 +1,1 @@
+{"name": "Daily #65", "size": 4, "queen": [0, 2, 1], "best": [0, 2, 1], "pawns": [0, 0, 3, 0, 1, 2, 1, 0, 3, 3, 0, 3], "blocks": [], "par": 2, "tip": "Plan the whole route before the first move.", "ice": false, "line": [0, 2, 1, 0, 0, 3, 3, 0, 3], "score": 8, "tier": "Warm-up", "recipe": "warmup-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-01-04", "number": 65}

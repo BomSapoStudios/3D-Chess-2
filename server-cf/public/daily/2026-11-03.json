@@ -1,0 +1,1 @@
+{"name": "Daily #3", "size": 4, "queen": [], "best": [2, 0, 0], "pawns": [0, 2, 2, 1, 1, 1, 1, 2, 2, 3, 2, 2], "blocks": [], "par": 2, "tip": "A greedy first move costs you later.", "ice": false, "line": [2, 0, 0, 0, 2, 2, 3, 2, 2], "score": 30, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.83, "date": "2026-11-03", "number": 3}

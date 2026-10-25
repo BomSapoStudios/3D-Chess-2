@@ -1,0 +1,1 @@
+{"name": "Daily #313", "size": 6, "queen": [], "best": [0, 4, 0], "pawns": [2, 2, 5, 3, 3, 4, 3, 4, 0, 4, 4, 0, 4, 4, 2, 4, 4, 3], "blocks": [], "par": 3, "tip": "The biggest sweep is a trap.", "ice": false, "line": [0, 4, 0, 4, 4, 0, 4, 4, 3, 2, 2, 5], "score": 54, "tier": "Medium", "recipe": "medium-6", "greedy": 4, "starts": 3, "trap": 1.0, "date": "2027-09-09", "number": 313}

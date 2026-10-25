@@ -1,0 +1,1 @@
+{"name": "Daily #346", "size": 4, "queen": [], "best": [0, 3, 3], "pawns": [0, 0, 0, 0, 1, 1, 0, 2, 2, 2, 0, 2, 3, 0, 3], "blocks": [], "par": 2, "tip": "Start where two lines meet.", "ice": false, "line": [0, 3, 3, 0, 0, 0, 3, 0, 3], "score": 20, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-10-12", "number": 346}

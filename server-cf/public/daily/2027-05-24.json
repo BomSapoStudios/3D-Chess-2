@@ -1,0 +1,1 @@
+{"name": "Daily #205", "size": 4, "queen": [0, 1, 2], "best": [0, 1, 2], "pawns": [0, 1, 0, 0, 1, 1, 0, 2, 0, 0, 3, 0], "blocks": [], "par": 2, "tip": "Every move should take at least two pawns.", "ice": false, "line": [0, 1, 2, 0, 1, 0, 0, 3, 0], "score": 8, "tier": "Warm-up", "recipe": "warmup-4", "greedy": 2, "starts": 1, "trap": 0.0, "date": "2027-05-24", "number": 205}

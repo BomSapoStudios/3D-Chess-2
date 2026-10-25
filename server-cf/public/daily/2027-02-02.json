@@ -1,0 +1,1 @@
+{"name": "Daily #94", "size": 4, "queen": [], "best": [0, 0, 0], "pawns": [0, 1, 0, 0, 2, 0, 0, 3, 0, 1, 2, 0], "blocks": [], "par": 2, "tip": "You don't have to ride a line to the edge.", "ice": false, "line": [0, 0, 0, 0, 3, 0, 1, 2, 0], "score": 15, "tier": "Warm-up", "recipe": "easy-4", "greedy": 2, "starts": 4, "trap": 0.0, "date": "2027-02-02", "number": 94}

@@ -1,0 +1,1 @@
+{"name": "Daily #269", "size": 4, "queen": [], "best": [0, 2, 0], "pawns": [0, 0, 2, 0, 1, 1, 0, 1, 2, 0, 3, 2], "blocks": [], "par": 2, "tip": "The obvious opening is the wrong one.", "ice": false, "line": [0, 2, 0, 0, 0, 2, 0, 3, 2], "score": 28, "tier": "Easy", "recipe": "easy-4", "greedy": 2, "starts": 1, "trap": 0.83, "date": "2027-07-27", "number": 269}
