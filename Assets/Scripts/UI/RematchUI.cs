@@ -197,7 +197,7 @@ public class RematchUI : MonoBehaviour
         // Color-Blind Symbols: the winner's shape before the headline
         PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
         float titleX = panel.x + 18;
-        if (PlayerSymbols.On && winner.HasValue && color == NeonTheme.Lime && !ZombieMode.Active && !QueenBlitz.Active)
+        if (PlayerSymbols.On && winner.HasValue && color != NeonTheme.Yellow && !ZombieMode.Active && !QueenBlitz.Active)
         {
             PlayerSymbols.DrawGUI(new Rect(titleX, panel.y + 12, 26, 26), winner.Value);
             titleX += 32;

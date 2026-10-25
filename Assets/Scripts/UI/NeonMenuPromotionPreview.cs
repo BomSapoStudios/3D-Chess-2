@@ -210,7 +210,7 @@ public partial class NeonMenu
         previewCamera.transform.LookAt(look);
         while (true)
         {
-            turntable.localRotation = Quaternion.Euler(0f, freezeTurntable ? 16f : Mathf.Sin(Time.time * 0.5f) * 35f, 0f);
+            turntable.localRotation = Quaternion.Euler(0f, freezeTurntable ? 16f : Mathf.Sin(AccessibilityPrefs.AmbientTime * 0.5f) * 35f, 0f); // nearly still with Reduce Motion
             yield return null;
         }
     }

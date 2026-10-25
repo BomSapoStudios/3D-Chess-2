@@ -155,6 +155,32 @@ public partial class NeonMenu
         new GameObject("Neon Menu").AddComponent<NeonMenu>();
     }
 
+    /// <summary>Larger Text: the header's right-hand button narrows so the title keeps room on a zoomed screen</summary>
+    private static void CompactHeader(GameObject screen)
+    {
+        Transform header = screen.transform.Find("Header");
+        if (header == null) return;
+        foreach (Transform child in header)
+        {
+            if (child.GetComponent<Button>() != null && ((RectTransform)child).anchorMin.x > 0.9f)
+            {
+                var rt = (RectTransform)child;
+                rt.sizeDelta = new Vector2(112f, rt.sizeDelta.y);
+                rt.anchoredPosition = new Vector2(-56f, rt.anchoredPosition.y);
+                var label = child.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null) { label.enableAutoSizing = true; label.fontSizeMin = 12; label.fontSizeMax = label.fontSize; }
+            }
+            var title = child.GetComponent<TextMeshProUGUI>();
+            if (title != null && title.name == "Title")
+            {
+                title.rectTransform.offsetMax = new Vector2(-122f, title.rectTransform.offsetMax.y);
+                title.enableAutoSizing = true;
+                title.fontSizeMin = 10;
+                title.fontSizeMax = title.fontSize;
+            }
+        }
+    }
+
     /// <summary>Larger Text: a pop-up card bigger than the zoomed screen pans instead of clipping</summary>
     private void FitCardForTextSize(RectTransform card)
     {
@@ -184,6 +210,7 @@ public partial class NeonMenu
         if (column != null) column.offsetMin = new Vector2(24, column.offsetMin.y);
         LargerTextLayout.Pan(menuScreen, new Vector2(480, 360));
 
+        foreach (GameObject screen in new[] { setupScreen, notifyScreen, accessScreen }) CompactHeader(screen);
         LargerTextLayout.Stack(setupScreen, 74f, (RectTransform)setupScreen.transform.Find("Left Card"), (RectTransform)setupScreen.transform.Find("Right Card"));
         LargerTextLayout.Stack(notifyScreen, 74f, (RectTransform)notifyScreen.transform.Find("Permission Card"), (RectTransform)notifyScreen.transform.Find("Kinds Card"));
         LargerTextLayout.Stack(accessScreen, 74f, accessLeft, accessRight);
