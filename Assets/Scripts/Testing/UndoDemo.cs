@@ -26,7 +26,7 @@ public class UndoDemo : MonoBehaviour
         yield return new WaitForSeconds(2f);
         var config = new GameConfiguration();
         config.playerCount = 2;
-        config.boardSize = zombies ? BoardSize.Large8x8x8 : BoardSize.Small4x4x4;
+        config.boardSize = zombies ? BoardSize.Large8x8x8 : BoardSize.Small5x5x5;
         config.aiDifficulty = AIDifficulty.Easy;
         config.playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Computer };
         config.aiPlayerCount = 1;

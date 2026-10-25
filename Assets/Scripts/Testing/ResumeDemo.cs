@@ -24,7 +24,7 @@ public class ResumeDemo : MonoBehaviour
 
     private static GameConfiguration Config(int mode, out string slot)
     {
-        var c = new GameConfiguration { playerCount = 2, boardSize = BoardSize.Small4x4x4, aiDifficulty = AIDifficulty.Easy };
+        var c = new GameConfiguration { playerCount = 2, boardSize = BoardSize.Small5x5x5, aiDifficulty = AIDifficulty.Easy };
         c.playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Computer };
         slot = SavedGames.Local;
         switch (mode)

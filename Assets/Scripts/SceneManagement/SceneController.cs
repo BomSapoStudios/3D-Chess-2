@@ -420,7 +420,7 @@ public class SceneController : MonoBehaviour
             whitePlayerType = PlayerType.Computer,
             blackPlayerType = PlayerType.Computer,
             aiDifficulty = AIDifficulty.Medium,
-            boardSize = BoardSize.Small4x4x4,
+            boardSize = BoardSize.Small5x5x5,
             enableTurnValidation = true,
             showMoveHints = true,
             enableSoundEffects = true

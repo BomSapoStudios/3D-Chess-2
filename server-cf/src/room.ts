@@ -962,14 +962,14 @@ export function isRankedConfig(config: Partial<GameConfig>): boolean {
 
 export function sanitizeConfig(input: Partial<GameConfig> = {}): Partial<GameConfig> {
   const config: Partial<GameConfig> = {};
-  if (input.boardSize === '4x4x4' || input.boardSize === '6x6x6' || input.boardSize === '8x8x8') config.boardSize = input.boardSize;
+  if (input.boardSize === '4x4x4' || input.boardSize === '5x5x5' || input.boardSize === '6x6x6' || input.boardSize === '8x8x8') config.boardSize = input.boardSize;
   if ([2, 4, 6].includes(Number(input.playerCount))) config.playerCount = Number(input.playerCount);
   if (typeof input.chaosMode === 'boolean') config.chaosMode = input.chaosMode;
   if (Number.isInteger(input.chaosInterval)) config.chaosInterval = Math.min(25, Math.max(3, Number(input.chaosInterval)));
   if (typeof input.timedMode === 'boolean') config.timedMode = input.timedMode;
   if (Number.isFinite(input.timePerPlayerSeconds)) config.timePerPlayerSeconds = Math.min(1800, Math.max(60, Number(input.timePerPlayerSeconds)));
   // Board sizes the player count needs (matches the game's setup screen)
-  if (config.playerCount === 4 && config.boardSize === '4x4x4') config.boardSize = '6x6x6';
+  if (config.playerCount === 4 && (config.boardSize === '4x4x4' || config.boardSize === '5x5x5')) config.boardSize = '6x6x6';
   if (config.playerCount === 6) config.boardSize = '8x8x8';
   if (['easy', 'medium', 'hard'].includes(input.aiDifficulty as string)) config.aiDifficulty = input.aiDifficulty;
   if (input.pace === 'live' || input.pace === 'slow') config.pace = input.pace;

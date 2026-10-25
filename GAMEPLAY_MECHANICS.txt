@@ -41,9 +41,12 @@ pass-and-play) or online, with optional Chaos Mode spins and chess clocks.
 There is also a single-player Zombie Survival mode.
 
 Board Sizes (shown in the menu as meal sizes):
-  • Snack 4³  — 4x4x4 —  64 cells — 2 players
+  • Snack 5³  — 5x5x5 — 125 cells — 2 players only
   • Meal 6³   — 6x6x6 — 216 cells — 2 or 4 players
   • Feast 8³  — 8x8x8 — 512 cells — 2, 4 or 6 players (6 players always 8³)
+  (4x4x4 was the 2-player board until 2026-10-25. It was replaced because the
+  two pawn walls started touching and White won nearly every game. 4x4x4 is
+  now only used by Queen Blitz puzzles built on it.)
 
 Player Colors (in turn order):
   White, Black, Green, Purple, Yellow, Orange
@@ -130,7 +133,8 @@ Your bench (every board size):
 Rules:
   • Every piece must be placed before Ready can be pressed.
   • Pieces go on your own starting face, within your placement zone:
-      4³  — your whole face
+      5³  — your whole face (25 squares); pawns spawn on the next layer,
+            leaving an empty middle layer between the two armies
       6³  — part of your face (White/Black: Y 3–5, Z 1–4;
                                Green/Purple: Y 0–2, X 1–4)
       8³  — the middle 4x4 of your face
@@ -405,7 +409,7 @@ SAVED GAMES (RESUME)
     Accessibility settings, for example). The in-game menu's button reads
     "Main Menu (game saved)".
   • Tapping that mode again shows GAME IN PROGRESS with a one-line summary
-    ("Playing Black on Snack 4³, 12 moves in", "Walnut run, round 4,
+    ("Playing Black on Snack 5³, 12 moves in", "Walnut run, round 4,
     score 85", "Puzzle 3, 2 moves so far"). Resume skips setup and puts the
     saved position back with your current settings. Start new opens the
     mode as usual; the save is replaced once the new game starts.
@@ -623,14 +627,14 @@ These are cosmetic only and never change the rules.
 
   Mode                  Players   Board         Notes
   ─────────────────────────────────────────────────────────────────────
-  Quick Play vs Comp.   You+Robot 4³            Pick White, Black or
+  Quick Play vs Comp.   You+Robot 5³            Pick White, Black or
                                                 Surprise me; Walnut; no
                                                 Chaos, no clock
-  On this iPhone        2, 4, 6   4³ / 6³ / 8³  Any mix of You and Robot
+  On this iPhone        2, 4, 6   5³ / 6³ / 8³  Any mix of You and Robot
                                                 seats (pass-and-play)
-  Play anyone (online)  2, 4, 6   4³ / 6³ / 8³  Find Match; ranked (10 min
+  Play anyone (online)  2, 4, 6   5³ / 6³ / 8³  Find Match; ranked (10 min
                                                 clock, no Chaos)
-  Play a friend         2, 4, 6   4³ / 6³ / 8³  Room code or challenge;
+  Play a friend         2, 4, 6   5³ / 6³ / 8³  Room code or challenge;
                                                 Robots allowed; unranked
                                                 (win/loss still recorded)
   Zombie Survival       1         8³            Pea / Walnut / Galaxy
@@ -692,7 +696,7 @@ These are cosmetic only and never change the rules.
   Setting             Options                         Default
   ─────────────────────────────────────────────────────────────────────
   Players             2, 4, 6                         2
-  Board               Snack 4³, Meal 6³, Feast 8³     Snack 4³
+  Board               Snack 5³, Meal 6³, Feast 8³     Snack 5³
                       (4 players: 6³+, 6 players: 8³)
   Seats               You / Robot per seat            You vs Robot
   Robot brain size    Pea, Walnut, Galaxy             Walnut

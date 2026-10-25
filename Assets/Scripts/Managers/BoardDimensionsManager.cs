@@ -2,15 +2,15 @@ using UnityEngine;
 
 /// <summary>
 /// Manages board dimensions for scalable 3D chess.
-/// Supports 4x4x4 (2 players), 6x6x6 (2-4 players), and 8x8x8 (2-6 players) boards.
+/// Supports 5x5x5 (2 players), 6x6x6 (2-4 players), and 8x8x8 (2-6 players) boards.
 /// </summary>
 public class BoardDimensionsManager : MonoBehaviour
 {
     public static BoardDimensionsManager Instance { get; private set; }
 
     [Header("Board Configuration")]
-    private BoardSize currentBoardSize = BoardSize.Small4x4x4;
-    private Vector3Int boardDimensions = new Vector3Int(4, 4, 4);
+    private BoardSize currentBoardSize = BoardSize.Small5x5x5;
+    private Vector3Int boardDimensions = new Vector3Int(5, 5, 5);
     private int maxPlayers = 2;
 
     private void Awake()
@@ -46,6 +46,11 @@ public class BoardDimensionsManager : MonoBehaviour
                 maxPlayers = 2;
                 Debug.Log($"🔍 TRACE SetBoardSize: Set to Small4x4x4");
                 break;
+            case BoardSize.Small5x5x5:
+                boardDimensions = new Vector3Int(5, 5, 5);
+                maxPlayers = 2;
+                Debug.Log($"🔍 TRACE SetBoardSize: Set to Small5x5x5");
+                break;
             case BoardSize.Medium6x6x6:
                 boardDimensions = new Vector3Int(6, 6, 6);
                 maxPlayers = 4;
@@ -57,7 +62,7 @@ public class BoardDimensionsManager : MonoBehaviour
                 Debug.Log($"🔍 TRACE SetBoardSize: Set to Large8x8x8");
                 break;
             default:
-                boardDimensions = new Vector3Int(4, 4, 4);
+                boardDimensions = new Vector3Int(5, 5, 5);
                 maxPlayers = 2;
                 Debug.Log($"🔍 TRACE SetBoardSize: DEFAULT case hit!");
                 break;
@@ -94,7 +99,7 @@ public class BoardDimensionsManager : MonoBehaviour
     /// <summary>
     /// Validate if a player count is supported by the current board size
     /// Valid combinations:
-    /// - 4x4x4: 2 players only
+    /// - 5x5x5 (and the 4x4x4 puzzle board): 2 players only
     /// - 6x6x6: 2 or 4 players
     /// - 8x8x8: 2, 4, or 6 players
     /// </summary>

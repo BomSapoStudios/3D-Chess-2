@@ -705,13 +705,14 @@ public class NetworkManager : MonoBehaviour
         }
         
         // Send create room message to server via Socket.IO
-        // Convert BoardSize enum to integer (Small4x4x4=4, Medium6x6x6=6, Large8x8x8=8)
+        // Convert BoardSize enum to integer (Small4x4x4=4, Small5x5x5=5, Medium6x6x6=6, Large8x8x8=8)
         int boardSizeInt = 8; // default
         if (gameConfig != null)
         {
             boardSizeInt = gameConfig.boardSize switch
             {
                 BoardSize.Small4x4x4 => 4,
+                BoardSize.Small5x5x5 => 5,
                 BoardSize.Medium6x6x6 => 6,
                 BoardSize.Large8x8x8 => 8,
                 _ => 8
@@ -901,7 +902,7 @@ public class NetworkManager : MonoBehaviour
                 var gameConfigData = new
                 {
                     playerCount = gameConfig?.playerCount ?? 2,
-                    boardSize = gameConfig?.boardSize.ToString() ?? "Small4x4x4",
+                    boardSize = gameConfig?.boardSize.ToString() ?? "Small5x5x5",
                     chaosMode = new
                     {
                         enabled = gameConfig?.enableChaosMode ?? false,
@@ -1163,6 +1164,7 @@ public class NetworkManager : MonoBehaviour
         int boardSizeInt = config.boardSize switch
         {
             BoardSize.Small4x4x4 => 4,
+            BoardSize.Small5x5x5 => 5,
             BoardSize.Medium6x6x6 => 6,
             BoardSize.Large8x8x8 => 8,
             _ => 8

@@ -24,7 +24,7 @@ public partial class NeonMenu : MonoBehaviour
 
     // Setup state
     private int playerCount = 2;
-    private BoardSize boardSize = BoardSize.Small4x4x4;
+    private BoardSize boardSize = BoardSize.Small5x5x5;
     private AIDifficulty difficulty = AIDifficulty.Medium;
     private readonly List<PlayerType> playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Computer };
     private bool chaosMode;
@@ -116,7 +116,7 @@ public partial class NeonMenu : MonoBehaviour
         int debugStats = PlayerPrefs.GetInt("DebugOpenStats", 0);
         if (debugStats == 1) ShowProfile(null, ShowOnline);
         else if (debugStats == 12) ShowOnlineSetup();
-        else if (debugStats == 13) { ShowOnline(); StartCoroutine(CreateRoutine("{\"boardSize\":\"4x4x4\",\"playerCount\":2,\"timedMode\":true,\"timePerPlayerSeconds\":600}")); } // online test: make a room (OnlineTestPlayer plays it)
+        else if (debugStats == 13) { ShowOnline(); StartCoroutine(CreateRoutine("{\"boardSize\":\"5x5x5\",\"playerCount\":2,\"timedMode\":true,\"timePerPlayerSeconds\":600}")); } // online test: make a room (OnlineTestPlayer plays it)
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 14) ShowAccess(); // Accessibility
@@ -491,7 +491,7 @@ public partial class NeonMenu : MonoBehaviour
         SectionLabel(left, "How big a cube?", NeonTheme.Cyan);
         ChipRow(left, new (string, System.Action, System.Func<bool>, System.Func<bool>)[]
         {
-            ("Snack 4³", () => SetBoard(BoardSize.Small4x4x4), () => boardSize == BoardSize.Small4x4x4, () => playerCount == 2),
+            ("Snack 5³", () => SetBoard(BoardSize.Small5x5x5), () => boardSize == BoardSize.Small5x5x5, () => playerCount == 2),
             ("Meal 6³", () => SetBoard(BoardSize.Medium6x6x6), () => boardSize == BoardSize.Medium6x6x6, () => playerCount <= 4),
             ("Feast 8³", () => SetBoard(BoardSize.Large8x8x8), () => boardSize == BoardSize.Large8x8x8, () => true),
         }, NeonTheme.Lime, 16);
@@ -639,7 +639,7 @@ public partial class NeonMenu : MonoBehaviour
     private void SetPlayers(int count)
     {
         playerCount = count;
-        if (count == 4 && boardSize == BoardSize.Small4x4x4) boardSize = BoardSize.Medium6x6x6;
+        if (count == 4 && boardSize == BoardSize.Small5x5x5) boardSize = BoardSize.Medium6x6x6;
         if (count == 6) boardSize = BoardSize.Large8x8x8;
         while (playerTypes.Count < count) playerTypes.Add(PlayerType.Computer);
         while (playerTypes.Count > count) playerTypes.RemoveAt(playerTypes.Count - 1);
@@ -838,7 +838,7 @@ public partial class NeonMenu : MonoBehaviour
         gamesSection.SetActive(false);
 
         SectionLabel(right, "Play anyone", NeonTheme.PinkSoft);
-        TextMeshProUGUI blurb = NewText("Blurb", right, "Get paired with the next player looking for a 4x4x4 game.", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
+        TextMeshProUGUI blurb = NewText("Blurb", right, "Get paired with the next player looking for a 5x5x5 game.", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         blurb.fontStyle = FontStyles.Normal;
         blurb.enableWordWrapping = true;
         blurb.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
@@ -1130,7 +1130,7 @@ public partial class NeonMenu : MonoBehaviour
         }
         ListenForStart();
         SetSearching("Finding you a ranked game (10 minutes each)…");
-        OnlineClient.Instance.FindMatch("4x4x4",
+        OnlineClient.Instance.FindMatch("5x5x5",
             code => { SetSearching("Opponent found!"); OnlineClient.Instance.JoinRoom(code); },
             error => { SetSearching(null); SetOnlineStatus(error); onlineBusy = false; });
     }
@@ -1194,7 +1194,7 @@ public partial class NeonMenu : MonoBehaviour
         client.OnMessage -= OnOnlineMessage;
         client.OnClosed -= OnOnlineClosed;
 
-        NetConfig net = state.config ?? new NetConfig { boardSize = "4x4x4", playerCount = 2 };
+        NetConfig net = state.config ?? new NetConfig { boardSize = "5x5x5", playerCount = 2 };
         var robots = new List<PieceColor>();
         if (net.aiColors != null) foreach (string c in net.aiColors) if (System.Enum.TryParse(c, out PieceColor rc)) robots.Add(rc);
         OnlineSession.Begin(client.LocalColor, client.IsHost, robots);
@@ -1202,7 +1202,9 @@ public partial class NeonMenu : MonoBehaviour
         OnlineSession.Replaying = state.seq > 0;
         OnlineGameBridge.Begin();
 
-        BoardSize size = net.boardSize == "8x8x8" ? BoardSize.Large8x8x8 : net.boardSize == "6x6x6" ? BoardSize.Medium6x6x6 : BoardSize.Small4x4x4;
+        BoardSize size = net.boardSize == "8x8x8" ? BoardSize.Large8x8x8 : net.boardSize == "6x6x6" ? BoardSize.Medium6x6x6
+            : net.boardSize == "4x4x4" ? BoardSize.Small4x4x4 // a room made by an older version of the app
+            : BoardSize.Small5x5x5;
         int count = net.playerCount == 4 || net.playerCount == 6 ? net.playerCount : 2;
         AIDifficulty level = net.aiDifficulty == "easy" ? AIDifficulty.Easy : net.aiDifficulty == "hard" ? AIDifficulty.Hard : AIDifficulty.Medium;
         var config = new GameConfiguration(count, 0, size, level);
@@ -2002,7 +2004,7 @@ public partial class NeonMenu : MonoBehaviour
     private void StartQuickPlay(PieceColor side)
     {
         playerCount = 2;
-        boardSize = BoardSize.Small4x4x4;
+        boardSize = BoardSize.Small5x5x5;
         difficulty = AIDifficulty.Medium;
         playerTypes.Clear();
         playerTypes.Add(side == PieceColor.White ? PlayerType.Human : PlayerType.Computer);
@@ -2041,6 +2043,7 @@ public partial class NeonMenu : MonoBehaviour
         if (p == null) p = new SetupPrefs { types = setupOnline ? new[] { 0, 0 } : new[] { 0, 1 } };
         playerCount = p.players == 4 || p.players == 6 ? p.players : 2;
         boardSize = (BoardSize)p.board;
+        if (boardSize == BoardSize.Small4x4x4) boardSize = BoardSize.Small5x5x5; // 4x4x4 is only for puzzles now
         difficulty = (AIDifficulty)p.difficulty;
         chaosMode = p.chaos;
         chaosInterval = p.chaosInterval == 5 || p.chaosInterval == 15 ? p.chaosInterval : 9;
@@ -2075,7 +2078,7 @@ public partial class NeonMenu : MonoBehaviour
         setupOnline = wasOnline;
         var robots = new List<string>();
         for (int i = 1; i < playerCount; i++) if (playerTypes[i] == PlayerType.Computer) robots.Add("\"" + ColorNames[i] + "\"");
-        string size = boardSize == BoardSize.Large8x8x8 ? "8x8x8" : boardSize == BoardSize.Medium6x6x6 ? "6x6x6" : "4x4x4";
+        string size = boardSize == BoardSize.Large8x8x8 ? "8x8x8" : boardSize == BoardSize.Medium6x6x6 ? "6x6x6" : "5x5x5";
         return "{\"boardSize\":\"" + size + "\",\"playerCount\":" + playerCount
             + ",\"chaosMode\":" + (chaosMode ? "true" : "false") + ",\"chaosInterval\":" + chaosInterval
             + ",\"timedMode\":" + (timedPlay && !slowPace ? "true" : "false") + ",\"timePerPlayerSeconds\":" + clockMinutes * 60

@@ -74,7 +74,7 @@ export class Matchmaker extends DurableObject<Env> {
 
     if (msg.type === 'matchmaking:join') {
       // Find Match games are ranked: always on a 10 minute clock each, never Chaos Mode
-      const config = { boardSize: '4x4x4', playerCount: 2, ...sanitizeConfig(msg.config as Partial<GameConfig>), timedMode: true, timePerPlayerSeconds: 600, chaosMode: false, pace: 'live' } as Partial<GameConfig>;
+      const config = { boardSize: '5x5x5', playerCount: 2, ...sanitizeConfig(msg.config as Partial<GameConfig>), timedMode: true, timePerPlayerSeconds: 600, chaosMode: false, pace: 'live' } as Partial<GameConfig>;
       me.config = config;
       me.key = `${config.boardSize}|${config.playerCount}`;
       me.since = Date.now();

@@ -327,11 +327,11 @@ public class MainMenuController : MonoBehaviour
     }
     
     /// <summary>
-    /// Skip the setup screens: 2 players on a 4x4x4 board, you (White) against a Medium computer
+    /// Skip the setup screens: 2 players on a 5x5x5 board, you (White) against a Medium computer
     /// </summary>
     public void StartQuickPlay()
     {
-        currentConfig = new GameConfiguration(2, 1, BoardSize.Small4x4x4, AIDifficulty.Medium);
+        currentConfig = new GameConfiguration(2, 1, BoardSize.Small5x5x5, AIDifficulty.Medium);
         currentConfig.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
         StartGame();
     }
@@ -773,7 +773,7 @@ public class MainMenuController : MonoBehaviour
         // Subtitle for clarity
         CreateUIText("Subtitle", "Welcome to 3D Chess", mainMenuPanel, new Vector2(0, 0.6f), new Vector2(1, 0.75f), 18);
 
-        // Quick Play - one tap into a 2-player 4x4x4 game against the computer
+        // Quick Play - one tap into a 2-player 5x5x5 game against the computer
         CreateUIButton("QuickPlayButton", "Quick Play vs Computer", mainMenuPanel,
                        new Vector2(0.1f, 0.45f), new Vector2(0.9f, 0.59f),
                        () => {
@@ -1541,7 +1541,7 @@ public class MainMenuController : MonoBehaviour
 
     /// <summary>
     /// Validate and enable/disable board size buttons based on player count
-    /// 2 players: 4x4x4, 6x6x6, 8x8x8
+    /// 2 players: 5x5x5, 6x6x6, 8x8x8
     /// 4 players: 6x6x6, 8x8x8
     /// 6 players: 8x8x8 only
     /// </summary>
@@ -1557,18 +1557,18 @@ public class MainMenuController : MonoBehaviour
         Debug.Log($"ValidateBoardSizeOptions: Player count = {playerCount}");
 
         // Find board size buttons
-        Transform button4x4 = boardSizePanel.transform.Find("4x4x4Button");
+        Transform button5x5 = boardSizePanel.transform.Find("5x5x5Button");
         Transform button6x6 = boardSizePanel.transform.Find("6x6x6Button");
         Transform button8x8 = boardSizePanel.transform.Find("8x8x8Button");
 
-        // 4x4x4: Only available for 2 players
-        if (button4x4 != null)
+        // 5x5x5: Only available for 2 players
+        if (button5x5 != null)
         {
-            Button btn = button4x4.GetComponent<Button>();
+            Button btn = button5x5.GetComponent<Button>();
             if (btn != null)
             {
                 btn.interactable = (playerCount == 2);
-                Debug.Log($"4x4x4 button: interactable={btn.interactable}");
+                Debug.Log($"5x5x5 button: interactable={btn.interactable}");
             }
         }
 
@@ -1687,11 +1687,11 @@ public class MainMenuController : MonoBehaviour
 
         // Board size buttons (will be shown/hidden dynamically based on player count)
         // Note: Buttons will be validated and enabled/disabled in ShowStep
-        CreateUIButton("4x4x4Button", "4x4x4 (2 players only)", boardSizePanel,
+        CreateUIButton("5x5x5Button", "5x5x5 (2 players only)", boardSizePanel,
                       new Vector2(0.1f, 0.68f), new Vector2(0.9f, 0.76f),
                       () => {
-                          Debug.Log("🎲 Board size selected: 4x4x4");
-                          SetBoardSize(BoardSize.Small4x4x4);
+                          Debug.Log("🎲 Board size selected: 5x5x5");
+                          SetBoardSize(BoardSize.Small5x5x5);
                       });
 
         CreateUIButton("6x6x6Button", "6x6x6 (2-4 players)", boardSizePanel,
@@ -3221,10 +3221,10 @@ public class MainMenuController : MonoBehaviour
             SetButtonHighlight(button, false);
             
             // Highlight the selected button based on actual button names
-            if (button.name.Contains("4x4x4") && currentConfig.boardSize == BoardSize.Small4x4x4)
+            if (button.name.Contains("5x5x5") && currentConfig.boardSize == BoardSize.Small5x5x5)
             {
                 SetButtonHighlight(button, true);
-                Debug.Log($"🔄 Highlighted board size button: {button.name} for Small4x4x4");
+                Debug.Log($"🔄 Highlighted board size button: {button.name} for Small5x5x5");
             }
             else if (button.name.Contains("6x6x6") && currentConfig.boardSize == BoardSize.Medium6x6x6)
             {
@@ -3439,7 +3439,7 @@ public class MainMenuController : MonoBehaviour
             // Board size
             string boardDesc = currentConfig.boardSize switch
             {
-                BoardSize.Small4x4x4 => "4x4x4 (Compact)",
+                BoardSize.Small5x5x5 => "5x5x5 (Compact)",
                 BoardSize.Medium6x6x6 => "6x6x6 (Standard)",
                 BoardSize.Large8x8x8 => "8x8x8 (Large)",
                 _ => "Not selected"

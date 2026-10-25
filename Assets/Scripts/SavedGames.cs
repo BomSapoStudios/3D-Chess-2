@@ -82,7 +82,7 @@ public class SavedGames : MonoBehaviour
             string name = QueenBlitz.IsDaily(save.blitzPack) ? "Daily puzzle" : $"Puzzle {c.blitzPuzzle + 1}";
             return $"{name}, {save.blitzMoves} move{(save.blitzMoves == 1 ? "" : "s")} so far";
         }
-        string size = c.boardSize == BoardSize.Large8x8x8 ? "Feast 8³" : c.boardSize == BoardSize.Medium6x6x6 ? "Meal 6³" : "Snack 4³";
+        string size = c.boardSize == BoardSize.Large8x8x8 ? "Feast 8³" : c.boardSize == BoardSize.Medium6x6x6 ? "Meal 6³" : c.boardSize == BoardSize.Small4x4x4 ? "Snack 4³" : "Snack 5³";
         if (c.saveSlot == QuickPlay) return $"Playing {(PieceColor)save.view} on {size}, {moves}";
         return $"{c.playerCount} players on {size}, {moves}";
     }

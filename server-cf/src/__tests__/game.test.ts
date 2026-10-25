@@ -441,3 +441,41 @@ describe('Setup', () => {
     expect(engine.placePiece('White', 'Queen', { x: 0, y: 2, z: 2 }).success).toBe(false);
   });
 });
+
+describe('5x5x5 board (the 2-player board)', () => {
+  test('is the default and allows the whole face for placement', () => {
+    const engine = new GameEngine('FIVE01', { playerCount: 2 });
+    expect(engine.getState().config.boardSize).toBe('5x5x5');
+    engine.addPlayer('u1', 'Alice', 'White');
+    engine.addPlayer('u2', 'Bob', 'Black');
+    engine.startPlacement();
+    // Corners and edges of your own face are fine; the next layer in is not
+    expect(engine.placePiece('White', 'King', { x: 0, y: 0, z: 0 }).success).toBe(true);
+    expect(engine.placePiece('White', 'Rook', { x: 0, y: 4, z: 4 }).success).toBe(true);
+    expect(engine.placePiece('White', 'Rook', { x: 1, y: 2, z: 2 }).success).toBe(false);
+    expect(engine.placePiece('Black', 'King', { x: 4, y: 4, z: 0 }).success).toBe(true);
+    expect(engine.placePiece('Black', 'Rook', { x: 3, y: 2, z: 2 }).success).toBe(false);
+  });
+
+  test('pawns spawn in front of each piece with an empty middle layer', () => {
+    const engine = new GameEngine('FIVE02', { boardSize: '5x5x5', playerCount: 2 });
+    engine.addPlayer('u1', 'Alice', 'White');
+    engine.addPlayer('u2', 'Bob', 'Black');
+    engine.startPlacement();
+    engine.placePiece('White', 'King', { x: 0, y: 2, z: 2 });
+    engine.placePiece('Black', 'King', { x: 4, y: 2, z: 2 });
+    markPlaced(engine, 'White');
+    markPlaced(engine, 'Black');
+    engine.startGame();
+    const board = (engine as unknown as { board: ChessBoard }).board;
+    expect(board.size).toBe(5);
+    expect(board.getPiece({ x: 1, y: 2, z: 2 })?.type).toBe('Pawn');
+    expect(board.getPiece({ x: 3, y: 2, z: 2 })?.type).toBe('Pawn');
+    expect(board.getPiece({ x: 2, y: 2, z: 2 })).toBeFalsy();
+  });
+
+  test('a White pawn promotes on x = 4', () => {
+    expect(Pawn.isPromotionSquare({ x: 4, y: 0, z: 0 }, 'White', 5)).toBe(true);
+    expect(Pawn.isPromotionSquare({ x: 3, y: 0, z: 0 }, 'White', 5)).toBe(false);
+  });
+});

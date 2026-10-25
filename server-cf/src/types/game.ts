@@ -4,7 +4,8 @@
 
 export type PlayerColor = 'White' | 'Black' | 'Green' | 'Purple' | 'Yellow' | 'Orange';
 export type PieceType = 'King' | 'Queen' | 'Rook' | 'Bishop' | 'Knight' | 'Pawn';
-export type BoardSize = '4x4x4' | '6x6x6' | '8x8x8';
+// 4x4x4 is only made by older versions of the app; current ones play 5x5x5 as the 2-player board
+export type BoardSize = '4x4x4' | '5x5x5' | '6x6x6' | '8x8x8';
 export type GamePhase = 'waiting' | 'placement' | 'playing' | 'gameover';
 export type AIDifficulty = 'easy' | 'medium' | 'hard';
 export type PlayerType = 'human' | 'ai' | 'guest';
@@ -121,6 +122,7 @@ export type EndReason =
 
 export const BOARD_DIMENSIONS: Record<BoardSize, number> = {
   '4x4x4': 4,
+  '5x5x5': 5,
   '6x6x6': 6,
   '8x8x8': 8,
 };
@@ -144,7 +146,7 @@ export const PLAYER_ADVANCE: Record<PlayerColor, { axis: 'x' | 'y' | 'z'; direct
 };
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
-  boardSize: '4x4x4',
+  boardSize: '5x5x5',
   playerCount: 2,
   chaosMode: false,
   chaosInterval: 10,

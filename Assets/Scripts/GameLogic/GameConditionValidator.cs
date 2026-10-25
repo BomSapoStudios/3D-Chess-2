@@ -487,8 +487,7 @@ public class GameConditionValidator : MonoBehaviour
     /// </summary>
     private Vector3Int GetBoardDimensions()
     {
-        // SIMPLIFIED: 2-player chess always uses 4x4x4 board
-        return new Vector3Int(4, 4, 4);
+        return BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions() : new Vector3Int(5, 5, 5);
     }
     
     /// <summary>

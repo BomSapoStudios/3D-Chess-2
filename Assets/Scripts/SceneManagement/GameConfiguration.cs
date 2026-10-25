@@ -6,9 +6,10 @@ using System.Collections.Generic;
 /// </summary>
 public enum BoardSize
 {
-    Small4x4x4,    // 4x4x4 board (default for 2 players)
-    Medium6x6x6,   // 6x6x6 board (for 2 players, more strategic)
-    Large8x8x8     // 8x8x8 board (for 2 players, maximum complexity)
+    Small4x4x4,    // 4x4x4 board: only Queen Blitz puzzles built on it (and old saved games); chess uses 5x5x5
+    Medium6x6x6,   // 6x6x6 board (2 or 4 players)
+    Large8x8x8,    // 8x8x8 board (2, 4 or 6 players)
+    Small5x5x5     // 5x5x5 board (2 players only; the smallest board for chess)
 }
 
 /// <summary>
@@ -21,7 +22,7 @@ public class GameConfiguration
     [Header("Game Setup")]
     public int playerCount = 2;                    // Number of players (2, 4, 6)
     public int aiPlayerCount = 0;                  // Number of AI players (0 to playerCount)
-    public BoardSize boardSize = BoardSize.Small4x4x4;  // Board size selection
+    public BoardSize boardSize = BoardSize.Small5x5x5;  // Board size selection
     
     [Header("Player Setup")]
     public PlayerType whitePlayerType = PlayerType.Human;
@@ -68,7 +69,7 @@ public class GameConfiguration
     {
         playerCount = 2;
         aiPlayerCount = 0;
-        boardSize = BoardSize.Small4x4x4;
+        boardSize = BoardSize.Small5x5x5;
         whitePlayerType = PlayerType.Human;
         blackPlayerType = PlayerType.Human;
         aiDifficulty = AIDifficulty.Medium;
@@ -88,7 +89,7 @@ public class GameConfiguration
     {
         playerCount = 2;
         aiPlayerCount = (whiteType == PlayerType.Computer ? 1 : 0) + (blackType == PlayerType.Computer ? 1 : 0);
-        boardSize = BoardSize.Small4x4x4;
+        boardSize = BoardSize.Small5x5x5;
         whitePlayerType = whiteType;
         blackPlayerType = blackType;
         aiDifficulty = difficulty;
@@ -290,7 +291,8 @@ public class GameConfiguration
     {
         return boardSize switch
         {
-            BoardSize.Small4x4x4 => "4x4x4 (Compact)",
+            BoardSize.Small4x4x4 => "4x4x4 (Puzzle)",
+            BoardSize.Small5x5x5 => "5x5x5 (Compact)",
             BoardSize.Medium6x6x6 => "6x6x6 (Standard)",
             BoardSize.Large8x8x8 => "8x8x8 (Large)",
             _ => "Unknown"
