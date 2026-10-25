@@ -214,6 +214,8 @@ public static class GraveyardScenery
         root.gameObject.AddComponent<GraveMist>();
         root.gameObject.AddComponent<GraveWisps>();
         root.gameObject.AddComponent<GraveBats>();
+        root.gameObject.AddComponent<GraveLanterns>();
+        root.gameObject.AddComponent<GraveRavens>();
     }
 
     // A crooked trunk with a few forking branches
@@ -401,6 +403,206 @@ public class GraveBats : MonoBehaviour
             float flap = Mathf.Sin(t * 18f + b.phase) * 40f;
             b.l.localRotation = Quaternion.Euler(0f, 0f, flap);
             b.r.localRotation = Quaternion.Euler(0f, 0f, -flap);
+        }
+    }
+}
+
+/// <summary>Iron lantern posts among the graves, each with a warm flickering flame and glow</summary>
+public class GraveLanterns : MonoBehaviour
+{
+    private readonly List<(Material flame, Transform glow, float phase)> lanterns = new List<(Material, Transform, float)>();
+
+    private void Start()
+    {
+        var rng = new System.Random(808);
+        Material iron = OrbitScenery.Lit(new Color(0.08f, 0.07f, 0.08f), Color.black, 0.6f, 0.4f);
+        var glowMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = Soft(), color = new Color(1f, 0.65f, 0.25f, 0.55f) };
+        int count = 14;
+        for (int i = 0; i < count; i++)
+        {
+            float a = (i + 0.5f + (float)rng.NextDouble() * 0.3f) / count * Mathf.PI * 2f;
+            float d = i % 2 == 0 ? 57f : 75f;   // between the rows of graves
+            Vector3 at = new Vector3(Mathf.Cos(a) * d, GraveyardScenery.GroundY, Mathf.Sin(a) * d);
+            var post = new GameObject("Lantern").transform;
+            post.SetParent(transform, false);
+            post.position = at;
+            post.rotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
+            float h = 6f + (float)rng.NextDouble() * 2f;
+            OrbitScenery.Part(post, PrimitiveType.Cylinder, new Vector3(0f, h * 0.5f, 0f), new Vector3(0.3f, h * 0.5f, 0.3f), iron);
+            OrbitScenery.Part(post, PrimitiveType.Cube, new Vector3(0.8f, h, 0f), new Vector3(1.8f, 0.2f, 0.2f), iron);      // the arm
+            // The lantern hanging from the arm: a cage with a flame inside
+            Vector3 lamp = new Vector3(1.5f, h - 1.2f, 0f);
+            OrbitScenery.Part(post, PrimitiveType.Cube, lamp + Vector3.up * 0.75f, new Vector3(1.1f, 0.15f, 1.1f), iron);
+            OrbitScenery.Part(post, PrimitiveType.Cube, lamp - Vector3.up * 0.75f, new Vector3(0.9f, 0.15f, 0.9f), iron);
+            for (int c = 0; c < 4; c++)
+            {
+                float ca = c * Mathf.PI / 2f + Mathf.PI / 4f;
+                OrbitScenery.Part(post, PrimitiveType.Cube, lamp + new Vector3(Mathf.Cos(ca) * 0.45f, 0f, Mathf.Sin(ca) * 0.45f), new Vector3(0.08f, 1.5f, 0.08f), iron);
+            }
+            var flame = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.75f, 0.35f) };
+            OrbitScenery.Part(post, PrimitiveType.Sphere, lamp, new Vector3(0.55f, 0.85f, 0.55f), flame);
+            var glow = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
+            Destroy(glow.GetComponent<Collider>());
+            glow.name = "Glow";
+            glow.SetParent(post, false);
+            glow.localPosition = lamp;
+            var gr = glow.GetComponent<MeshRenderer>();
+            gr.sharedMaterial = glowMat;
+            gr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lanterns.Add((flame, glow, (float)rng.NextDouble() * 10f));
+        }
+    }
+
+    private void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        float t = Time.time;
+        foreach (var l in lanterns)
+        {
+            // Candle flicker
+            float f = 0.85f + 0.1f * Mathf.Sin(t * 9f + l.phase) + 0.06f * Mathf.Sin(t * 23f + l.phase * 2f);
+            l.flame.color = new Color(1f, 0.6f + 0.2f * f, 0.25f + 0.15f * f);
+            l.glow.localScale = Vector3.one * 12f * f;
+            if (cam != null) l.glow.rotation = Quaternion.LookRotation(l.glow.position - cam.transform.position);
+        }
+    }
+
+    private static Texture2D Soft()
+    {
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float u = (x + 0.5f) / size * 2f - 1f, v = (y + 0.5f) / size * 2f - 1f;
+            px[y * size + x] = new Color(1f, 1f, 1f, Mathf.Pow(Mathf.Clamp01(1f - Mathf.Sqrt(u * u + v * v)), 2f));
+        }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+}
+
+/// <summary>
+/// Ravens perched on the iron fence and on gravestones. They turn their heads now and then,
+/// and every so often one flaps off, circles over the graves and lands on another perch.
+/// </summary>
+public class GraveRavens : MonoBehaviour
+{
+    private class Raven { public Transform body, head, wingL, wingR; public int perch; public float nextLook, flyStart = -1f; public Vector3 from, to; public Quaternion look; }
+    private readonly List<Raven> ravens = new List<Raven>();
+    private readonly List<(Vector3 pos, Vector3 face)> perches = new List<(Vector3, Vector3)>();
+    private readonly HashSet<int> taken = new HashSet<int>();
+    private float nextFlight;
+    private const float FlightTime = 5f;
+
+    private void Start()
+    {
+        var rng = new System.Random(4141);
+        // Perches: fence-post tops, all facing in toward the board
+        for (int i = 0; i < 90; i += 3)
+        {
+            float a = i / 90f * Mathf.PI * 2f;
+            Vector3 p = new Vector3(Mathf.Cos(a) * 100f, GraveyardScenery.GroundY + 6.6f, Mathf.Sin(a) * 100f);
+            perches.Add((p, -new Vector3(p.x, 0f, p.z).normalized));
+        }
+        Material feathers = OrbitScenery.Lit(new Color(0.07f, 0.06f, 0.1f), new Color(0.05f, 0.03f, 0.1f), 0.6f, 0.85f); // a violet sheen so they show against the dark
+        Material beak = OrbitScenery.Lit(new Color(0.12f, 0.11f, 0.1f), Color.black, 0.2f, 0.5f);
+        Material eye = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.85f, 0.2f) };
+        for (int i = 0; i < 9; i++)
+        {
+            int perch;
+            do perch = rng.Next(perches.Count); while (taken.Contains(perch));
+            taken.Add(perch);
+            var r = new Raven { perch = perch, nextLook = Time.time + (float)rng.NextDouble() * 4f };
+            r.body = new GameObject("Raven").transform;
+            r.body.SetParent(transform, false);
+            r.body.localScale = Vector3.one * 4f; // big enough to read at the fence
+            OrbitScenery.Part(r.body, PrimitiveType.Sphere, new Vector3(0f, 0.55f, 0f), new Vector3(0.7f, 0.8f, 1.1f), feathers, Quaternion.Euler(-25f, 0f, 0f));
+            OrbitScenery.Part(r.body, PrimitiveType.Cube, new Vector3(0f, 0.3f, -0.75f), new Vector3(0.35f, 0.08f, 0.7f), feathers, Quaternion.Euler(30f, 0f, 0f)); // tail
+            OrbitScenery.Part(r.body, PrimitiveType.Cylinder, new Vector3(0.12f, 0.1f, 0.05f), new Vector3(0.05f, 0.12f, 0.05f), beak); // legs
+            OrbitScenery.Part(r.body, PrimitiveType.Cylinder, new Vector3(-0.12f, 0.1f, 0.05f), new Vector3(0.05f, 0.12f, 0.05f), beak);
+            r.head = new GameObject("Head").transform;
+            r.head.SetParent(r.body, false);
+            r.head.localPosition = new Vector3(0f, 1.05f, 0.35f);
+            OrbitScenery.Part(r.head, PrimitiveType.Sphere, Vector3.zero, Vector3.one * 0.5f, feathers);
+            OrbitScenery.Part(r.head, PrimitiveType.Cube, new Vector3(0f, -0.05f, 0.35f), new Vector3(0.12f, 0.12f, 0.4f), beak, Quaternion.Euler(10f, 45f, 0f));
+            OrbitScenery.Part(r.head, PrimitiveType.Sphere, new Vector3(0.17f, 0.07f, 0.15f), Vector3.one * 0.12f, eye);
+            OrbitScenery.Part(r.head, PrimitiveType.Sphere, new Vector3(-0.17f, 0.07f, 0.15f), Vector3.one * 0.12f, eye);
+            Transform Wing(float side)
+            {
+                var pivot = new GameObject("Wing").transform;
+                pivot.SetParent(r.body, false);
+                pivot.localPosition = new Vector3(side * 0.3f, 0.7f, 0f);
+                OrbitScenery.Part(pivot, PrimitiveType.Cube, new Vector3(side * 0.6f, 0f, -0.1f), new Vector3(1.2f, 0.05f, 0.7f), feathers);
+                return pivot;
+            }
+            r.wingL = Wing(-1f);
+            r.wingR = Wing(1f);
+            r.look = Quaternion.identity;
+            ravens.Add(r);
+            Perch(r);
+        }
+        nextFlight = Time.time + 5f;
+    }
+
+    private void Perch(Raven r)
+    {
+        var p = perches[r.perch];
+        r.body.position = p.pos;
+        r.body.rotation = Quaternion.LookRotation(p.face);
+        // Wings folded along the body
+        r.wingL.localRotation = Quaternion.Euler(0f, 0f, -80f) * Quaternion.Euler(0f, 20f, 0f);
+        r.wingR.localRotation = Quaternion.Euler(0f, 0f, 80f) * Quaternion.Euler(0f, -20f, 0f);
+    }
+
+    private void Update()
+    {
+        float t = Time.time;
+        // Every so often one raven takes off for another perch
+        if (t >= nextFlight)
+        {
+            nextFlight = t + Random.Range(6f, 14f);
+            Raven r = ravens[Random.Range(0, ravens.Count)];
+            if (r.flyStart < 0f)
+            {
+                int to;
+                do to = Random.Range(0, perches.Count); while (taken.Contains(to));
+                taken.Remove(r.perch);
+                taken.Add(to);
+                r.from = perches[r.perch].pos;
+                r.to = perches[to].pos;
+                r.perch = to;
+                r.flyStart = t;
+            }
+        }
+
+        foreach (Raven r in ravens)
+        {
+            if (r.flyStart >= 0f)
+            {
+                float k = (t - r.flyStart) / FlightTime;
+                if (k >= 1f) { r.flyStart = -1f; Perch(r); continue; }
+                // Up over the graves in an arc, then down onto the new perch
+                Vector3 mid = new Vector3((r.from.x + r.to.x) * 0.3f, GraveyardScenery.GroundY + 32f, (r.from.z + r.to.z) * 0.3f);
+                Vector3 a = Vector3.Lerp(r.from, mid, k), b = Vector3.Lerp(mid, r.to, k);
+                Vector3 pos = Vector3.Lerp(a, b, k);
+                Vector3 ahead = Vector3.Lerp(Vector3.Lerp(r.from, mid, k + 0.01f), Vector3.Lerp(mid, r.to, k + 0.01f), k + 0.01f);
+                r.body.position = pos;
+                if ((ahead - pos).sqrMagnitude > 0.0001f) r.body.rotation = Quaternion.LookRotation(ahead - pos);
+                float flap = Mathf.Sin(t * 16f) * 45f * (k < 0.85f ? 1f : (1f - k) / 0.15f);
+                r.wingL.localRotation = Quaternion.Euler(0f, 0f, flap);
+                r.wingR.localRotation = Quaternion.Euler(0f, 0f, -flap);
+                continue;
+            }
+            // Perched: now and then turn the head to look about
+            if (t >= r.nextLook)
+            {
+                r.nextLook = t + Random.Range(1.5f, 4f);
+                r.look = Quaternion.Euler(Random.Range(-15f, 20f), Random.Range(-70f, 70f), Random.Range(-15f, 15f));
+            }
+            r.head.localRotation = Quaternion.Slerp(r.head.localRotation, r.look, Time.deltaTime * 8f);
         }
     }
 }

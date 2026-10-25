@@ -67,7 +67,7 @@ public static class Backdrops
             case Kind.MeltingClocks: return "A dreamy golden dusk where soft clocks droop from branches and drift past the board";
             case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the planets, passing comets and satellites whizzing by";
             case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
-            case Kind.Graveyard: return "A moonlit cemetery with glowing tombstones, creeping mist, will-o'-wisps and bats";
+            case Kind.Graveyard: return "A moonlit cemetery with glowing tombstones, lanterns, ravens, mist, will-o'-wisps and bats";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
