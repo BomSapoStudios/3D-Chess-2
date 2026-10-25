@@ -30,6 +30,9 @@ public class ThreatIndicatorManager : MonoBehaviour
     
     // Track active threat indicators
     private Dictionary<ChessPiece, GameObject> activeAttackerIndicators = new Dictionary<ChessPiece, GameObject>();
+
+    /// <summary>Pieces marked as giving check right now (Color-Blind Symbols adds a target over each)</summary>
+    public ICollection<ChessPiece> Attackers => activeAttackerIndicators.Keys;
     private List<GameObject> activeAttackPaths = new List<GameObject>();
     private CheckThreatInfo currentThreats;
     

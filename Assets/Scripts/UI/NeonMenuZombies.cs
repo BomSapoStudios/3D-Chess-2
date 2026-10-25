@@ -76,6 +76,7 @@ public partial class NeonMenu
         }
         zombiePawnsLabel = NewText("Pawns", card.transform, "", 13, NeonTheme.Yellow, TextAlignmentOptions.Center);
         Place(zombiePawnsLabel.rectTransform, new Vector2(0.5f, 0f), new Vector2(560, 20), new Vector2(0, 16));
+        FitCardForTextSize((RectTransform)zombiePicker.transform.Find("Card"));
         zombiePicker.SetActive(false);
     }
 

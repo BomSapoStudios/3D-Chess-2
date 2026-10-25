@@ -515,6 +515,7 @@ public class InputManager : MonoBehaviour
         
         selectedPiece = piece;
         selectedPiece.OnSelected();
+        Haptics.Light(); // picked up
         
         // Add visual feedback for mobile users
         Debug.Log($"🔍 SelectPiece: About to call ShowValidMoveIndicators for {piece.pieceColor} {piece.pieceType}");
@@ -983,7 +984,7 @@ public class InputManager : MonoBehaviour
                 if (template != null)
                 {
                     glowMaterial = new Material(template);
-                    glowMaterial.color = new Color(NeonTheme.Cyan.r, NeonTheme.Cyan.g, NeonTheme.Cyan.b, 0.36f);
+                    glowMaterial.color = new Color(NeonTheme.Cyan.r, NeonTheme.Cyan.g, NeonTheme.Cyan.b, AccessibilityPrefs.HighContrast ? 0.6f : 0.36f);
                     glowMaterial.SetFloat("_Glossiness", 0.85f);
                     glowMaterial.renderQueue = 3000;
                 }

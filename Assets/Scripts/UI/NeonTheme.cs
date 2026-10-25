@@ -16,7 +16,11 @@ public static class NeonTheme
     public static readonly Color Cyan = Hex("29F0FF");
     public static readonly Color Yellow = Hex("FFE14D");
     public static readonly Color Lavender = Hex("C9B8F0");
-    public static readonly Color Muted = Hex("5A3A8C");
+    private static readonly Color MutedBase = Hex("5A3A8C");
+    private static readonly Color MutedBright = Hex("A08ED0");
+
+    /// <summary>Dim purple for things that are off or unavailable (lighter with High Contrast, to stay readable)</summary>
+    public static Color Muted => AccessibilityPrefs.HighContrast ? MutedBright : MutedBase;
     public static readonly Color White = Color.white;
 
     // Fonts (Google Fonts, SIL Open Font License; files and licenses in Resources/Fonts)
@@ -242,7 +246,31 @@ public static class NeonTheme
         style.normal.textColor = outlined ? fill : Ground;
         GUI.Label(rect, text, style);
 
-        return GUI.Button(rect, GUIContent.none, GUIStyle.none);
+        bool tapped = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+        if (tapped) Haptics.Selection();
+        return tapped;
+    }
+
+    /// <summary>
+    /// A label drawn straight over the 3D scene. With High Contrast a dark plate goes behind the
+    /// words so small neon text stays readable over any backdrop.
+    /// </summary>
+    public static void SceneLabel(Rect rect, string text, GUIStyle style)
+    {
+        if (AccessibilityPrefs.HighContrast && !string.IsNullOrEmpty(text) && Event.current.type == EventType.Repaint)
+        {
+            var content = new GUIContent(text);
+            Vector2 one = style.CalcSize(content);
+            float w = Mathf.Min(one.x, rect.width);
+            float h = Mathf.Min(style.wordWrap ? style.CalcHeight(content, rect.width) : one.y, rect.height);
+            TextAnchor a = style.alignment;
+            int col = (int)a % 3, row = (int)a / 3; // 0 left/upper, 1 center/middle, 2 right/lower
+            float x = col == 0 ? rect.x : col == 1 ? rect.center.x - w / 2f : rect.xMax - w;
+            float y = row == 0 ? rect.y : row == 1 ? rect.center.y - h / 2f : rect.yMax - h;
+            Rect plate = new Rect(x - 6f, y - 2f, w + 12f, h + 4f);
+            GUI.DrawTexture(plate, Solid, ScaleMode.StretchToFill, true, 0, new Color(Ground.r, Ground.g, Ground.b, 0.88f), 0, 8);
+        }
+        GUI.Label(rect, text, style);
     }
 
     /// <summary>Rounded panel with a neon border (no shadow)</summary>

@@ -484,6 +484,7 @@ public class PlacementManager : MonoBehaviour
     {
         if (!OnlineSession.CanControl(piece.pieceColor)) return; // the other player's pieces
         Debug.Log($"🎯 PlacementManager: Tray piece clicked - {piece.pieceColor} {piece.pieceType}");
+        if (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(piece.pieceColor)) Haptics.Light(); // picked up
         
         // SELECTION STATE DEBUGGING: Identify if this is human or AI selection
         bool isPlayerHuman = TurnManager.Instance != null && !TurnManager.Instance.IsPlayerAI(piece.pieceColor);
@@ -1209,7 +1210,7 @@ public class PlacementManager : MonoBehaviour
         // see-through floors (queue 3100), so stacked floors don't wash them out.
         Shader sprite = Shader.Find("Sprites/Default");
         Material material = new Material(sprite != null ? sprite : indicatorShader);
-        material.color = new Color(color.r, color.g, color.b, 0.55f);
+        material.color = new Color(color.r, color.g, color.b, AccessibilityPrefs.HighContrast ? 0.92f : 0.55f); // High Contrast: solid dots
         material.renderQueue = 3100;
 
         Debug.Log($"🎨 PlacementManager: Created placement material with shader {indicatorShader.name}, color {color}");
@@ -1317,6 +1318,7 @@ public class PlacementManager : MonoBehaviour
         
         // Attempt to place the piece
         PlacePieceOnBoard(selectedTrayPiece, targetPosition);
+        Haptics.Light(); // set down
     }
     
     /// <summary>

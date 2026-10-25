@@ -760,6 +760,7 @@ public abstract class ChessPiece : MonoBehaviour
     {
         Material template = Resources.Load<Material>("PieceSets/Crystal");
         Material bubble = template != null ? new Material(template) : new Material(Shader.Find("Legacy Shaders/Transparent/Diffuse"));
+        if (AccessibilityPrefs.HighContrast) alpha = Mathf.Max(alpha, 0.55f); // High Contrast: more solid highlights
         bubble.color = new Color(color.r, color.g, color.b, alpha);
         bubble.SetFloat("_Metallic", 0f);
         bubble.SetFloat("_Glossiness", 0.85f);

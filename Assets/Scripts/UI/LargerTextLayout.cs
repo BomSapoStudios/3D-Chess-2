@@ -108,3 +108,21 @@ public class LargerTextLayout : MonoBehaviour
         scroll.vertical = height > view.y + 1f;
     }
 }
+
+/// <summary>
+/// Larger Text: a pop-up that's only a picture to look at (tap anywhere closes it) is drawn
+/// bigger, but never past the edges of the screen
+/// </summary>
+public class ShrinkToFit : MonoBehaviour
+{
+    public Vector2 size;
+
+    private void LateUpdate()
+    {
+        var parent = transform.parent as RectTransform;
+        if (parent == null) return;
+        Vector2 room = parent.rect.size - new Vector2(16f, 16f);
+        float k = Mathf.Min(1f, room.x / size.x, room.y / size.y);
+        transform.localScale = new Vector3(k, k, 1f);
+    }
+}

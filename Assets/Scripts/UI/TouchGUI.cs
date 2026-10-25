@@ -31,10 +31,11 @@ public static class TouchGUI
 
     /// <summary>
     /// Start drawing in scaled, safe-area coordinates. Returns the usable width and height.
+    /// zoom draws everything bigger still (Larger Text, for guides and result panels).
     /// </summary>
-    public static Vector2 Begin()
+    public static Vector2 Begin(float zoom = 1f)
     {
-        currentScale = Scale;
+        currentScale = Scale * zoom;
         if (NeonTheme.BodyFont != null) GUI.skin.font = NeonTheme.BodyFont;
         Rect safe = Screen.safeArea;
         currentOffset = new Vector2(safe.x, Screen.height - safe.yMax);

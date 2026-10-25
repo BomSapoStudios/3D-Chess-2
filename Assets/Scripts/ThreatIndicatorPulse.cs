@@ -40,6 +40,7 @@ public class ThreatIndicatorPulse : MonoBehaviour
         // Calculate pulse factor using sine wave (faster than king check indicator)
         float time = Time.time * pulseSpeed;
         float pulseFactor = (Mathf.Sin(time) + 1f) * 0.5f; // 0 to 1
+        if (AccessibilityPrefs.ReduceMotion) pulseFactor = 0.75f; // Reduce Motion: holds steady
         
         // Animate scale
         float currentScale = Mathf.Lerp(minScale, maxScale, pulseFactor);
@@ -47,6 +48,7 @@ public class ThreatIndicatorPulse : MonoBehaviour
         
         // Animate alpha
         float currentAlpha = Mathf.Lerp(minAlpha, maxAlpha, pulseFactor);
+        if (AccessibilityPrefs.HighContrast) currentAlpha = Mathf.Max(currentAlpha, 0.62f); // High Contrast: more solid
         Color newColor = baseColor;
         newColor.a = currentAlpha;
         pulseMaterial.color = newColor;

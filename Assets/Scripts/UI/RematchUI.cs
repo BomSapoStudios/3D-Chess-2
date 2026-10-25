@@ -68,7 +68,11 @@ public class RematchUI : MonoBehaviour
             if (!GameIsOver()) return;
             gameOverAt = Time.unscaledTime;
             localDeadline = Time.unscaledTime + RematchSeconds;
-            Haptics.Selection();
+            // How it went, felt: a win, a loss (checkmated, overrun) or a draw
+            Color outcome = Headline().Item2;
+            if (outcome == NeonTheme.Lime) Haptics.Success();
+            else if (outcome == NeonTheme.Pink) Haptics.Error();
+            else Haptics.Warning();
             if (!Online && !ZombieMode.Active && !QueenBlitz.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
@@ -181,7 +185,7 @@ public class RematchUI : MonoBehaviour
     private void OnGUI()
     {
         if (!Showing || leaving) return;
-        Vector2 ui = TouchGUI.Begin();
+        Vector2 ui = TouchGUI.Begin(AccessibilityPrefs.TextScale); // Larger Text draws the whole panel bigger
         GUI.depth = -15;
 
         float w = Mathf.Min(500f, ui.x - 32f), h = 158f;
@@ -190,7 +194,15 @@ public class RematchUI : MonoBehaviour
         NeonTheme.GUIPanel(panel, NeonTheme.Pink, 0.94f);
 
         var (title, color) = Headline();
-        GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), title, NeonTheme.GUILabelStyle(color, 24, true, TextAnchor.MiddleLeft, display: true));
+        // Color-Blind Symbols: the winner's shape before the headline
+        PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
+        float titleX = panel.x + 18;
+        if (PlayerSymbols.On && winner.HasValue && color == NeonTheme.Lime && !ZombieMode.Active && !QueenBlitz.Active)
+        {
+            PlayerSymbols.DrawGUI(new Rect(titleX, panel.y + 12, 26, 26), winner.Value);
+            titleX += 32;
+        }
+        GUI.Label(new Rect(titleX, panel.y + 8, panel.xMax - 18 - titleX, 34), title, NeonTheme.GUILabelStyle(color, 24, true, TextAnchor.MiddleLeft, display: true));
         // Online: the rating change once the server has recorded the game
         NetRatingChange rating = Online && Bridge != null ? Bridge.MyRating : null;
         if (rating != null)
@@ -225,11 +237,12 @@ public class RematchUI : MonoBehaviour
             // Puzzles: try again, or on to the next one
             bool exists = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
             bool more = exists && QueenBlitz.PuzzleOpen(QueenBlitz.PackId, QueenBlitz.Index + 1);
-            if (TouchGUI.NeonButton(new Rect(x, rowY, 120, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
+            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 404f); // narrower with Larger Text at 2x
+            if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
             GUI.enabled = more;
-            if (TouchGUI.NeonButton(new Rect(x + 132, rowY, 150, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
+            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
             GUI.enabled = true;
-            if (TouchGUI.NeonButton(new Rect(x + 294, rowY, 110, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
+            if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
             string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}"
                 : exists ? $"Clear {QueenBlitz.ChapterUnlock} in this chapter to open the next one"
                 : "That's every puzzle in this pack!";

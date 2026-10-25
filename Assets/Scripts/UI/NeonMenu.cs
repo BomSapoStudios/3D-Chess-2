@@ -119,6 +119,7 @@ public partial class NeonMenu : MonoBehaviour
         else if (debugStats == 13) { ShowOnline(); StartCoroutine(CreateRoutine("{\"boardSize\":\"4x4x4\",\"playerCount\":2,\"timedMode\":true,\"timePerPlayerSeconds\":600}")); } // online test: make a room (OnlineTestPlayer plays it)
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
+        else if (debugStats == 14) ShowAccess(); // Accessibility
         else if (debugStats == 4) { ShowCustomize(); SelectTab(CustomizeTab.Effects); }
         else if (debugStats == 5) { ShowCustomize(); SelectTab(CustomizeTab.Pieces); }
         else if (debugStats == 7) { ShowCustomize(); SelectTab(CustomizeTab.Backdrop); }
@@ -243,6 +244,7 @@ public partial class NeonMenu : MonoBehaviour
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 1f;
         gameObject.AddComponent<GraphicRaycaster>();
+        gameObject.AddComponent<ContrastPlates>(); // High Contrast: plates behind small text
 
         // Background fills the whole screen, including behind the notch
         Image bg = NewImage("Background", transform, NeonTheme.Ground);
@@ -1985,6 +1987,7 @@ public partial class NeonMenu : MonoBehaviour
         Button surprise = NeonButton(card.transform, "Surprise me!", new Vector2(150, 64), NeonTheme.Yellow, NeonTheme.Pink, -1f, 19, () => PickSide(UnityEngine.Random.value < 0.5f ? PieceColor.White : PieceColor.Black));
         Place((RectTransform)surprise.transform, new Vector2(0.5f, 0f), new Vector2(150, 64), new Vector2(175, 62));
 
+        FitCardForTextSize(card.rectTransform);
         sidePicker.SetActive(false);
     }
 
@@ -2135,7 +2138,7 @@ public partial class NeonMenu : MonoBehaviour
         NeonTheme.StyleFilled(image, fill, shadow, tilt);
         Button button = image.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => onClick());
+        button.onClick.AddListener(() => { Haptics.Selection(); onClick(); });
         TextMeshProUGUI label = NewText("Text", image.transform, text, fontSize, NeonTheme.Ground, TextAlignmentOptions.Center);
         Stretch(label.rectTransform);
         return button;

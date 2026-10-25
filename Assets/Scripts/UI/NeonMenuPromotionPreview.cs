@@ -45,6 +45,7 @@ public partial class NeonMenu
         card.type = Image.Type.Sliced;
         card.raycastTarget = false;
         Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(460, 330), Vector2.zero);
+        if (AccessibilityPrefs.TextScale > 1f) card.gameObject.AddComponent<ShrinkToFit>().size = new Vector2(460, 330); // Larger Text: never past the screen edges
         Image border = NewImage("Border", card.transform, NeonTheme.Lime);
         border.sprite = NeonTheme.RoundedOutline;
         border.type = Image.Type.Sliced;

@@ -604,7 +604,7 @@ public class QueenBlitzDirector : MonoBehaviour
     private void DrawTally()
     {
         NeonTheme.GUIPanel(TallyRect, NeonTheme.Yellow, 0.85f);
-        float k = Mathf.Clamp01((Time.time - tallyBump) / 0.3f);
+        float k = AccessibilityPrefs.ReduceMotion ? 1f : Mathf.Clamp01((Time.time - tallyBump) / 0.3f); // Reduce Motion: no bounce
         float bump = 1f + 0.25f * (1f - k) * Mathf.Sin(k * Mathf.PI);
         Color before = GUI.color;
         GUI.color = NeonTheme.Yellow;
@@ -630,6 +630,7 @@ public class QueenBlitzDirector : MonoBehaviour
             {
                 float f = (Time.time - funnelStarted - i * FunnelStep) / FunnelFlight;
                 if (f >= 1f) continue;                 // arrived
+                if (f > 0f && AccessibilityPrefs.ReduceMotion) continue; // Reduce Motion: it leaves its slot without flying
                 if (f > 0f)
                 {
                     float e = f * f;                      // speeds up into the tally
@@ -650,7 +651,7 @@ public class QueenBlitzDirector : MonoBehaviour
                 continue;
             }
             // Impact: lands big, squashes, and settles with a wobble; a flash and a glow fade out
-            float k = Mathf.Clamp01((Time.time - filledAt[i]) / 0.4f);
+            float k = AccessibilityPrefs.ReduceMotion ? 1f : Mathf.Clamp01((Time.time - filledAt[i]) / 0.4f);
             float bump = 1f + 0.55f * Mathf.Exp(-6f * k) * Mathf.Cos(k * Mathf.PI * 3f);
             float squash = 1f - 0.25f * Mathf.Exp(-8f * k) * Mathf.Sin(k * Mathf.PI * 3f);
             float w = SlotSize * bump / squash, h = SlotSize * bump * squash;
@@ -664,6 +665,14 @@ public class QueenBlitzDirector : MonoBehaviour
             }
             GUI.color = Color.Lerp(Color.white, fill, Mathf.Clamp01(k * 2.5f));
             GUI.DrawTexture(hit, NeonIcons.Pawn);
+            if (PlayerSymbols.On)
+            {
+                // Color-Blind Symbols: taken pawns get a tick, so taken and not-yet-taken differ in shape too
+                GUI.color = NeonTheme.Ground;
+                GUI.DrawTexture(new Rect(r.xMax - SlotSize * 0.5f + 1f, r.yMax - SlotSize * 0.5f + 1f, SlotSize * 0.5f, SlotSize * 0.5f), NeonIcons.Tick);
+                GUI.color = NeonTheme.Lime;
+                GUI.DrawTexture(new Rect(r.xMax - SlotSize * 0.5f, r.yMax - SlotSize * 0.5f, SlotSize * 0.5f, SlotSize * 0.5f), NeonIcons.Tick);
+            }
         }
         GUI.color = before;
     }
@@ -690,7 +699,7 @@ public class QueenBlitzDirector : MonoBehaviour
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
             GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
             if (QueenBlitz.Moves == 0)
-                GUI.Label(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+                NeonTheme.SceneLabel(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
             if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
                 Restart(QueenBlitz.Index);
         }

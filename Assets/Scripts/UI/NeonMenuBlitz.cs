@@ -61,6 +61,7 @@ public partial class NeonMenu
         // Everything below the title is rebuilt for each view
         blitzContent = NewRect("Content", card.transform);
         Stretch(blitzContent);
+        FitCardForTextSize(card.rectTransform);
         blitzPicker.SetActive(false);
     }
 

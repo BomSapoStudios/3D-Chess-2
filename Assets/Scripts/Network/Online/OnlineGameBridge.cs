@@ -380,8 +380,10 @@ public class OnlineGameBridge : MonoBehaviour
             if (left.TotalSeconds > 0) clock = left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m left to move" : $"{Math.Max(1, left.Minutes)}m left to move";
         }
         if (!TurnPlannerUI.IsOpen) {
-            GUI.Label(new Rect(20, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
-            if (clock != null) GUI.Label(new Rect(20, ui.y - 56, 300, 24), clock, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14));
+            float left = 20f;
+            if (PlayerSymbols.On) { PlayerSymbols.DrawGUI(new Rect(20, ui.y - 31, 18, 18), OnlineSession.LocalColor); left += 24f; } // Color-Blind Symbols
+            NeonTheme.SceneLabel(new Rect(left, ui.y - 34, 300, 24), you, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14));
+            if (clock != null) NeonTheme.SceneLabel(new Rect(20, ui.y - 56, 300, 24), clock, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14));
         }
 
         if (!string.IsNullOrEmpty(banner) && Time.time < bannerUntil)

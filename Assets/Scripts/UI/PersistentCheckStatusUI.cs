@@ -347,6 +347,41 @@ public class PersistentCheckStatusUI : MonoBehaviour
         bool over = GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.GameOver;
         bool show = enablePersistentStatus && (!QueenBlitz.Active || over);
         if (statusPanel.activeSelf != show) statusPanel.SetActive(show);
+        if (!show) return;
+
+        // High Contrast: a darker bar behind the small neon text
+        if (AccessibilityPrefs.HighContrast && backgroundImage != null && backgroundImage.color.a < 0.88f)
+        {
+            Color c = backgroundImage.color;
+            backgroundImage.color = new Color(c.r, c.g, c.b, 0.88f);
+        }
+        UpdateTurnSymbol();
+    }
+
+    private Image turnSymbol;
+
+    /// <summary>Color-Blind Symbols: the player whose turn it is gets their shape beside "Turn: …"</summary>
+    private void UpdateTurnSymbol()
+    {
+        bool show = PlayerSymbols.On && statusText != null && !chaosEventActive && !gameEnded && currentGameState == GameState.Playing;
+        if (turnSymbol == null)
+        {
+            if (!show) return;
+            var go = new GameObject("Turn Symbol", typeof(RectTransform));
+            go.transform.SetParent(statusPanel.transform, false);
+            turnSymbol = go.AddComponent<Image>();
+            turnSymbol.preserveAspect = true;
+            turnSymbol.raycastTarget = false;
+            turnSymbol.rectTransform.anchorMin = turnSymbol.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        }
+        if (turnSymbol.gameObject.activeSelf != show) turnSymbol.gameObject.SetActive(show);
+        if (!show) return;
+        turnSymbol.sprite = PlayerSymbols.Sprite(currentTurn);
+        turnSymbol.color = PlayerSymbols.Tint(currentTurn);
+        float size = statusText.fontSize * 1.25f;
+        float width = Mathf.Min(statusText.preferredWidth, statusText.rectTransform.rect.width);
+        turnSymbol.rectTransform.sizeDelta = new Vector2(size, size);
+        turnSymbol.rectTransform.anchoredPosition = new Vector2(-width / 2f - size / 2f - 6f, 0f);
     }
 
     /// <summary>The New Game button (shown at game over), in the same place and style as Turn Planner</summary>
@@ -619,7 +654,9 @@ public class PersistentCheckStatusUI : MonoBehaviour
         Debug.Log($"🚨 PersistentCheckStatusUI.OnKingInCheckEvent: {kingColor} king is in check!");
 
         // Update check status for this specific player
+        bool wasInCheck = playerCheckStatus.TryGetValue(kingColor, out bool before) && before;
         playerCheckStatus[kingColor] = true;
+        if (!wasInCheck && !OnlineSession.Replaying) Haptics.Warning(); // check!
 
         // Only update display if in Playing state - prevents interference during state transitions
         if (currentGameState == GameState.Playing)
@@ -800,6 +837,9 @@ public class PersistentCheckStatusUI : MonoBehaviour
             currentTurn = newCurrentPlayer;
             UpdateStatusDisplay();
         }
+        // Your move: a tap when it comes back to you from a robot or an online opponent
+        if (newCurrentPlayer != previousPlayer && Haptics.Mine(newCurrentPlayer) && !Haptics.Mine(previousPlayer) && !OnlineSession.Replaying)
+            Haptics.Light();
     }
     
     /// <summary>

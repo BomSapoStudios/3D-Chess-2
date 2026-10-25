@@ -130,6 +130,20 @@ public class PlacementFocus : MonoBehaviour
 
     private void Dim(Renderer r, bool dim)
     {
+        if (AccessibilityPrefs.HighContrast)
+        {
+            // High Contrast: squares you can use brighten and the rest go much darker
+            if (dimmed.Contains(r) == dim && lit.Contains(r) != dim) return;
+            var block = new MaterialPropertyBlock();
+            Color c = r.sharedMaterial.color;
+            Color look = dim
+                ? (BoardLook.SolidFloors ? Color.Lerp(c, NeonTheme.Ground, 0.75f) : new Color(c.r, c.g, c.b, c.a * 0.25f))
+                : new Color(Mathf.Lerp(c.r, 1f, 0.3f), Mathf.Lerp(c.g, 1f, 0.3f), Mathf.Lerp(c.b, 1f, 0.3f), Mathf.Max(c.a, 0.6f));
+            block.SetColor(ColorId, look);
+            r.SetPropertyBlock(block);
+            if (dim) { dimmed.Add(r); lit.Remove(r); } else { lit.Add(r); dimmed.Remove(r); }
+            return;
+        }
         if (dim && !dimmed.Contains(r))
         {
             var block = new MaterialPropertyBlock();
@@ -142,10 +156,14 @@ public class PlacementFocus : MonoBehaviour
         else if (!dim && dimmed.Remove(r)) r.SetPropertyBlock(null);
     }
 
+    private readonly HashSet<Renderer> lit = new HashSet<Renderer>(); // High Contrast: brightened usable squares
+
     private void RestoreAll()
     {
         foreach (Renderer r in dimmed) if (r != null) r.SetPropertyBlock(null);
         dimmed.Clear();
+        foreach (Renderer r in lit) if (r != null) r.SetPropertyBlock(null);
+        lit.Clear();
         foreach (Renderer r in hidden) if (r != null) r.enabled = true;
         hidden.Clear();
         foreach (Collider c in disabled) if (c != null) c.enabled = true;

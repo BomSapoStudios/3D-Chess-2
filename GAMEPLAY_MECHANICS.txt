@@ -23,6 +23,7 @@ CONTENTS
   13. Rematch
   14. Rankings & Stats
   15. Notifications
+ 15b. Accessibility
   16. Customize
   17. Game Modes Summary
   18. Game Setup Flow
@@ -518,6 +519,64 @@ Push notifications, each switchable on the Notifications screen:
   • Take your time games: a warning about 2 hours before your 24 hours run out
 
 Pushes go only to players who aren't currently in the game.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15b. ACCESSIBILITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The Accessibility button on the home screen (next to Notifications) opens a
+screen of switches. Every visual option starts OFF, and none of them follows
+the iPhone's own settings: the game looks exactly as usual until a player turns
+one on here. Choices are kept on the phone (PlayerPrefs, keys A11y.*).
+
+  Reduce Motion        — fades and still frames in place of big movement.
+                         Home screen buttons stop rocking and rippling (the
+                         blob shape holds still). Chaos spins: each piece fades
+                         out and back in at its new square. Promotions always
+                         use the short Fade animation. Captured pieces, Queen
+                         Blitz pawns and a conquered king fade where they stand
+                         (no flying shards, knocked-flying pawns or orbs).
+                         Pieces glide straight instead of hopping; no landing
+                         bounce, swell or spreading rings. View buttons cut
+                         straight to the new view. Check and threat bubbles stop
+                         pulsing. Backdrops (Melting Clocks, Deep Sea, Earth
+                         Orbit, Neon Jungle, Cyber City, Graveyard, Neon Desert,
+                         Deep Space) and their particles slow to nearly still.
+                         Gameplay timing is unchanged: a fade takes as long as
+                         the move it replaces.
+  Color-Blind Symbols  — each player has a shape as well as a color:
+                           White ● circle     Black ▲ triangle   Green ■ square
+                           Purple ◆ diamond   Yellow ★ star      Orange ✚ cross
+                         The shape floats over every piece (board and benches)
+                         and shows on the on-screen bench, Ready buttons, View
+                         buttons, the turn banner, the chess clocks, the online
+                         "You are…" line and the result panel. A king in check
+                         gets a warning sign and each piece giving check a
+                         crosshair, so check doesn't rely on red alone. Green
+                         turns teal, Yellow paler and Orange deeper, so those
+                         three differ in lightness too. Queen Blitz: pawns taken
+                         this run get a tick in the tracker.
+  High Contrast        — aims for 4.5:1 for small text. Dark plates behind small
+                         neon text (menus and labels over the board), a darker
+                         turn banner, lighter "unavailable" purple, solid
+                         placement dots, more solid selection, capture and check
+                         bubbles, and during setup your usable squares brighten
+                         while the rest go much darker.
+  Larger Text          — 1.5x or 2x for the menus (home, setup, Customize and its
+                         store panel, online screens, Notifications,
+                         Accessibility, the pop-up pickers), the How to Play
+                         guide and the result panel. Screens that no longer fit
+                         scroll (card screens restack into one column); the guide
+                         becomes one scrolling column. Text during play is not
+                         scaled yet.
+  Haptics (ON)         — taps and buzzes on iPhone, on by default with an off
+                         switch: button taps, picking up and placing pieces,
+                         moves landing, captures, zombie bites, check (warning),
+                         promotions and wins (success), losses and overruns
+                         (error), your turn coming back to you, and a light tick
+                         per pawn a Queen Blitz sweep knocks out (bunched up so a
+                         long sweep doesn't buzz nonstop).
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -140,7 +140,7 @@ public class PlacementUI : MonoBehaviour
         GUI.skin.label.normal.textColor = NeonTheme.Lavender;
 
         // Game state info
-        GUI.Label(stateInfoRect, currentStateText);
+        NeonTheme.SceneLabel(stateInfoRect, currentStateText, GUI.skin.label);
         
         // Get camera controller once for all camera-related operations
         CameraController cameraController = FindFirstObjectByType<CameraController>();
@@ -185,7 +185,7 @@ public class PlacementUI : MonoBehaviour
         if (!string.IsNullOrEmpty(instructions))
         {
             Rect instructionsRect = new Rect(20, uiHeight - 70, uiWidth - 40, 60);
-            GUI.Label(instructionsRect, instructions);
+            NeonTheme.SceneLabel(instructionsRect, instructions, GUI.skin.label);
         }
 
         TouchGUI.End();
@@ -241,7 +241,8 @@ public class PlacementUI : MonoBehaviour
         PieceColor? selectedColor = PlacementManager.Instance.SelectedTrayColor;
         ChessPieceType? selectedType = PlacementManager.Instance.SelectedTrayType;
 
-        GUI.Label(new Rect(x - 120f, y, 112f, size), $"{color}'s\nbench", NeonTheme.GUILabelStyle(tint, 14, true, TextAnchor.MiddleRight));
+        NeonTheme.SceneLabel(new Rect(x - 120f, y, 112f, size), $"{color}'s\nbench", NeonTheme.GUILabelStyle(tint, 14, true, TextAnchor.MiddleRight));
+        PlayerSymbols.DrawGUI(new Rect(x - 146f, y + size / 2f - 12f, 24f, 24f), color); // Color-Blind Symbols
         foreach (ChessPieceType t in types)
         {
             Rect r = new Rect(x, y, size, size);
@@ -259,6 +260,7 @@ public class PlacementUI : MonoBehaviour
                 GUI.DrawTexture(new Rect(r.x + 7f, r.y + 5f, size - 14f, size - 14f), icon, ScaleMode.ScaleToFit, true);
                 GUI.color = old;
             }
+            PlayerSymbols.DrawGUI(new Rect(r.x + 3f, r.y + 3f, 15f, 15f), color);
             int count = byType[t].Count;
             if (count > 1)
                 GUI.Label(new Rect(r.xMax - 26f, r.yMax - 20f, 24f, 18f), $"x{count}", NeonTheme.GUILabelStyle(chosen ? NeonTheme.Ground : NeonTheme.White, 12, true, TextAnchor.MiddleRight));
@@ -576,6 +578,7 @@ public class PlacementUI : MonoBehaviour
             {
                 OnPlayerReadyButtonClicked(player);
             }
+            PlayerSymbols.DrawGUI(new Rect(readyRect.x + 4f, readyRect.y + 4f, 16f, 16f), player); // Color-Blind Symbols
         }
 
         GUI.backgroundColor = originalColor; // Restore original color

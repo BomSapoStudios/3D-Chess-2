@@ -74,7 +74,7 @@ public class PlayerViewUI : MonoBehaviour
         float x = (ui.x - total) / 2f;
         float y = ui.y - h - 12f;
 
-        GUI.Label(new Rect(x, y, 48f, h), "View", NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14, true, TextAnchor.MiddleCenter));
+        NeonTheme.SceneLabel(new Rect(x, y, 48f, h), "View", NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14, true, TextAnchor.MiddleCenter));
         x += 52f;
         foreach (PieceColor color in players)
         {
@@ -85,6 +85,7 @@ public class PlayerViewUI : MonoBehaviour
                 ViewFrom(color);
                 LastViewed = color;
             }
+            PlayerSymbols.DrawGUI(new Rect(x + 2f, y + 2f, 13f, 13f), color); // Color-Blind Symbols
             x += w + gap;
         }
         TouchGUI.End();

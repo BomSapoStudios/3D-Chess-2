@@ -47,6 +47,11 @@ public static class Haptics
 
     private static bool On => AccessibilityPrefs.Haptics;
 
+    /// <summary>Is this side played by a person on this phone (not a robot, not someone online)?</summary>
+    public static bool Mine(PieceColor color) =>
+        (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(color))
+        && (!OnlineSession.IsActive || color == OnlineSession.LocalColor);
+
 #if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")] private static extern void _HapticSelection();
     [DllImport("__Internal")] private static extern void _HapticImpact(int style);

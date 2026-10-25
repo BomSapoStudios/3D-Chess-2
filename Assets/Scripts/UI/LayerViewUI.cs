@@ -136,7 +136,7 @@ public class LayerViewUI : MonoBehaviour
         float height = Mathf.Min(40f, (ui.y - y - 20f - 70f) / (levels + 1) - gap);
         float x = ui.x - width - 10f;
 
-        GUI.Label(new Rect(x, y, width, 18f), "Floors", NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14, true, TextAnchor.MiddleCenter));
+        NeonTheme.SceneLabel(new Rect(x, y, width, 18f), "Floors", NeonTheme.GUILabelStyle(NeonTheme.Cyan, 14, true, TextAnchor.MiddleCenter));
         y += 20f;
         if (TouchGUI.NeonButton(new Rect(x, y, width, height), "All", NeonTheme.Pink, NeonTheme.Cyan, outlined: selectedLevel >= 0, fontSize: 16))
         {

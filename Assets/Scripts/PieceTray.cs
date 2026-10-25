@@ -385,7 +385,7 @@ public class PieceTray : MonoBehaviour
                 material.color = NeonTheme.Lavender; // neon style: soft lavender for White
                 break;
             case PieceColor.Black:
-                material.color = NeonTheme.Muted; // neon style: deep violet for Black
+                material.color = NeonTheme.Hex("5A3A8C"); // neon style: deep violet for Black (NeonTheme.Muted, which High Contrast lightens)
                 break;
             case PieceColor.Green:
                 material.color = new Color(0.15f, 0.5f, 0.15f, 0.8f); // Darker forest green

@@ -140,28 +140,73 @@ public class HowToPlayUI : MonoBehaviour
             return;
         }
 
+        float zoom = AccessibilityPrefs.TextScale;
+        if (zoom > 1f)
+        {
+            // Larger Text: the guide is drawn bigger in one column that scrolls
+            TouchGUI.End();
+            ui = TouchGUI.Begin(zoom);
+            GUI.depth = -10;
+        }
+
         Rect full = new Rect(0, 0, ui.x, ui.y);
         TouchGUI.Block(full);
 
-        float margin = 30f;
-        Rect panel = new Rect(margin, 15f, ui.x - margin * 2, ui.y - 30f);
+        float margin = zoom > 1f ? 12f : 30f;
+        Rect panel = new Rect(margin, zoom > 1f ? 8f : 15f, ui.x - margin * 2, ui.y - (zoom > 1f ? 16f : 30f));
         NeonTheme.GUIPanel(panel, NeonTheme.Cyan, 0.96f);
 
         var guide = Guide();
         GUI.Label(new Rect(panel.x, panel.y + 6f, panel.width, 30f), guide.title, NeonTheme.GUILabelStyle(NeonTheme.Lime, 22, true, TextAnchor.MiddleCenter, display: true));
 
         GUIStyle body = NeonTheme.GUILabelStyle(NeonTheme.White, 12, false, TextAnchor.UpperLeft);
-        float columnWidth = (panel.width - 48f) / 2f;
         float top = panel.y + 40f;
-        float columnHeight = panel.height - 100f;
-        GUI.Label(new Rect(panel.x + 16f, top, columnWidth, columnHeight), guide.left, body);
-        GUI.Label(new Rect(panel.x + 32f + columnWidth, top, columnWidth, columnHeight), guide.right, body);
+        if (zoom > 1f)
+        {
+            Rect view = new Rect(panel.x + 16f, top, panel.width - 32f, panel.yMax - 58f - top);
+            ScrollingText(view, guide.left + "\n\n" + guide.right, body);
+        }
+        else
+        {
+            float columnWidth = (panel.width - 48f) / 2f;
+            float columnHeight = panel.height - 100f;
+            GUI.Label(new Rect(panel.x + 16f, top, columnWidth, columnHeight), guide.left, body);
+            GUI.Label(new Rect(panel.x + 32f + columnWidth, top, columnWidth, columnHeight), guide.right, body);
+        }
 
         if (NeonTheme.GUIButton(new Rect(panel.x + panel.width / 2f - 70f, panel.yMax - 52f, 140f, 42f), "Got it!", NeonTheme.Pink, NeonTheme.Cyan, false, 17))
         {
             showing = false;
+            scroll = 0f;
         }
 
         TouchGUI.End();
+    }
+
+    private float scroll;
+
+    /// <summary>Text taller than its box: drag (or use the wheel) to scroll it, with a thin bar showing where you are</summary>
+    private void ScrollingText(Rect view, string text, GUIStyle style)
+    {
+        float height = style.CalcHeight(new GUIContent(text), view.width - 10f);
+        float most = Mathf.Max(0f, height - view.height);
+        Event e = Event.current;
+        if (view.Contains(e.mousePosition))
+        {
+            if (e.type == EventType.MouseDrag) { scroll -= e.delta.y; e.Use(); }
+            else if (e.type == EventType.ScrollWheel) { scroll += e.delta.y * 12f; e.Use(); }
+        }
+        scroll = Mathf.Clamp(scroll, 0f, most);
+
+        GUI.BeginGroup(view);
+        GUI.Label(new Rect(0f, -scroll, view.width - 10f, height), text, style);
+        GUI.EndGroup();
+
+        if (most > 0f && e.type == EventType.Repaint)
+        {
+            float barHeight = Mathf.Max(24f, view.height * view.height / height);
+            float barY = view.y + (view.height - barHeight) * (scroll / most);
+            GUI.DrawTexture(new Rect(view.xMax - 4f, barY, 4f, barHeight), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0, NeonTheme.Cyan, 0, 2);
+        }
     }
 }

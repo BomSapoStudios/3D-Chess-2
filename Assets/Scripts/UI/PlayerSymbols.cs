@@ -88,6 +88,37 @@ public static class PlayerSymbols
         }
     }
 
+    private static Texture2D alert, target;
+
+    /// <summary>A warning triangle with "!" cut out: a king in check</summary>
+    public static Texture2D Alert
+    {
+        get
+        {
+            if (alert == null)
+                alert = Draw(p => Mathf.Max(Triangle(p + new Vector2(0f, 0.12f), 0.8f),
+                    -Mathf.Min(Box(p - new Vector2(0f, 0.08f), new Vector2(0.085f, 0.24f), 0.05f), (p - new Vector2(0f, -0.36f)).magnitude - 0.1f)), 0.1f);
+            return alert;
+        }
+    }
+
+    /// <summary>A crosshair: a piece giving check</summary>
+    public static Texture2D Target
+    {
+        get
+        {
+            if (target == null)
+                target = Draw(p =>
+                {
+                    float d = Mathf.Abs(p.magnitude - 0.55f) - 0.08f;
+                    d = Mathf.Min(d, Box(new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - new Vector2(0f, 0.62f), new Vector2(0.07f, 0.24f), 0.03f));
+                    d = Mathf.Min(d, Box(new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - new Vector2(0.62f, 0f), new Vector2(0.24f, 0.07f), 0.03f));
+                    return d;
+                }, 0.1f);
+            return target;
+        }
+    }
+
     private const int Size = 96;
 
     /// <summary>Rasterize a signed distance (shape units: -1..1 across the picture) with a dark rim</summary>

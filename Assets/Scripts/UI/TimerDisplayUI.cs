@@ -203,6 +203,27 @@ public class TimerDisplayUI : MonoBehaviour
             timerText.alignment = TextAlignmentOptions.Center;
             timerText.font = Resources.Load<TMP_FontAsset>("LiberationSans SDF");
 
+            // Color-Blind Symbols: the player's shape at the start of their clock
+            if (PlayerSymbols.On)
+            {
+                float symbolSize = timerFontSize * 0.8f;
+                GameObject symbolObj = new GameObject("Symbol", typeof(RectTransform));
+                symbolObj.transform.SetParent(timerObj.transform, false);
+                Image symbol = symbolObj.AddComponent<Image>();
+                symbol.sprite = PlayerSymbols.Sprite(player);
+                symbol.color = PlayerSymbols.Tint(player);
+                symbol.preserveAspect = true;
+                symbol.raycastTarget = false;
+                RectTransform symbolRect = symbol.rectTransform;
+                symbolRect.anchorMin = symbolRect.anchorMax = new Vector2(0f, 0.5f);
+                symbolRect.sizeDelta = new Vector2(symbolSize, symbolSize);
+                symbolRect.anchoredPosition = new Vector2(symbolSize / 2f + 4f, 0f);
+                timerText.margin = new Vector4(symbolSize + 8f, 0f, 0f, 0f);
+                timerText.enableAutoSizing = true; // the shape takes some of the width
+                timerText.fontSizeMin = timerFontSize * 0.6f;
+                timerText.fontSizeMax = timerFontSize;
+            }
+
             // Store in dictionary
             playerTimerTexts[player] = timerText;
 

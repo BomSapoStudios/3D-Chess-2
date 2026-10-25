@@ -155,6 +155,17 @@ public partial class NeonMenu
         new GameObject("Neon Menu").AddComponent<NeonMenu>();
     }
 
+    /// <summary>Larger Text: a pop-up card bigger than the zoomed screen pans instead of clipping</summary>
+    private void FitCardForTextSize(RectTransform card)
+    {
+        if (AccessibilityPrefs.TextScale <= 1f || card == null) return;
+        RectTransform holder = NewRect(card.name + " Holder", card.parent);
+        holder.SetSiblingIndex(card.GetSiblingIndex());
+        Stretch(holder);
+        card.SetParent(holder, false);
+        LargerTextLayout.Pan(holder.gameObject, card.sizeDelta + new Vector2(32f, 32f));
+    }
+
     /// <summary>With Larger Text on, put each screen in a scroll view so the zoomed menu never clips</summary>
     private void FitScreensForTextSize()
     {
