@@ -43,7 +43,7 @@ public class ResumeDemo : MonoBehaviour
                 c.queenBlitz = true;
                 QueenBlitz.PackId = "starter";
                 c.blitzPuzzle = 2;
-                c.boardSize = QueenBlitz.PuzzlesOf("starter")[2].size == 6 ? BoardSize.Medium6x6x6 : QueenBlitz.PuzzlesOf("starter")[2].size == 8 ? BoardSize.Large8x8x8 : BoardSize.Small4x4x4;
+                c.boardSize = QueenBlitz.BoardFor(QueenBlitz.PuzzlesOf("starter")[2].size);
                 slot = SavedGames.Blitz;
                 break;
             case 4:

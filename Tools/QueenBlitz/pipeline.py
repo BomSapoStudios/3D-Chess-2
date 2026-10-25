@@ -29,6 +29,14 @@ RECIPES = {
     "block-med-6": (6, False, 2, False, 3, (6, 10), 4),
     "block-hard-6": (6, False, 3, False, 4, (8, 12), 3),
     "devious-8":   (8, False, 0, False, 5, (10, 15), 2),
+    "warmup-5":    (5, False, 0, True, 2, (3, 7), None),
+    "easy-5":      (5, False, 0, False, 2, (4, 8), 6),
+    "medium-5":    (5, False, 0, False, 3, (6, 10), 4),
+    "hard-5":      (5, False, 0, False, 4, (8, 12), 3),
+    "devious-5":   (5, False, 0, False, 5, (10, 15), 2),
+    "ice-easy-5":  (5, True, 1, True, 2, (3, 7), None),
+    "ice-med-5":   (5, True, 3, False, 3, (6, 10), 4),
+    "block-med-5": (5, False, 2, False, 3, (6, 10), 4),
 }
 
 
@@ -91,7 +99,7 @@ def grade(m):
     score += m["trap_share"] * 10                          # the obvious opening fails
     if not m["given"]:
         score += 4 + max(0, 6 - m["starts"]) * 1.5         # few good starting squares
-    score += {4: 0, 6: 4, 8: 9}.get(m["size"], 0)
+    score += {4: 0, 5: 2, 6: 4, 8: 9}.get(m["size"], 0)
     score += 4 if m["ice"] else 0
     score += 3 if m["blocks"] else 0
     score += min(m["diag3"], 3) * 2

@@ -341,7 +341,7 @@ public partial class NeonMenu
         blitzPicker.SetActive(false);
         QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
         playerCount = 2;
-        boardSize = puzzle.size == 4 ? BoardSize.Small4x4x4 : puzzle.size == 6 ? BoardSize.Medium6x6x6 : BoardSize.Large8x8x8;
+        boardSize = QueenBlitz.BoardFor(puzzle.size);
         playerTypes.Clear();
         playerTypes.Add(PlayerType.Human);    // you and your queen, White
         playerTypes.Add(PlayerType.Computer); // the pawns, Black (they never move)

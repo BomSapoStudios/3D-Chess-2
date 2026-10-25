@@ -86,6 +86,7 @@ public static class QueenBlitz
         new PackInfo { id = "blockade", name = "Blockade", pawnPrice = PackPawnPrice },
         new PackInfo { id = "feast", name = "Feast", pawnPrice = PackPawnPrice },
         new PackInfo { id = "review", name = "Review", free = true, review = true },
+        new PackInfo { id = "review-5", name = "Review 5³", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
@@ -459,6 +460,18 @@ public static class QueenBlitz
         Moves++;
         if (QueenBlitzDirector.Instance != null) QueenBlitzDirector.Instance.AfterMove();
     }
+
+    /// <summary>The cube a puzzle of this size plays on</summary>
+    public static BoardSize BoardFor(int size)
+    {
+        switch (size)
+        {
+            case 4: return BoardSize.Small4x4x4;
+            case 5: return BoardSize.Small5x5x5;
+            case 6: return BoardSize.Medium6x6x6;
+            default: return BoardSize.Large8x8x8;
+        }
+    }
 }
 
 /// <summary>A block in a Queen Blitz puzzle: the queen can't enter or pass its square</summary>
@@ -651,7 +664,7 @@ public class QueenBlitzDirector : MonoBehaviour
         config.blitzPuzzle = Mathf.Clamp(index, 0, QueenBlitz.Puzzles.Length - 1);
         // The next puzzle may be on another size of cube
         int size = QueenBlitz.Puzzles[config.blitzPuzzle].size;
-        config.boardSize = size == 4 ? BoardSize.Small4x4x4 : size == 6 ? BoardSize.Medium6x6x6 : BoardSize.Large8x8x8;
+        config.boardSize = QueenBlitz.BoardFor(size);
         SceneController.Instance.LoadGameScene(config);
     }
 

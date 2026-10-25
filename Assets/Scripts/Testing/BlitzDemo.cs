@@ -44,7 +44,7 @@ public class BlitzDemo : MonoBehaviour
         QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
         var config = new GameConfiguration();
         config.playerCount = 2;
-        config.boardSize = puzzle.size == 4 ? BoardSize.Small4x4x4 : puzzle.size == 6 ? BoardSize.Medium6x6x6 : BoardSize.Large8x8x8;
+        config.boardSize = QueenBlitz.BoardFor(puzzle.size);
         config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
         config.aiPlayerCount = 1;
         config.queenBlitz = true;
