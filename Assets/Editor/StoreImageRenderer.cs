@@ -27,7 +27,6 @@ public static class StoreImageRenderer
     private const string CandidatesKey = "StoreImageRenderer.Candidates";
     private const string NewOnlyKey = "StoreImageRenderer.NewOnly";
     private static bool timingCandidates;
-    private const string ProductPrefix = "BomSapo.Chess3D.";
     private const int PromoSize = 1024;
     private const int ReviewWidth = 2796, ReviewHeight = 1290;
 
@@ -51,7 +50,7 @@ public static class StoreImageRenderer
 
     public static string OutputFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Desktop", "store-images");
 
-    public static string ProductId(string storeId) => ProductPrefix + storeId.ToLowerInvariant();
+    public static string ProductId(string storeId) => Store.ProductId(storeId);
 
     /// <summary>Tools > Store Images > New Items Only: only items without images yet (new backdrops, sets, promotions)</summary>
     [MenuItem("Tools/Store Images/New Items Only")]

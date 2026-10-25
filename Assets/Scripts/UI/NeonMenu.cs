@@ -1646,7 +1646,12 @@ public partial class NeonMenu : MonoBehaviour
         ResetFriendsCache();
     }
 
-    private void OnDestroy() => GameCenter.Restored -= OnGameCenterRestored;
+    private void OnDestroy()
+    {
+        GameCenter.Restored -= OnGameCenterRestored;
+        Purchases.PricesLoaded -= RefreshCustomize;
+        Purchases.Owned -= OnPurchased;
+    }
 
     private void ResetFriendsCache()
     {

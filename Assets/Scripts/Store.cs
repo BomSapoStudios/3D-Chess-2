@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// What's unlocked on this phone, and what things cost. Cyberpunk pieces, the Neon Glow backdrop
-/// and the Fade promotion are free; everything else unlocks for pawns (PawnBank) or, once
-/// in-app purchases are set up, for money. Ownership is saved on this phone.
+/// and the Fade promotion are free; everything else unlocks for pawns (PawnBank) or for money
+/// (Purchases, the App Store). Ownership is saved on this phone.
 /// </summary>
 public static class Store
 {
@@ -32,9 +33,26 @@ public static class Store
     public static bool BuyWithPawns(string id, int price)
     {
         if (!PawnBank.Spend(price)) return false;
+        Grant(id);
+        return true;
+    }
+
+    /// <summary>Marks an item owned on this phone (paid for in pawns or money)</summary>
+    public static void Grant(string id)
+    {
         PlayerPrefs.SetInt("Owned." + id, 1);
         PlayerPrefs.Save();
-        return true;
+    }
+
+    /// <summary>The App Store product ID for an item, e.g. BomSapo.Chess3D.set.abyssglow</summary>
+    public static string ProductId(string id) => "BomSapo.Chess3D." + id.ToLowerInvariant();
+
+    /// <summary>Every item that's sold (everything that isn't free)</summary>
+    public static IEnumerable<string> PaidIds()
+    {
+        foreach (PieceShapes.Kind k in PieceShapes.All) if (!Free(k)) yield return Id(k);
+        foreach (Backdrops.Kind k in Backdrops.All) if (!Free(k)) yield return Id(k);
+        foreach (PromotionStyle.Kind k in PromotionStyle.All) if (!Free(k)) yield return Id(k);
     }
 
     /// <summary>

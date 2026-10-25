@@ -93,7 +93,7 @@ public partial class NeonMenu
         title.rectTransform.anchorMin = new Vector2(0, 0);
         title.rectTransform.anchorMax = new Vector2(1, 1);
         title.rectTransform.offsetMin = new Vector2(62, 0);
-        title.rectTransform.offsetMax = new Vector2(-260, 0);
+        title.rectTransform.offsetMax = new Vector2(-380, 0);
         title.rectTransform.localEulerAngles = new Vector3(0, 0, -1.5f);
 
         Button done = NeonButton(header, "Done!", new Vector2(104, 42), NeonTheme.Pink, NeonTheme.Cyan, 1.5f, 19, ShowMenu);
@@ -130,6 +130,14 @@ public partial class NeonMenu
             Refresh();
             StartPreviewForTab();
         });
+
+#if !UNITY_WEBGL || UNITY_EDITOR
+        // Restore purchases (Apple requires one): what this Apple ID bought comes back on a new phone
+        Button restore = NeonButton(header, "Restore purchases", new Vector2(124, 34), NeonTheme.Lavender, NeonTheme.Pink, 0f, 12, RestorePurchases);
+        Place((RectTransform)restore.transform, new Vector2(1, 0.5f), new Vector2(124, 34), new Vector2(-312, 0));
+#endif
+        Purchases.PricesLoaded += RefreshCustomize;
+        Purchases.Owned += OnPurchased;
 
         // ── Body: rail | preview card | grid ──
         RectTransform body = NewRect("Body", root);
@@ -384,8 +392,7 @@ public partial class NeonMenu
         Stretch(panel.dollarLabel.rectTransform);
         Button dollarBuy = dollarFace.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(dollarBuy);
-        // Money purchases need the App Store set up (StoreKit): not yet
-        dollarBuy.onClick.AddListener(() => { Haptics.Selection(); ShowToast("Buying with money is coming soon. Pawns work now!"); });
+        dollarBuy.onClick.AddListener(UnlockWithMoney);
 
         panel.note = NewText("Note", box, "", 12, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         panel.note.fontStyle = FontStyles.Normal;
@@ -409,28 +416,83 @@ public partial class NeonMenu
         panel.note.text = enough ? $"You have {have:N0} pawns." : $"You have {have:N0} pawns: {pawns - have:N0} more to go.";
     }
 
+    /// <summary>The locked item being previewed on this tab (its Store id and pawn price), or false</summary>
+    private bool ShowingLocked(out string id, out int pawns)
+    {
+        id = null; pawns = 0;
+        if (tab == CustomizeTab.Pieces && PieceShapes.Showing.HasValue) { id = Store.Id(PieceShapes.Showing.Value); pawns = Store.PieceSetPawns; }
+        else if (tab == CustomizeTab.Effects && showingPromotion.HasValue) { id = Store.Id(showingPromotion.Value); pawns = Store.PromotionPawns; }
+        else if (tab == CustomizeTab.Backdrop && showingBackdrop.HasValue) { id = Store.Id(showingBackdrop.Value); pawns = Store.BackdropPawns; }
+        return id != null;
+    }
+
     private void UnlockWithPawns()
     {
-        bool pieces = tab == CustomizeTab.Pieces, effects = tab == CustomizeTab.Effects;
-        string id; int price;
-        if (pieces && PieceShapes.Showing.HasValue) { id = Store.Id(PieceShapes.Showing.Value); price = Store.PieceSetPawns; }
-        else if (effects && showingPromotion.HasValue) { id = Store.Id(showingPromotion.Value); price = Store.PromotionPawns; }
-        else if (tab == CustomizeTab.Backdrop && showingBackdrop.HasValue) { id = Store.Id(showingBackdrop.Value); price = Store.BackdropPawns; }
-        else return;
+        if (!ShowingLocked(out string id, out int price)) return;
         if (!Store.BuyWithPawns(id, price))
         {
             ShowToast($"Not enough pawns yet: you need {price - PawnBank.Total:N0} more.");
             return;
         }
         Haptics.Selection();
-        // Unlocked: put it to use straight away
-        if (pieces) { PieceShapes.Current = PieceShapes.Showing.Value; PieceShapes.Showing = null; }
-        else if (effects) { PromotionStyle.Current = showingPromotion.Value; showingPromotion = null; }
+        UseUnlocked();
+    }
+
+    private bool buying;
+
+    private void UnlockWithMoney()
+    {
+        if (buying || !ShowingLocked(out string id, out _)) return;
+        Haptics.Selection();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        ShowToast("Buying with money works in the iPhone app. Pawns work here!");
+#else
+        buying = true;
+        Purchases.Buy(id, outcome =>
+        {
+            buying = false;
+            switch (outcome)
+            {
+                case Purchases.Outcome.Bought: break;   // OnPurchased puts it to use
+                case Purchases.Outcome.Cancelled: ShowToast("No problem, nothing was charged."); break;
+                case Purchases.Outcome.Pending: ShowToast("Waiting for approval. It unlocks as soon as it's approved."); break;
+                case Purchases.Outcome.Unavailable: ShowToast("The App Store isn't reachable right now. Try again in a moment."); break;
+                default: ShowToast("The purchase didn't go through. Nothing was charged; please try again."); break;
+            }
+        });
+#endif
+    }
+
+    /// <summary>Bought or restored through the App Store: if it's the one on show, put it to use</summary>
+    private void OnPurchased(string id)
+    {
+        if (customizeScreen == null || !customizeScreen.activeInHierarchy) return;
+        if (ShowingLocked(out string showing, out _) && showing == id) { UseUnlocked(); return; }
+        BuildCards();
+        RefreshCustomize();
+    }
+
+    /// <summary>Just unlocked: use it straight away</summary>
+    private void UseUnlocked()
+    {
+        if (tab == CustomizeTab.Pieces) { PieceShapes.Current = PieceShapes.Showing.Value; PieceShapes.Showing = null; }
+        else if (tab == CustomizeTab.Effects) { PromotionStyle.Current = showingPromotion.Value; showingPromotion = null; }
         else { Backdrops.Current = showingBackdrop.Value; showingBackdrop = null; }
         ShowToast("Unlocked!");
         BuildCards();
         Refresh();
         StartPreviewForTab();
+    }
+
+    private void RestorePurchases()
+    {
+        Haptics.Selection();
+        ShowToast("Checking the App Store for your purchases...");
+        Purchases.Restore(ok =>
+        {
+            ShowToast(ok ? "Your purchases are restored." : "Couldn't reach the App Store. Please try again.");
+            if (customizeScreen != null && customizeScreen.activeInHierarchy) { BuildCards(); Refresh(); StartPreviewForTab(); }
+        });
     }
 
     // A row of finish chips; picking one shows the set turning in it
@@ -773,7 +835,7 @@ public partial class NeonMenu
         PieceShapes.Kind set = PieceShapes.Active;
         bool setLocked = PieceShapes.Showing.HasValue;
         finishBox.SetActive(!setLocked);
-        if (setLocked) ShowUnlock(piecesUnlock, Store.PieceSetPawns, Store.PieceSetDollars); else piecesUnlock.root.SetActive(false);
+        if (setLocked) ShowUnlock(piecesUnlock, Store.PieceSetPawns, Purchases.Price(Store.Id(set), Store.PieceSetDollars)); else piecesUnlock.root.SetActive(false);
         piecesName.text = PieceShapes.DisplayName(set);
         piecesBlurb.text = PieceShapes.Description(set);
         PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
@@ -782,11 +844,11 @@ public partial class NeonMenu
         if (backdropLoop == null) { backdropPicture.texture = Thumb("Backdrop_" + ShownBackdrop); Cover(backdropPicture); }
         backdropName.text = Backdrops.DisplayName(ShownBackdrop);
         backdropBlurb.text = Backdrops.Description(ShownBackdrop);
-        if (showingBackdrop.HasValue) ShowUnlock(backdropUnlock, Store.BackdropPawns, Store.BackdropDollars); else backdropUnlock.root.SetActive(false);
+        if (showingBackdrop.HasValue) ShowUnlock(backdropUnlock, Store.BackdropPawns, Purchases.Price(Store.Id(ShownBackdrop), Store.BackdropDollars)); else backdropUnlock.root.SetActive(false);
 
         effectsName.text = PromotionStyle.DisplayName(ShownPromotion);
         effectsBlurb.text = PromotionStyle.Description(ShownPromotion);
-        if (showingPromotion.HasValue) ShowUnlock(effectsUnlock, Store.PromotionPawns, Store.PromotionDollars); else effectsUnlock.root.SetActive(false);
+        if (showingPromotion.HasValue) ShowUnlock(effectsUnlock, Store.PromotionPawns, Purchases.Price(Store.Id(ShownPromotion), Store.PromotionDollars)); else effectsUnlock.root.SetActive(false);
 
         foreach (var s in boardSwitches)
         {
