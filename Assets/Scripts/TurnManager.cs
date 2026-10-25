@@ -998,6 +998,13 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private void DetermineOpeningTurnOrder()
     {
+        // A resumed game is past its opening: the saved player keeps the move (or a robot moving first would play again)
+        if (SavedGames.Restored)
+        {
+            Debug.Log($"🔄 TurnManager: Resumed game - {currentPlayer} keeps the move");
+            return;
+        }
+
         PieceColor previousPlayer = currentPlayer;
         PieceColor startingPlayer;
         string reason;

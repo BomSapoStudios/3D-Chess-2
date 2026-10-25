@@ -93,6 +93,7 @@ public class SavedGames : MonoBehaviour
     private Save resume;
     private bool finished;
     private bool setUp; // this scene's game has reached setup (the state left over from the last game doesn't count)
+    private bool restored; // this game was put back from a save
     private int turnsSeen, savedAtTurn = -1, movesBefore;
     private float nextClockSave;
     private TurnManager subscribedTurns;
@@ -125,6 +126,9 @@ public class SavedGames : MonoBehaviour
     /// <summary>A saved game is being put back (setup is skipped with stand-in pieces)</summary>
     public static bool Resuming => Instance != null && Instance.resume != null;
 
+    /// <summary>This game was put back from a save: it's past its opening, so the saved player keeps the move</summary>
+    public static bool Restored => Instance != null && Instance.restored;
+
     private int TurnKey => QueenBlitz.Active ? QueenBlitz.Moves : turnsSeen;
 
     private void Update()
@@ -139,7 +143,7 @@ public class SavedGames : MonoBehaviour
         if (state == GameState.PiecePlacement && (!setUp || finished))
         {
             // This game's setup (or a rematch's, in the same scene)
-            if (finished) { finished = false; savedAtTurn = -1; turnsSeen = 0; movesBefore = 0; }
+            if (finished) { finished = false; restored = false; savedAtTurn = -1; turnsSeen = 0; movesBefore = 0; }
             setUp = true;
         }
         if (!setUp || finished) return;
@@ -186,6 +190,7 @@ public class SavedGames : MonoBehaviour
         if (!ZombiesOut()) return;
         Restore(resume);
         resume = null;
+        restored = true;
         turnsSeen = 0;
         savedAtTurn = TurnKey; // this position is the save
     }
