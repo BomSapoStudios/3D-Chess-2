@@ -838,10 +838,14 @@ public partial class NeonMenu : MonoBehaviour
         gamesSection.SetActive(false);
 
         SectionLabel(right, "Play anyone", NeonTheme.PinkSoft);
-        TextMeshProUGUI blurb = NewText("Blurb", right, "Get paired with the next player looking for a 5x5x5 game.", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
+        TextMeshProUGUI blurb = NewText("Blurb", right, "Pick a board and get paired with the next player looking for one.", 15, NeonTheme.Lavender, TextAlignmentOptions.TopLeft);
         blurb.fontStyle = FontStyles.Normal;
         blurb.enableWordWrapping = true;
-        blurb.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
+        blurb.enableAutoSizing = true;
+        blurb.fontSizeMin = 12;
+        blurb.fontSizeMax = 15;
+        blurb.gameObject.AddComponent<LayoutElement>().preferredHeight = 22;
+        BuildMatchSizeRow(right);
         RectTransform matchRow = Row(right);
         NeonButton(matchRow, "Find match!", new Vector2(0, 50), NeonTheme.Pink, NeonTheme.Cyan, -1f, 19, FindOnlineMatch);
         matchButtonRow = matchRow.gameObject;
@@ -897,11 +901,17 @@ public partial class NeonMenu : MonoBehaviour
         NeonSpinner spinner = NeonSpinner.Create(panel, 84);
         Place((RectTransform)spinner.transform, new Vector2(0, 0.5f), new Vector2(84, 84), new Vector2(46, 0));
 
+        // Wraps and shrinks so long lines stay inside the card
         searchingLabel = NewText("Label", panel, "", 17, NeonTheme.Yellow, TextAlignmentOptions.Left);
+        searchingLabel.enableWordWrapping = true;
+        searchingLabel.enableAutoSizing = true;
+        searchingLabel.fontSizeMin = 11;
+        searchingLabel.fontSizeMax = 17;
+        searchingLabel.overflowMode = TextOverflowModes.Ellipsis;
         searchingLabel.rectTransform.anchorMin = new Vector2(0, 0.5f);
         searchingLabel.rectTransform.anchorMax = new Vector2(1, 1);
         searchingLabel.rectTransform.offsetMin = new Vector2(100, 0);
-        searchingLabel.rectTransform.offsetMax = new Vector2(0, -4);
+        searchingLabel.rectTransform.offsetMax = new Vector2(-4, -2);
 
         Button cancel = NeonButton(panel, "Cancel", new Vector2(120, 38), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, CancelFindMatch);
         RectTransform cancelRect = (RectTransform)cancel.transform;
@@ -912,6 +922,46 @@ public partial class NeonMenu : MonoBehaviour
 
         searchingPanel = panel.gameObject;
         searchingPanel.SetActive(false);
+    }
+
+    // Find Match board sizes: only 5x5x5 is live, the others are shown greyed out until they launch
+    private void BuildMatchSizeRow(RectTransform parent)
+    {
+        RectTransform row = NewRect("Board Sizes", parent);
+        var rowSize = row.gameObject.AddComponent<LayoutElement>();
+        rowSize.preferredHeight = 44;
+        rowSize.flexibleHeight = 0;
+        var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 10;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = true;
+
+        foreach (string size in new[] { "5x5x5", "6x6x6", "8x8x8" })
+        {
+            bool live = size == "5x5x5";
+            Image chip = NewImage(size, row, NeonTheme.PinkSoft);
+            if (live) NeonTheme.StyleFilled(chip, NeonTheme.PinkSoft, NeonTheme.Pink);
+            else NeonTheme.StyleOutline(chip, NeonTheme.Muted);
+            Button button = chip.gameObject.AddComponent<Button>();
+            NeonTheme.NeutralTint(button);
+            string name = size;
+            button.onClick.AddListener(() =>
+            {
+                Haptics.Selection();
+                if (!live) SetOnlineStatus($"{name} matches are coming soon!");
+            });
+            string text = live ? size : $"{size}\n<size=72%>Coming soon!</size>";
+            TextMeshProUGUI label = NewText("Text", chip.transform, text, 15, live ? NeonTheme.Ground : NeonTheme.Muted, TextAlignmentOptions.Center);
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 10;
+            label.fontSizeMax = 15;
+            label.lineSpacing = -12;
+            Stretch(label.rectTransform);
+            label.rectTransform.offsetMin = new Vector2(4, 2);
+            label.rectTransform.offsetMax = new Vector2(-4, -2);
+        }
     }
 
     private void SetSearching(string label)
