@@ -3,30 +3,15 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Development-only: plays Queen Blitz puzzles by themselves with the solver's answers and checks
+/// Development-only: plays Queen Blitz puzzles by themselves with the solver's answers (each
+/// puzzle's "line" in its pack file) and checks
 /// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
 /// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
 /// Auto-place for the queen (each costs a pawn). Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
 {
-    private static BoardPosition P(int x, int y, int z) => new BoardPosition(x, y, z);
     private static bool autoPlace;
-
-    // The queen's start, then each square she stops on (from Tools/QueenBlitz/puzzles.py)
-    private static readonly BoardPosition[][] Solutions =
-    {
-        new[] { P(0, 1, 1), P(3, 1, 1) },
-        new[] { P(0, 0, 0), P(3, 0, 0), P(3, 3, 0) },
-        new[] { P(0, 0, 0), P(2, 2, 2), P(2, 2, 0) },
-        new[] { P(2, 0, 2), P(2, 0, 0), P(2, 2, 2), P(0, 0, 0) },
-        new[] { P(3, 0, 0), P(3, 2, 2), P(1, 2, 0) },
-        new[] { P(3, 0, 5), P(3, 0, 2), P(3, 5, 2), P(5, 3, 0) },
-        new[] { P(5, 0, 5), P(1, 0, 1), P(4, 0, 1), P(0, 4, 5) },
-        new[] { P(0, 0, 0), P(2, 0, 0), P(2, 3, 0) },
-        new[] { P(0, 1, 4), P(5, 1, 4), P(1, 5, 4), P(5, 5, 4), P(5, 5, 0) },
-        new[] { P(4, 5, 1), P(4, 0, 1), P(0, 0, 5), P(5, 5, 5), P(3, 5, 5), P(5, 5, 3) },
-    };
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Boot()
@@ -59,7 +44,7 @@ public class BlitzDemo : MonoBehaviour
         QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
         var config = new GameConfiguration();
         config.playerCount = 2;
-        config.boardSize = puzzle.size == 4 ? BoardSize.Small4x4x4 : BoardSize.Medium6x6x6;
+        config.boardSize = puzzle.size == 4 ? BoardSize.Small4x4x4 : puzzle.size == 6 ? BoardSize.Medium6x6x6 : BoardSize.Large8x8x8;
         config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
         config.aiPlayerCount = 1;
         config.queenBlitz = true;
@@ -72,7 +57,7 @@ public class BlitzDemo : MonoBehaviour
 
         while (PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
         yield return new WaitForSeconds(1f);
-        BoardPosition[] solution = Solutions[index];
+        BoardPosition[] solution = puzzle.line; // the queen's start, then each square she stops on
         if (!puzzle.queen.HasValue)
         {
             // Place the queen where the solver starts, as a player would

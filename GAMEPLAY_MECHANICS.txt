@@ -364,8 +364,15 @@ Screen:
   • The puzzle name, moves, par and pawns left sit at the very top, with the puzzle's tip
     under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
 
-The ten test puzzles: 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place her; blocks
-appear from 6; 8–10 are ice (pars 1, 2, 2, 3, 2, 3, 3, 2, 4, 5).
+The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place
+her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);
+8–10 are ice (pars 1, 2, 2, 3, 2, 3, 3, 2, 4, 5).
+
+Puzzle files:
+  • Each pack is a JSON file in Assets/Resources/QueenBlitz (starter.json so far). Each puzzle
+    lists its pawns, blocks, queen (empty = you place her), par, an Auto-place start and one
+    par solution. Tools/QueenBlitz/packs.py re-solves every pack and checks them;
+    puzzles.py --export rewrites starter.json.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

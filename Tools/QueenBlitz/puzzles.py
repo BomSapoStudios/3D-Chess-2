@@ -1,5 +1,8 @@
-"""The ten test puzzles. Run this file to re-check every par with the solver."""
+"""The Starter pack: the ten free puzzles. Run this file to re-check every par with the solver;
+`python3 puzzles.py --export` also writes them to the app (Assets/Resources/QueenBlitz/starter.json)."""
+import sys
 from solver import Board
+import packs
 
 # name, size, queen start (None: the player places it), pawns, blockers, tip, ice (optional)
 PUZZLES = [
@@ -13,8 +16,8 @@ PUZZLES = [
      "The biggest sweep isn't always the best first move."),
     ("Your Move", 4, None, [(1, 2, 0), (2, 2, 1), (3, 1, 1), (3, 2, 2)], [],
      "Place the queen yourself. Where you start matters."),
-    ("Roadblocks", 6, None, [(3, 0, 4), (3, 5, 2), (4, 4, 1), (5, 3, 0)], [(1, 1, 5), (2, 4, 4), (4, 1, 4), (4, 3, 2)],
-     "Blocks stop the queen. Find a way around them."),
+    ("Roadblock", 6, None, [(0, 2, 4), (0, 3, 4), (0, 4, 4), (1, 1, 4), (2, 1, 4), (3, 1, 4), (4, 1, 4)], [(0, 1, 4)],
+     "A block stops the queen dead. Find another way round the corner."),
     ("Diagonal Detour", 6, None, [(0, 4, 5), (1, 3, 4), (2, 0, 1), (2, 2, 3), (3, 0, 1), (4, 0, 4)], [(0, 1, 4), (2, 2, 5), (3, 3, 1), (5, 5, 4)],
      "Only one starting square works in three."),
     ("First Frost", 4, (0, 0, 0), [(1, 0, 0), (2, 0, 0), (2, 1, 0), (2, 2, 0), (2, 3, 0)], [(3, 0, 0)],
@@ -34,3 +37,5 @@ if __name__ == "__main__":
         starts = 1 if start else len(b.optimal_starts(par))
         free = Board(n, pawns, (), ice).solve(start, limit=8)[0] if blocks else None
         print(f"{i:2} {name:16} {n}³ {'ice ' if ice else ''}par={par} greedy={greedy} starts={starts} parWithoutBlocks={free} solution={line}")
+    if "--export" in sys.argv:
+        print("wrote", packs.export("starter", "Starter", True, PUZZLES))

@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 /// you choose where she starts (placing her is not a move). On an ice floor she can't stop
 /// partway: every move slides to the board's edge or the square before a block.
 ///
-/// Pars come from the solver in Tools/QueenBlitz (puzzles.py checks them all).
+/// Puzzles load from JSON pack files; pars come from the solver in Tools/QueenBlitz (packs.py checks them all).
 /// </summary>
 public static class QueenBlitz
 {
@@ -26,48 +26,87 @@ public static class QueenBlitz
         public int par;
         public string tip;
         public bool ice;                 // ice floor: every move slides to the edge or a block
+        public BoardPosition[] line;     // one par solution: the queen's start, then each square she stops on
     }
 
-    private static BoardPosition P(int x, int y, int z) => new BoardPosition(x, y, z);
+    // ───────────────────────── Packs ─────────────────────────
+    // Puzzles live in JSON, one file per pack, in Assets/Resources/QueenBlitz (written and checked by
+    // Tools/QueenBlitz/packs.py). Squares are flat x,y,z lists; an empty "queen" means the player places her.
 
-    public static readonly Puzzle[] Puzzles =
+    [System.Serializable]
+    private class PuzzleData
     {
-        new Puzzle { name = "Straight Shot", size = 4, queen = P(0, 1, 1), par = 1,
-            pawns = new[] { P(1, 1, 1), P(2, 1, 1), P(3, 1, 1) }, blocks = new BoardPosition[0],
-            tip = "The queen drives straight through every pawn on her line." },
-        new Puzzle { name = "Corner Turn", size = 4, queen = P(0, 0, 0), par = 2,
-            pawns = new[] { P(1, 0, 0), P(2, 0, 0), P(3, 0, 0), P(3, 1, 0), P(3, 2, 0), P(3, 3, 0) }, blocks = new BoardPosition[0],
-            tip = "Finish one line where the next one begins." },
-        new Puzzle { name = "Stop Short", size = 4, queen = P(0, 0, 0), par = 2,
-            pawns = new[] { P(1, 1, 1), P(2, 2, 2), P(2, 2, 0), P(2, 2, 1) }, blocks = new BoardPosition[0],
-            tip = "You don't have to ride a line to the edge." },
-        new Puzzle { name = "Long Way Round", size = 4, queen = P(2, 0, 2), par = 3,
-            pawns = new[] { P(0, 0, 0), P(1, 1, 1), P(2, 0, 1), P(2, 1, 1), P(2, 2, 2) }, blocks = new BoardPosition[0],
-            tip = "The biggest sweep isn't always the best first move." },
-        new Puzzle { name = "Your Move", size = 4, queen = null, best = P(3, 0, 0), par = 2,
-            pawns = new[] { P(1, 2, 0), P(2, 2, 1), P(3, 1, 1), P(3, 2, 2) }, blocks = new BoardPosition[0],
-            tip = "Place the queen yourself. Where you start matters." },
-        new Puzzle { name = "Roadblocks", size = 6, queen = null, best = P(3, 0, 5), par = 3,
-            pawns = new[] { P(3, 0, 4), P(3, 5, 2), P(4, 4, 1), P(5, 3, 0) },
-            blocks = new[] { P(1, 1, 5), P(2, 4, 4), P(4, 1, 4), P(4, 3, 2) },
-            tip = "Blocks stop the queen. Find a way around them." },
-        new Puzzle { name = "Diagonal Detour", size = 6, queen = null, best = P(5, 0, 5), par = 3,
-            pawns = new[] { P(0, 4, 5), P(1, 3, 4), P(2, 0, 1), P(2, 2, 3), P(3, 0, 1), P(4, 0, 4) },
-            blocks = new[] { P(0, 1, 4), P(2, 2, 5), P(3, 3, 1), P(5, 5, 4) },
-            tip = "Only one starting square works in three." },
-        new Puzzle { name = "First Frost", size = 4, queen = P(0, 0, 0), par = 2, ice = true,
-            pawns = new[] { P(1, 0, 0), P(2, 0, 0), P(2, 1, 0), P(2, 2, 0), P(2, 3, 0) },
-            blocks = new[] { P(3, 0, 0) },
-            tip = "Ice! The queen slides until the edge or a block stops her." },
-        new Puzzle { name = "Ice Rink", size = 6, queen = null, best = P(0, 1, 4), par = 4, ice = true,
-            pawns = new[] { P(1, 1, 4), P(2, 4, 4), P(2, 5, 4), P(4, 1, 4), P(4, 5, 4), P(5, 1, 4), P(5, 5, 1), P(5, 5, 2), P(5, 5, 3), P(5, 5, 4) },
-            blocks = new[] { P(0, 1, 3), P(1, 0, 5), P(4, 3, 1), P(4, 3, 5), P(5, 1, 0), P(5, 2, 5), P(5, 3, 2), P(5, 5, 5) },
-            tip = "Use the blocks as brakes." },
-        new Puzzle { name = "Black Ice", size = 6, queen = null, best = P(4, 5, 1), par = 5, ice = true,
-            pawns = new[] { P(0, 0, 5), P(2, 2, 5), P(3, 0, 2), P(3, 3, 5), P(3, 5, 5), P(4, 3, 1), P(4, 4, 1), P(4, 4, 5), P(4, 5, 4), P(4, 5, 5), P(5, 5, 3) },
-            blocks = new[] { P(0, 5, 5), P(1, 4, 4), P(2, 3, 1), P(2, 5, 3), P(2, 5, 5), P(3, 2, 3), P(4, 3, 3), P(5, 3, 3) },
-            tip = "Only one starting square clears it in five." },
-    };
+        public string name;
+        public int size;
+        public int[] queen;
+        public int[] best;
+        public int[] pawns;
+        public int[] blocks;
+        public int par;
+        public string tip;
+        public bool ice;
+        public int[] line;
+    }
+
+    [System.Serializable]
+    private class PackData
+    {
+        public string id;
+        public string name;
+        public bool free;
+        public PuzzleData[] puzzles;
+    }
+
+    /// <summary>The pack being played. Only the free Starter pack so far.</summary>
+    public const string PackId = "starter";
+
+    private static Puzzle[] puzzles;
+
+    public static Puzzle[] Puzzles
+    {
+        get
+        {
+            if (puzzles == null) puzzles = LoadPack(PackId);
+            return puzzles;
+        }
+    }
+
+    private static Puzzle[] LoadPack(string id)
+    {
+        TextAsset file = Resources.Load<TextAsset>("QueenBlitz/" + id);
+        if (file == null)
+        {
+            Debug.LogError($"Queen Blitz: no pack file Resources/QueenBlitz/{id}.json");
+            return new Puzzle[0];
+        }
+        PackData pack = JsonUtility.FromJson<PackData>(file.text);
+        var list = new List<Puzzle>();
+        foreach (PuzzleData d in pack.puzzles)
+        {
+            BoardPosition[] queen = Cells(d.queen);
+            BoardPosition[] best = Cells(d.best);
+            list.Add(new Puzzle
+            {
+                name = d.name, size = d.size, par = d.par, tip = d.tip, ice = d.ice,
+                queen = queen.Length > 0 ? queen[0] : (BoardPosition?)null,
+                best = best.Length > 0 ? best[0] : default,
+                pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line),
+            });
+        }
+        return list.ToArray();
+    }
+
+    private static BoardPosition[] Cells(int[] flat)
+    {
+        if (flat == null) return new BoardPosition[0];
+        var cells = new BoardPosition[flat.Length / 3];
+        for (int i = 0; i < cells.Length; i++) cells[i] = new BoardPosition(flat[i * 3], flat[i * 3 + 1], flat[i * 3 + 2]);
+        return cells;
+    }
+
+    /// <summary>Saved progress for a puzzle. Starter keeps the keys it had before packs existed.</summary>
+    private static string Key(string kind, int index) =>
+        PackId == "starter" ? $"QueenBlitz{kind}.{index}" : $"QueenBlitz{kind}.{PackId}.{index}";
 
     /// <summary>The current game is a Queen Blitz puzzle</summary>
     public static bool Active { get; set; }
@@ -100,8 +139,8 @@ public static class QueenBlitz
     /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
     public static int Reward(int index) => Puzzles[index].pawns.Length;
 
-    public static bool EverCleared(int index) => PlayerPrefs.GetInt($"QueenBlitzCleared.{index}", 0) == 1;
-    public static int BestMoves(int index) => PlayerPrefs.GetInt($"QueenBlitzBest.{index}", 0);
+    public static bool EverCleared(int index) => PlayerPrefs.GetInt(Key("Cleared", index), 0) == 1;
+    public static int BestMoves(int index) => PlayerPrefs.GetInt(Key("Best", index), 0);
 
     /// <summary>Record a clear: pay the pawns if this puzzle still pays, keep the fewest moves.
     /// Returns the pawns paid, and whether the moves are a new best.</summary>
@@ -113,10 +152,10 @@ public static class QueenBlitz
             paid = Reward(Index);
             PawnBank.Earn(paid);
         }
-        PlayerPrefs.SetInt($"QueenBlitzCleared.{Index}", 1);
+        PlayerPrefs.SetInt(Key("Cleared", Index), 1);
         int before = BestMoves(Index);
         bool best = before == 0 || Moves < before;
-        if (best) PlayerPrefs.SetInt($"QueenBlitzBest.{Index}", Moves);
+        if (best) PlayerPrefs.SetInt(Key("Best", Index), Moves);
         PlayerPrefs.Save();
         return (paid, best && before > 0);
     }
