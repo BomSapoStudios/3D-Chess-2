@@ -1104,8 +1104,28 @@ public class TurnManager : MonoBehaviour
             Debug.Log("🔄 ⚠️ TurnManager: Black must resolve check before ending turn");
         }
 
+        // Check can only be measured once play has begun, so by now the game has already started
+        // with the default player: their turn indicator, clock and robot. Hand the opening over.
+        if (oldCurrentPlayer != currentPlayer && GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
+            RestartOpeningTurn();
+
         // Final validation
         Debug.Log($"🔄 TurnManager: Turn order establishment COMPLETE - Starting player: {currentPlayer}");
+    }
+
+    /// <summary>
+    /// The opening player changed after play started: tell the UI (same-player form, so it reads as
+    /// a reset rather than a move), restart the clock for them, and let a robot opener move.
+    /// </summary>
+    private void RestartOpeningTurn()
+    {
+        OnTurnChanged?.Invoke(currentPlayer, currentPlayer);
+        if (TimerManager.Instance != null && TimerManager.Instance.IsTimedPlayActive())
+        {
+            TimerManager.Instance.PauseTimer();
+            TimerManager.Instance.StartTimer(currentPlayer);
+        }
+        if (IsCurrentPlayerAI()) StartCoroutine(DelayedInitialAIMove(currentPlayer, 0.1f));
     }
     
     // ===== ANTI-REPETITION SYSTEM =====

@@ -154,8 +154,9 @@ Changing your mind:
 
 Who moves first:
   • Normally White.
-  • If anyone starts the game in check (possible with 4 or 6 players), the
-    first player in check moves first, and no King may be captured until
+  • If anyone starts the game in check (any player count: e.g. White's
+    setup leaves Black's King attacked), the first player in check (in turn
+    order) moves first, and no King may be captured until
     everyone who started in check has had a turn to get out of it.
 
 

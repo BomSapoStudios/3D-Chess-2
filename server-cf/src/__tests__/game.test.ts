@@ -474,6 +474,23 @@ describe('5x5x5 board (the 2-player board)', () => {
     expect(board.getPiece({ x: 2, y: 2, z: 2 })).toBeFalsy();
   });
 
+  test('Black placed in check from two directions moves first', () => {
+    const engine = new GameEngine('FIVE03', { boardSize: '5x5x5', playerCount: 2 });
+    engine.addPlayer('u1', 'Alice', 'White');
+    engine.addPlayer('u2', 'Bob', 'Black');
+    engine.startPlacement();
+    engine.placePiece('White', 'King', { x: 0, y: 2, z: 2 });
+    engine.placePiece('White', 'Bishop', { x: 0, y: 0, z: 0 });
+    engine.placePiece('White', 'Queen', { x: 0, y: 4, z: 4 });
+    engine.placePiece('Black', 'King', { x: 4, y: 4, z: 0 });
+    markPlaced(engine, 'White');
+    markPlaced(engine, 'Black');
+    expect(engine.startGame()).toBe(true);
+    const board = (engine as unknown as { board: ChessBoard }).board;
+    expect(CheckDetection.getCheckInfo('Black', board).isInCheck).toBe(true);
+    expect(engine.getState().currentTurn).toBe('Black');
+  });
+
   test('a White pawn promotes on x = 4', () => {
     expect(Pawn.isPromotionSquare({ x: 4, y: 0, z: 0 }, 'White', 5)).toBe(true);
     expect(Pawn.isPromotionSquare({ x: 3, y: 0, z: 0 }, 'White', 5)).toBe(false);
