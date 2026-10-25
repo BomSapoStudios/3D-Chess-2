@@ -245,6 +245,7 @@ public class RematchUI : MonoBehaviour
             if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
             string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}"
                 : exists ? $"Clear {QueenBlitz.ChapterUnlock} in this chapter to open the next one"
+                : QueenBlitz.IsDaily(QueenBlitz.PackId) ? "A new daily puzzle comes out tomorrow!"
                 : "That's every puzzle in this pack!";
             GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), next, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
             TouchGUI.End();

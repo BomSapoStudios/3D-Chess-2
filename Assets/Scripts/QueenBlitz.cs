@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -113,6 +114,7 @@ public static class QueenBlitz
 
     public static PackInfo Info(string id)
     {
+        if (IsDaily(id)) return new PackInfo { id = id, name = $"Daily #{DailyNumber(DailyDate(id))}", free = true };
         foreach (PackInfo p in Catalog) if (p.id == id) return p;
         return Catalog[0];
     }
@@ -141,6 +143,95 @@ public static class QueenBlitz
         }
         return list;
     }
+
+    /// <summary>"Puzzle 3: Corner Turn", or just "Daily #12" for a daily</summary>
+    public static string PuzzleTitle => IsDaily(PackId) ? Current.name : $"Puzzle {Index + 1}: {Current.name}";
+
+    // ───────────────────────── Daily puzzle ─────────────────────────
+    // One puzzle per date, made in advance (Tools/QueenBlitz/daily.py) and served as static files
+    // from the Worker at /daily/YYYY-MM-DD.json. The app keeps the past week and the next six days,
+    // so it plays offline for a week. A daily is a one-puzzle pack with the id "daily:YYYY-MM-DD".
+
+    /// <summary>Daily #1 (daily.py's EPOCH must match)</summary>
+    public static readonly System.DateTime DailyEpoch = new System.DateTime(2026, 11, 1);
+    public const string DailyPrefix = "daily:";
+    public const int DailyAhead = 6;
+    public const int DailyBehind = 7;
+
+    /// <summary>The player's own calendar date. Development builds can pretend another day with
+    /// PlayerPrefs "DebugDailyToday" = "yyyy-MM-dd" (for testing dailies before they start).</summary>
+    public static System.DateTime Today
+    {
+        get
+        {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+            string debug = PlayerPrefs.GetString("DebugDailyToday", "");
+            if (System.DateTime.TryParseExact(debug, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out System.DateTime pretend)) return pretend;
+#endif
+            return System.DateTime.Now.Date;
+        }
+    }
+    public static bool IsDaily(string id) => id != null && id.StartsWith(DailyPrefix);
+    public static string DailyId(System.DateTime day) => DailyPrefix + day.ToString("yyyy-MM-dd");
+    public static int DailyNumber(System.DateTime day) => (int)(day.Date - DailyEpoch).TotalDays + 1;
+
+    public static System.DateTime DailyDate(string id) =>
+        System.DateTime.ParseExact(id.Substring(DailyPrefix.Length), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string DailyFile(string date) =>
+        System.IO.Path.Combine(Application.persistentDataPath, "QueenBlitzDaily", date + ".json");
+
+    public static bool HasDaily(System.DateTime day) => System.IO.File.Exists(DailyFile(day.ToString("yyyy-MM-dd")));
+
+    public static bool DailyCleared(System.DateTime day) => EverCleared(0, DailyId(day));
+
+    /// <summary>Days in a row with the daily cleared, up to today (today not done yet doesn't break it)</summary>
+    public static int DailyStreak()
+    {
+        System.DateTime day = DailyCleared(Today) ? Today : Today.AddDays(-1);
+        int streak = 0;
+        while (day >= DailyEpoch && DailyCleared(day)) { streak++; day = day.AddDays(-1); }
+        return streak;
+    }
+
+    /// <summary>Download any of these days' dailies the phone doesn't have yet. Days before Daily #1
+    /// are skipped; a missing file (not made yet, or offline) is simply left for next time.</summary>
+    public static IEnumerator FetchDailies(System.DateTime first, System.DateTime last, System.Action done = null)
+    {
+        for (System.DateTime day = first.Date; day <= last.Date; day = day.AddDays(1))
+        {
+            if (day < DailyEpoch || HasDaily(day)) continue;
+            string date = day.ToString("yyyy-MM-dd");
+            // A day that wasn't there is asked for again tomorrow at the earliest: missing files reach
+            // the Worker itself, and those requests count against its daily limit
+            string triedKey = "QueenBlitzDailyTried." + date, todayText = Today.ToString("yyyy-MM-dd");
+            if (PlayerPrefs.GetString(triedKey, "") == todayText) continue;
+            PlayerPrefs.SetString(triedKey, todayText);
+            using (UnityWebRequest request = UnityWebRequest.Get($"{OnlineClient.DefaultServerUrl}/daily/{date}.json"))
+            {
+                request.timeout = 8;
+                yield return request.SendWebRequest();
+                if (request.result == UnityWebRequest.Result.ConnectionError)
+                {
+                    PlayerPrefs.DeleteKey(triedKey); // offline: try again next time
+                    break;
+                }
+                if (request.result != UnityWebRequest.Result.Success) continue;
+                string text = request.downloadHandler.text;
+                if (string.IsNullOrEmpty(text) || !text.TrimStart().StartsWith("{")) continue;
+                string path = DailyFile(date);
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+                System.IO.File.WriteAllText(path, text);
+                loaded.Remove(DailyId(day));
+            }
+        }
+        done?.Invoke();
+    }
+
+    /// <summary>The usual window: the past week (catch-up) and the next six days (offline)</summary>
+    public static IEnumerator FetchDailyWindow(System.Action done = null) =>
+        FetchDailies(Today.AddDays(-DailyBehind), Today.AddDays(DailyAhead), done);
 
     // ───────────────────────── Owning packs and opening chapters ─────────────────────────
 
@@ -183,9 +274,20 @@ public static class QueenBlitz
 
     private static Puzzle[] LoadPack(string id)
     {
-        TextAsset file = Resources.Load<TextAsset>("QueenBlitz/" + id);
-        if (file == null) return new Puzzle[0]; // a pack not made yet
-        PackData pack = JsonUtility.FromJson<PackData>(file.text);
+        PackData pack;
+        if (IsDaily(id))
+        {
+            // A daily is one puzzle, downloaded into the phone's storage (see FetchDailies)
+            string path = DailyFile(id.Substring(DailyPrefix.Length));
+            if (!System.IO.File.Exists(path)) return new Puzzle[0];
+            pack = new PackData { id = id, free = true, puzzles = new[] { JsonUtility.FromJson<PuzzleData>(System.IO.File.ReadAllText(path)) } };
+        }
+        else
+        {
+            TextAsset file = Resources.Load<TextAsset>("QueenBlitz/" + id);
+            if (file == null) return new Puzzle[0]; // a pack not made yet
+            pack = JsonUtility.FromJson<PackData>(file.text);
+        }
         var list = new List<Puzzle>();
         foreach (PuzzleData d in pack.puzzles)
         {
@@ -692,8 +794,8 @@ public class QueenBlitzDirector : MonoBehaviour
         {
             QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
             string text = state == GameState.PiecePlacement
-                ? $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Place your queen    ·    Par {puzzle.par}"
-                : $"Puzzle {QueenBlitz.Index + 1}: {puzzle.name}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}";
+                ? $"{QueenBlitz.PuzzleTitle}    ·    Place your queen    ·    Par {puzzle.par}"
+                : $"{QueenBlitz.PuzzleTitle}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}";
             // At the very top (the turn line is hidden in puzzles), clear of the board
             Rect rect = new Rect(ui.x / 2f - 230f, 6f, 460f, 32f);
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);

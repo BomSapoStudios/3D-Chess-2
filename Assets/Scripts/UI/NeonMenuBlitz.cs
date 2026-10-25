@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Queen Blitz from the main menu. With more than one pack in the build it opens on the packs
-/// (progress, or the price of a locked one); a pack shows its puzzles ten at a time, one tab per
-/// chapter, with the pawns each pays or your best. Starter alone goes straight to its puzzles.
+/// Queen Blitz from the main menu. It opens on the Daily puzzle and the packs (progress, or the
+/// price of a locked one); a pack shows its puzzles ten at a time, one tab per chapter, with the
+/// pawns each pays or your best. The Daily view shows a week at a time, back through the archive.
 /// </summary>
 public partial class NeonMenu
 {
@@ -16,12 +16,16 @@ public partial class NeonMenu
     private TextMeshProUGUI blitzPawnsLabel;
     private RectTransform blitzContent;
     private int blitzChapter;
+    private enum BlitzView { Packs, Puzzles, Buy, Daily }
+    private BlitzView blitzView;
 
     private void ShowBlitzPicker()
     {
         if (blitzPicker == null) BuildBlitzPicker();
-        if (QueenBlitz.Available().Count > 1) ShowBlitzPacks();
-        else ShowBlitzPuzzles("starter", 0);
+        blitzDailyFetched.Clear();
+        ShowBlitzPacks();
+        // Pick up the daily puzzles in the background; the Daily card updates when they arrive
+        StartCoroutine(QueenBlitz.FetchDailyWindow(() => { if (blitzPicker.activeSelf && blitzView == BlitzView.Packs) ShowBlitzPacks(); }));
         blitzPicker.transform.SetAsLastSibling();
         blitzPicker.SetActive(true);
     }
@@ -103,13 +107,27 @@ public partial class NeonMenu
         BlitzText("One queen. Clear every pawn in as few moves as you can. Your first clear of a puzzle keeps its pawns.",
             15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
 
+        blitzView = BlitzView.Packs;
         var packs = QueenBlitz.Available();
-        int count = packs.Count;
+        int count = packs.Count + 1;
         float width = Mathf.Min(170f, 560f / count - 10f);
-        for (int i = 0; i < count; i++)
+
+        // The Daily puzzle comes first
+        float dx = -(count - 1) / 2f * (width + 10f);
+        bool todayDone = QueenBlitz.DailyCleared(QueenBlitz.Today);
+        Button daily = NeonButton(blitzContent, "Daily", new Vector2(width, 64), todayDone ? NeonTheme.Lavender : NeonTheme.Yellow, NeonTheme.Pink, -1f, 18,
+            () => { Haptics.Selection(); ShowBlitzDaily(0); });
+        Place((RectTransform)daily.transform, new Vector2(0.5f, 0.5f), new Vector2(width, 64), new Vector2(dx, 10));
+        int streak = QueenBlitz.DailyStreak();
+        string dailyUnder = QueenBlitz.Today < QueenBlitz.DailyEpoch ? $"Starts {QueenBlitz.DailyEpoch:MMM d}"
+            : todayDone ? (streak > 1 ? $"Done! {streak} days in a row" : "Done for today!")
+            : streak > 0 ? $"{streak}-day streak" : $"#{QueenBlitz.DailyNumber(QueenBlitz.Today)} is ready";
+        BlitzText(dailyUnder, 13, NeonTheme.Yellow, new Vector2(0.5f, 0.5f), new Vector2(width + 8, 20), new Vector2(dx, -36));
+
+        for (int i = 0; i < packs.Count; i++)
         {
             QueenBlitz.PackInfo pack = packs[i];
-            float x = (i - (count - 1) / 2f) * (width + 10f);
+            float x = (i + 1 - (count - 1) / 2f) * (width + 10f);
             int total = QueenBlitz.PuzzlesOf(pack.id).Length;
             bool owned = QueenBlitz.Owns(pack);
             Color color = pack.review ? NeonTheme.Pink : owned ? NeonTheme.Lime : NeonTheme.Muted;
@@ -121,17 +139,22 @@ public partial class NeonMenu
         }
     }
 
-    /// <summary>The last chapter you've opened, so a returning player lands where they left off</summary>
+    /// <summary>The first open chapter with a puzzle left to clear, so a returning player lands where they left off</summary>
     private static int FirstOpenChapter(string pack)
     {
-        int chapter = 0;
-        while (chapter + 1 < QueenBlitz.Chapters(pack) && QueenBlitz.ChapterOpen(pack, chapter + 1)) chapter++;
-        return chapter;
+        int chapters = QueenBlitz.Chapters(pack), last = 0;
+        for (int c = 0; c < chapters && QueenBlitz.ChapterOpen(pack, c); c++)
+        {
+            last = c;
+            if (QueenBlitz.ClearedCount(pack, c * QueenBlitz.ChapterSize, QueenBlitz.ChapterSize) < QueenBlitz.ChapterSize) return c;
+        }
+        return last;
     }
 
     private void ShowBlitzBuy(QueenBlitz.PackInfo pack)
     {
         ClearBlitzContent();
+        blitzView = BlitzView.Buy;
         blitzTitle.text = pack.name.ToUpper();
         BlitzBack(ShowBlitzPacks);
         int total = QueenBlitz.PuzzlesOf(pack.id).Length;
@@ -160,13 +183,14 @@ public partial class NeonMenu
     private void ShowBlitzPuzzles(string packId, int chapter)
     {
         ClearBlitzContent();
+        blitzView = BlitzView.Puzzles;
         QueenBlitz.PackId = packId;
         QueenBlitz.PackInfo pack = QueenBlitz.Info(packId);
         QueenBlitz.Puzzle[] puzzles = QueenBlitz.PuzzlesOf(packId);
         int chapters = QueenBlitz.Chapters(packId);
         blitzChapter = Mathf.Clamp(chapter, 0, chapters - 1);
         blitzTitle.text = packId == "starter" ? "QUEEN BLITZ" : pack.name.ToUpper();
-        if (QueenBlitz.Available().Count > 1) BlitzBack(ShowBlitzPacks);
+        BlitzBack(ShowBlitzPacks);
 
         if (chapters == 1)
         {
@@ -213,6 +237,102 @@ public partial class NeonMenu
             string stars = done ? $"Best {QueenBlitz.BestMoves(index, packId)} / par {puzzle.par}" : $"{puzzle.pawns.Length} pawns";
             BlitzText(stars, 14, done ? NeonTheme.Lavender : NeonTheme.Yellow, new Vector2(0.5f, 0f), new Vector2(108, 20), new Vector2(x, y - 32));
         }
+    }
+
+    // ── Daily ──
+
+    /// <summary>A week of dailies ending `weeksBack` weeks before today; the archive is free</summary>
+    private void ShowBlitzDaily(int weeksBack)
+    {
+        ClearBlitzContent();
+        blitzView = BlitzView.Daily;
+        blitzTitle.text = "DAILY PUZZLE";
+        BlitzBack(ShowBlitzPacks);
+        System.DateTime today = QueenBlitz.Today;
+        if (today < QueenBlitz.DailyEpoch)
+        {
+            BlitzText($"The first daily puzzle comes out on {QueenBlitz.DailyEpoch:MMMM d}.", 18, NeonTheme.Lavender,
+                new Vector2(0.5f, 0.5f), new Vector2(520, 50), new Vector2(0, 20));
+            return;
+        }
+        System.DateTime last = today.AddDays(-7 * weeksBack);
+        System.DateTime first = last.AddDays(-6);
+        int streak = QueenBlitz.DailyStreak();
+        BlitzText(streak > 0 ? $"Streak: {streak} day{(streak == 1 ? "" : "s")} in a row. Each first clear keeps its pawns."
+                : "A new puzzle every day: easy on Monday, devious on Sunday. Each first clear keeps its pawns.",
+            15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
+
+        bool missing = false;
+        for (int k = 0; k < 7; k++)
+        {
+            System.DateTime day = first.AddDays(k);
+            float x = (k - 3) * 80f;
+            if (day < QueenBlitz.DailyEpoch) continue;
+            bool have = QueenBlitz.HasDaily(day);
+            missing |= !have;
+            bool done = QueenBlitz.DailyCleared(day);
+            bool isToday = day == today;
+            Color color = !have ? NeonTheme.Muted : done ? NeonTheme.Lime : isToday ? NeonTheme.Yellow : NeonTheme.Cyan;
+            System.DateTime pick = day;
+            Button b = NeonButton(blitzContent, $"#{QueenBlitz.DailyNumber(day)}", new Vector2(72, 54), color, NeonTheme.Ground, (k - 3) * 0.4f, 17,
+                () => StartDaily(pick));
+            Place((RectTransform)b.transform, new Vector2(0.5f, 0.5f), new Vector2(72, 54), new Vector2(x, 10));
+            BlitzText(isToday ? "Today" : day.ToString("ddd d"), 13, isToday ? NeonTheme.Yellow : NeonTheme.Lavender,
+                new Vector2(0.5f, 0.5f), new Vector2(78, 20), new Vector2(x, -30));
+            if (have)
+            {
+                QueenBlitz.Puzzle p = QueenBlitz.PuzzlesOf(QueenBlitz.DailyId(day))[0];
+                string under = done ? $"Best {QueenBlitz.BestMoves(0, QueenBlitz.DailyId(day))}/{p.par}" : $"{p.pawns.Length} pawns";
+                BlitzText(under, 12, done ? NeonTheme.Lavender : NeonTheme.Yellow, new Vector2(0.5f, 0.5f), new Vector2(78, 18), new Vector2(x, -48));
+            }
+        }
+
+        // Older weeks are free to play too
+        if (first > QueenBlitz.DailyEpoch)
+        {
+            Button earlier = NeonButton(blitzContent, "< Earlier", new Vector2(110, 38), NeonTheme.Cyan, NeonTheme.Ground, -0.5f, 15, () => ShowBlitzDaily(weeksBack + 1));
+            Place((RectTransform)earlier.transform, new Vector2(0.5f, 0f), new Vector2(110, 38), new Vector2(-200, 40));
+        }
+        if (weeksBack > 0)
+        {
+            Button later = NeonButton(blitzContent, "Later >", new Vector2(110, 38), NeonTheme.Cyan, NeonTheme.Ground, 0.5f, 15, () => ShowBlitzDaily(weeksBack - 1));
+            Place((RectTransform)later.transform, new Vector2(0.5f, 0f), new Vector2(110, 38), new Vector2(200, 40));
+        }
+        // Fetch this week's puzzles if any are missing, then show them
+        // (only once per visit to this week, and only redrawn if something new arrived, so a
+        // missing day never turns into repeated requests)
+        if (missing && !blitzDailyFetched.Contains(weeksBack))
+        {
+            blitzDailyFetched.Add(weeksBack);
+            int before = DailiesHeld(first, last);
+            StartCoroutine(QueenBlitz.FetchDailies(first, last, () =>
+            {
+                if (DailiesHeld(first, last) > before && blitzPicker.activeSelf && blitzView == BlitzView.Daily && blitzDailyWeeks == weeksBack)
+                    ShowBlitzDaily(weeksBack);
+            }));
+        }
+        blitzDailyWeeks = weeksBack;
+    }
+
+    private int blitzDailyWeeks;
+    private readonly System.Collections.Generic.HashSet<int> blitzDailyFetched = new System.Collections.Generic.HashSet<int>();
+
+    private static int DailiesHeld(System.DateTime first, System.DateTime last)
+    {
+        int n = 0;
+        for (System.DateTime d = first; d <= last; d = d.AddDays(1)) if (QueenBlitz.HasDaily(d)) n++;
+        return n;
+    }
+
+    private void StartDaily(System.DateTime day)
+    {
+        if (!QueenBlitz.HasDaily(day))
+        {
+            ShowToast("Connect to the internet once to get this puzzle.");
+            return;
+        }
+        QueenBlitz.PackId = QueenBlitz.DailyId(day);
+        StartBlitz(0);
     }
 
     private void StartBlitz(int index)
