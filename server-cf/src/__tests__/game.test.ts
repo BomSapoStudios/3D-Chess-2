@@ -377,6 +377,76 @@ describe('Opening check (multiplayer)', () => {
   });
 });
 
+describe('Check swaps turns (multiplayer)', () => {
+  function fourPlayer(board: ChessBoard, turn: 'White' | 'Black' | 'Green' | 'Purple' = 'White') {
+    const engine = new GameEngine('SWAP01', { boardSize: '6x6x6', playerCount: 4 });
+    (['White', 'Black', 'Green', 'Purple'] as const).forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string; currentTurn: string };
+    e.board = board;
+    e.phase = 'playing';
+    e.currentTurn = turn;
+    return engine;
+  }
+  function kings(board: ChessBoard) {
+    board.placePiece({ x: 0, y: 5, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 5, y: 5, z: 5 }, 'King', 'Black');
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'King', 'Green');
+    board.placePiece({ x: 3, y: 0, z: 5 }, 'King', 'Purple');
+  }
+  /** Who moves for the next `n` turns, starting after `mover` */
+  function turns(engine: GameEngine, mover: string, n: number): string[] {
+    const e = engine as unknown as { advanceTurn: (c: string) => void; currentTurn: string };
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) { e.advanceTurn(mover); mover = e.currentTurn; out.push(mover); }
+    return out;
+  }
+
+  test('an attacker due to move first trades places with the player they check, for good', () => {
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 3, y: 3, z: 5 }, 'Rook', 'Black'); // Black checks Purple (along y), e.g. uncovered by White's move
+    const engine = fourPlayer(board, 'White');
+    expect(turns(engine, 'White', 1)).toEqual(['Purple']);
+    board.removePiece({ x: 3, y: 3, z: 5 }); // Purple got out of check
+    expect(turns(engine, 'Purple', 7)).toEqual(['Green', 'Black', 'White', 'Purple', 'Green', 'Black', 'White']);
+  });
+
+  test('nobody trades places when the attacker already moves after the player in check', () => {
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 4, y: 0, z: 0 }, 'Rook', 'White'); // White just checked Green
+    const engine = fourPlayer(board, 'White');
+    expect(turns(engine, 'White', 1)).toEqual(['Black']);
+  });
+
+  test('an attacker who is in check too keeps their place', () => {
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 3, y: 3, z: 5 }, 'Rook', 'Black');  // Black checks Purple
+    board.placePiece({ x: 5, y: 5, z: 2 }, 'Rook', 'Green');  // Green checks Black (along z)
+    const engine = fourPlayer(board, 'White');
+    expect(turns(engine, 'White', 1)).toEqual(['Black']);
+  });
+
+  test('at the start, a player checked by someone earlier in the order moves before them', () => {
+    const engine = new GameEngine('SWAP02', { boardSize: '6x6x6', playerCount: 4 });
+    (['White', 'Black', 'Green', 'Purple'] as const).forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string };
+    const board = new ChessBoard('6x6x6');
+    kings(board);
+    board.placePiece({ x: 3, y: 3, z: 5 }, 'Rook', 'Black'); // Black checks Purple
+    e.board = board;
+    e.phase = 'placement';
+    for (const c of ['White', 'Black', 'Green', 'Purple'] as const) markPlaced(engine, c);
+    (engine as unknown as { spawnPawns: () => void }).spawnPawns = () => {};
+    expect(engine.startGame()).toBe(true);
+    expect(engine.getState().currentTurn).toBe('White'); // White isn't attacking Purple
+    expect(turns(engine, 'White', 1)).toEqual(['Purple']);
+    board.removePiece({ x: 3, y: 3, z: 5 }); // Purple got out of check
+    expect(turns(engine, 'Purple', 3)).toEqual(['Green', 'Black', 'White']);
+  });
+});
+
 describe('Forfeit (multiplayer)', () => {
   function fourPlayer(board: ChessBoard, turn: 'White' | 'Black' | 'Green' | 'Purple' = 'White') {
     const engine = new GameEngine('FORF01', { boardSize: '6x6x6', playerCount: 4 });

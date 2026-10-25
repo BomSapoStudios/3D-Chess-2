@@ -52,6 +52,8 @@ export interface EngineSnapshot {
   startedInCheck?: PlayerColor[];
   /** For each player in check, who checked them first (they win the pieces if that player forfeits) */
   firstChecker?: Partial<Record<PlayerColor, PlayerColor>>;
+  /** Turn order once a player in check has traded places with an attacker (absent: the usual order) */
+  turnOrder?: PlayerColor[];
 }
 
 export interface PlacePieceResult {
@@ -74,6 +76,7 @@ export class GameEngine {
   private pendingPromotion: { position: BoardPosition; color: PlayerColor } | null = null;
   private startedInCheck: PlayerColor[] = [];
   private firstChecker: Partial<Record<PlayerColor, PlayerColor>> = {};
+  private turnOrder: PlayerColor[] | null = null; // null: the usual order (getActiveColors)
   private chaosCountdown: number;
   private turnsSinceChaos: number;
   private drawOffer: { from: PlayerColor } | null = null;
@@ -201,7 +204,7 @@ export class GameEngine {
     // who is in check moves first, so they get to resolve it (matches the Unity client)
     const active = this.getActiveColors();
     this.startedInCheck = active.filter(c => CheckDetection.getCheckInfo(c, this.board).isInCheck);
-    this.currentTurn = this.startedInCheck[0] ?? active[0];
+    this.currentTurn = this.letCheckedMoveFirst(active[0]);
     this.updateFirstCheckers(null);
     this.positionHistory.push(this.board.hash());
     return true;
@@ -471,6 +474,8 @@ export class GameEngine {
           // One slice turned a quarter (like the game's own Chaos Mode); every device plays this exact spin
           const rotation = ChaosRotationEngine.applyRandom(this.board, 'layer');
           chaosRotation = rotation;
+          // The spin may have put someone in check: they move before their attacker
+          this.currentTurn = this.letCheckedMoveFirst(this.currentTurn!);
           // Record chaos rotation in move history
           const chaosRecord: MoveRecord = {
             moveNumber: this.turnNumber,
@@ -501,7 +506,7 @@ export class GameEngine {
   }
 
   private getNextTurnColors(justMoved: PlayerColor): PlayerColor[] {
-    const active = this.getActiveColors();
+    const active = this.turnOrderNow();
     const idx = active.indexOf(justMoved);
     // Return all colors that come after justMoved in turn order
     if (idx === -1) return active;
@@ -510,10 +515,41 @@ export class GameEngine {
   }
 
   private advanceTurn(currentColor: PlayerColor): void {
-    const active = this.getActiveColors();
+    const active = this.turnOrderNow();
     if (active.length === 0) return;
     const idx = active.indexOf(currentColor);
-    this.currentTurn = active[(idx + 1) % active.length];
+    this.currentTurn = this.letCheckedMoveFirst(active[(idx + 1) % active.length]);
+  }
+
+  /** The players still in the game, in the order they take turns */
+  private turnOrderNow(): PlayerColor[] {
+    const active = this.getActiveColors();
+    return this.turnOrder ? this.turnOrder.filter(c => active.includes(c)) : active;
+  }
+
+  /**
+   * A player in check moves before anyone attacking them (matches the Unity client). Going round
+   * from `firstUp`, if an attacker would move before the player they check, the two trade places in
+   * the turn order for the rest of the game. An attacker who is in check too keeps their place.
+   * Returns who moves now.
+   */
+  private letCheckedMoveFirst(firstUp: PlayerColor): PlayerColor {
+    const order = this.turnOrderNow();
+    const start = Math.max(0, order.indexOf(firstUp));
+    const seq = [...order.slice(start), ...order.slice(0, start)];
+    const inCheck = seq.filter(c => CheckDetection.getCheckInfo(c, this.board).isInCheck);
+    for (const victim of inCheck.filter(c => CheckDetection.hasAnyLegalMove(c, this.board))) { // a mated player is out, not moved up
+      const checkers = this.checkersOf(victim);
+      const v = seq.indexOf(victim);
+      const c = seq.findIndex((col, i) => i < v && checkers.includes(col) && !inCheck.includes(col));
+      if (c < 0) continue;
+      const full = this.turnOrder ?? this.getActiveColors();
+      const a = full.indexOf(seq[c]), b = full.indexOf(victim);
+      [full[a], full[b]] = [full[b], full[a]];
+      this.turnOrder = full;
+      [seq[c], seq[v]] = [seq[v], seq[c]];
+    }
+    return seq[0] ?? firstUp;
   }
 
   // ── Multi-player elimination & conquest ──────────────────────────────────────
@@ -575,13 +611,14 @@ export class GameEngine {
 
       // Their turn passes to the next player still in the game
       const wasTheirTurn = this.currentTurn === color;
-      const order = active;
+      const order = this.turnOrderNow();
       this.eliminatePlayer(color);
       delete this.firstChecker[color];
       this.startedInCheck = this.startedInCheck.filter(c => c !== color);
       if (wasTheirTurn) {
         const i = order.indexOf(color);
-        this.currentTurn = [...order.slice(i + 1), ...order.slice(0, i)].find(c => c !== color) ?? null;
+        const next = [...order.slice(i + 1), ...order.slice(0, i)].find(c => c !== color);
+        this.currentTurn = next ? this.letCheckedMoveFirst(next) : null;
       }
       this.updateFirstCheckers(null);
       const left = this.getActiveColors();
@@ -680,6 +717,7 @@ export class GameEngine {
       drawOffer: this.drawOffer,
       startedInCheck: [...this.startedInCheck],
       firstChecker: { ...this.firstChecker },
+      ...(this.turnOrder ? { turnOrder: [...this.turnOrder] } : {}),
     };
   }
 
@@ -699,6 +737,7 @@ export class GameEngine {
     engine.drawOffer = s.drawOffer;
     engine.startedInCheck = [...(s.startedInCheck ?? [])];
     engine.firstChecker = { ...(s.firstChecker ?? {}) };
+    engine.turnOrder = s.turnOrder ? [...s.turnOrder] : null;
     return engine;
   }
 

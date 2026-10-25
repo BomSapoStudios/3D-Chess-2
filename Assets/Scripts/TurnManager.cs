@@ -32,6 +32,8 @@ public class TurnManager : MonoBehaviour
     private bool bothPlayersStartInCheck = false;
     // Players placed into check who haven't had their first turn yet: no king can be taken until they have
     private readonly System.Collections.Generic.List<PieceColor> startedInCheck = new System.Collections.Generic.List<PieceColor>();
+    // Turn order once a player in check has traded places with an attacker (null: the usual order)
+    private System.Collections.Generic.List<PieceColor> turnOrder;
     private System.Collections.Generic.Dictionary<PieceColor, bool> initialCheckStates = new System.Collections.Generic.Dictionary<PieceColor, bool>();
     
     [Header("Anti-Repetition System")]
@@ -259,8 +261,8 @@ public class TurnManager : MonoBehaviour
         // Use PlayerManager for scalable turn cycling (supports 2-6 players)
         if (PlayerManager.Instance != null)
         {
-            currentPlayer = PlayerManager.Instance.GetNextPlayer(currentPlayer);
-            Debug.Log($"🔍 TurnManager.NextTurn: PlayerManager returned next player: {currentPlayer}");
+            currentPlayer = LetCheckedMoveFirst(NextInTurnOrder(currentPlayer));
+            Debug.Log($"🔍 TurnManager.NextTurn: next player: {currentPlayer}");
         }
         else
         {
@@ -470,6 +472,17 @@ public class TurnManager : MonoBehaviour
     private void OnChaosRotationCompleted(ChaosRotationType rotationType)
     {
         Debug.Log($"🌪️ TurnManager: Chaos rotation completed ({rotationType}) - checking if AI move is needed");
+
+        // The spin may have put someone in check: they move before their attacker (as the server does)
+        if (GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.Playing)
+        {
+            PieceColor first = LetCheckedMoveFirst(currentPlayer);
+            if (first != currentPlayer)
+            {
+                SetCurrentPlayer(first); // also starts a robot's move
+                return;
+            }
+        }
         
         // If current player is AI, trigger their move after chaos completion
         if (IsCurrentPlayerAI())
@@ -939,6 +952,7 @@ public class TurnManager : MonoBehaviour
         initialBlackInCheck = false;
         bothPlayersStartInCheck = false;
         startedInCheck.Clear();
+        turnOrder = null;
         initialCheckStates = new System.Collections.Generic.Dictionary<PieceColor, bool>(playerCheckStates);
 
         // Extract White and Black check states for backwards compatibility
@@ -1026,50 +1040,15 @@ public class TurnManager : MonoBehaviour
             Debug.Log($"🔄 TurnManager: PlayerManager not available, using 2-player fallback");
         }
 
-        // For 2-player games, use the original White/Black check-based logic
-        if (activePlayers.Count == 2 && activePlayers.Contains(PieceColor.White) && activePlayers.Contains(PieceColor.Black))
-        {
-            Debug.Log("🔄 TurnManager: Using 2-player turn order logic based on check states");
-
-            if (!initialWhiteInCheck && !initialBlackInCheck)
-            {
-                // Neither in check - ALWAYS White starts (standard chess rule)
-                startingPlayer = PieceColor.White;
-                reason = "standard opening (neither player in check) - White moves first";
-            }
-            else if (initialWhiteInCheck && !initialBlackInCheck)
-            {
-                // White only in check - White must get out of check first
-                startingPlayer = PieceColor.White;
-                reason = "White in check and must resolve it";
-            }
-            else if (!initialWhiteInCheck && initialBlackInCheck)
-            {
-                // Black only in check - Black gets first turn to resolve check
-                startingPlayer = PieceColor.Black;
-                reason = "Black in check and gets first turn to resolve it";
-            }
-            else
-            {
-                // Both in check - White starts but cannot capture king
-                startingPlayer = PieceColor.White;
-                reason = "both players in check (White starts but cannot capture king)";
-            }
-        }
-        else
-        {
-            // MULTI-PLAYER: White starts, unless someone was placed into check: then the first player
-            // in turn order who is in check moves first to resolve it. Until every player who started
-            // in check has had a turn, no king can be taken (ShouldBlockKingCapture).
-            var order = new System.Collections.Generic.List<PieceColor>(activePlayers);
-            order.Sort();
-            startedInCheck.Clear();
-            foreach (PieceColor c in order)
-                if (initialCheckStates.TryGetValue(c, out bool inCheck) && inCheck) startedInCheck.Add(c);
-            startingPlayer = startedInCheck.Count > 0 ? startedInCheck[0] : order[0];
-            reason = $"multi-player game - {(startedInCheck.Count > 0 ? "first player in check" : "first player in rotation")}";
-            Debug.Log($"🔄 TurnManager: Multi-player mode - {activePlayers.Count} players, first is {startingPlayer}");
-        }
+        // White starts. Anyone placed in check moves before the players attacking them: an attacker
+        // who would go first trades places with them in the turn order (LetCheckedMoveFirst). Until
+        // every player who started in check has had a turn, no king can be taken (ShouldBlockKingCapture).
+        var order = new System.Collections.Generic.List<PieceColor>(activePlayers);
+        order.Sort();
+        foreach (PieceColor c in order)
+            if (initialCheckStates.TryGetValue(c, out bool inCheck) && inCheck) startedInCheck.Add(c);
+        startingPlayer = order.Count > 0 ? LetCheckedMoveFirst(order[0]) : PieceColor.White;
+        reason = startingPlayer == (order.Count > 0 ? order[0] : PieceColor.White) ? "first in turn order" : "in check, so moves before their attacker";
 
         Debug.Log($"🔄 TurnManager: Opening turn order determined - {startingPlayer} starts first ({reason})");
         Debug.Log($"🔄 TurnManager: Player type check - {startingPlayer} is AI: {IsPlayerAI(startingPlayer)}");
@@ -1126,6 +1105,68 @@ public class TurnManager : MonoBehaviour
             TimerManager.Instance.StartTimer(currentPlayer);
         }
         if (IsCurrentPlayerAI()) StartCoroutine(DelayedInitialAIMove(currentPlayer, 0.1f));
+    }
+
+    /// <summary>Who comes after `player` in the turn order, passing over anyone already out</summary>
+    private PieceColor NextInTurnOrder(PieceColor player)
+    {
+        if (turnOrder == null) return PlayerManager.Instance.GetNextPlayer(player);
+        int i = turnOrder.IndexOf(player);
+        for (int step = 1; step <= turnOrder.Count; step++)
+        {
+            PieceColor next = turnOrder[(i + step + turnOrder.Count) % turnOrder.Count];
+            if (!PlayerManager.Instance.IsPlayerEliminated(next)) return next;
+        }
+        return PlayerManager.Instance.GetNextPlayer(player);
+    }
+
+    /// <summary>The players still in the game, in the order they take turns</summary>
+    private System.Collections.Generic.List<PieceColor> TurnOrderNow()
+    {
+        var active = PlayerManager.Instance != null
+            ? PlayerManager.Instance.GetActivePlayers()
+            : new System.Collections.Generic.List<PieceColor> { PieceColor.White, PieceColor.Black };
+        active.Sort();
+        return turnOrder != null ? turnOrder.FindAll(active.Contains) : active;
+    }
+
+    /// <summary>
+    /// A player in check moves before anyone attacking them (matches the server). Going round from
+    /// firstUp, if an attacker would move before the player they check, the two trade places in the
+    /// turn order for the rest of the game. An attacker who is in check too keeps their place.
+    /// Returns who moves now.
+    /// </summary>
+    private PieceColor LetCheckedMoveFirst(PieceColor firstUp)
+    {
+        var checks = CheckDetectionManager.Instance;
+        var order = TurnOrderNow();
+        if (checks == null || order.Count == 0) return firstUp;
+        int start = Mathf.Max(0, order.IndexOf(firstUp));
+        var seq = new System.Collections.Generic.List<PieceColor>();
+        for (int i = 0; i < order.Count; i++) seq.Add(order[(start + i) % order.Count]);
+
+        checks.InvalidateCache();
+        var ends = GameEndDetectionManager.Instance;
+        var inCheck = seq.FindAll(c => checks.IsKingInCheck(c));
+        var canEscape = inCheck.FindAll(c => ends == null || ends.HasLegalMoves(c)); // a mated player is out, not moved up
+        foreach (PieceColor victim in canEscape)
+        {
+            var checkers = checks.GetAttackingPlayers(victim);
+            int v = seq.IndexOf(victim);
+            int a = seq.FindIndex(c => checkers.Contains(c) && c != victim && !inCheck.Contains(c));
+            if (a < 0 || a > v) continue;
+            PieceColor attacker = seq[a];
+            if (turnOrder == null)
+            {
+                turnOrder = PlayerManager.Instance != null ? PlayerManager.Instance.GetAllPlayers() : TurnOrderNow();
+                turnOrder.Sort();
+            }
+            int ia = turnOrder.IndexOf(attacker), iv = turnOrder.IndexOf(victim);
+            turnOrder[ia] = victim; turnOrder[iv] = attacker;
+            seq[a] = victim; seq[v] = attacker;
+            Debug.Log($"🔄 TurnManager: {victim} is in check from {attacker}, who was due first - they trade places in the turn order");
+        }
+        return seq[0];
     }
     
     // ===== ANTI-REPETITION SYSTEM =====

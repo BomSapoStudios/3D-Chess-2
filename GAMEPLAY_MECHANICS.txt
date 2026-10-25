@@ -155,9 +155,10 @@ Changing your mind:
 Who moves first:
   • Normally White.
   • If anyone starts the game in check (any player count: e.g. White's
-    setup leaves Black's King attacked), the first player in check (in turn
-    order) moves first, and no King may be captured until
-    everyone who started in check has had a turn to get out of it.
+    setup leaves Black's King attacked), they move before the player
+    attacking them (see "In check moves first" below), and no King may be
+    captured until everyone who started in check has had a turn to get out
+    of it. With two players, the player in check simply moves first.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -206,6 +207,21 @@ Board size: 4 players need Meal 6³ or Feast 8³; 6 players always Feast 8³.
 
 Turn order: White → Black → Green → Purple → Yellow → Orange, skipping
 anyone who is out (or stalemated that turn).
+
+IN CHECK MOVES FIRST (Brandon's rule: you always get a turn before the
+player putting you in check)
+  • Whenever a player is in check and one of the players attacking their
+    King would move before them (a discovered check, a Chaos spin, conquered
+    pieces changing colour, or the starting setup), the two trade places in
+    the turn order for the rest of the game. The player in check therefore
+    moves before that attacker, and nobody gets an extra turn.
+  • Checked at the start of play, after every turn and after every Chaos
+    spin. An attacker who is in check too keeps their place. A player with
+    no way out is checkmated as usual instead.
+  • Example (4 players): White moves and uncovers Black's Rook on Purple's
+    King. Black and Purple trade places, so the order becomes
+    White → Purple → Green → Black.
+  • App and server apply the same rule, so online games agree.
 
 CONQUEST
   When you checkmate a player, their King is removed and all of their other
