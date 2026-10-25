@@ -20,12 +20,21 @@ public static class TouchGUI
     private static float currentScale = 1f;
     private static Vector2 currentOffset;
 
+    // Layout size in GUI units of a landscape iPhone, which the in-game screens were designed on
+    private const float PhoneWidth = 880f;
+    private const float PhoneHeight = 400f;
+
     public static float Scale
     {
         get
         {
             float dpi = Screen.dpi > 0f ? Screen.dpi : 160f;
-            return Mathf.Clamp(dpi / 160f, 1f, 3f);
+            float byDpi = Mathf.Clamp(dpi / 160f, 1f, 3f);
+            // Bigger screens (iPad, a folding phone opened up) would otherwise show phone-sized
+            // controls in a sea of space: grow until the layout is about an iPhone's width
+            Rect safe = Screen.safeArea;
+            float bySize = Mathf.Min(safe.width / PhoneWidth, safe.height / PhoneHeight);
+            return Mathf.Max(byDpi, bySize);
         }
     }
 

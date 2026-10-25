@@ -241,8 +241,9 @@ public partial class NeonMenu : MonoBehaviour
         CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(844, 390) / AccessibilityPrefs.TextScale; // Larger Text zooms the whole menu
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 1f;
+        // Expand keeps the whole 844x390 layout on screen: iPhones fill it, and squarer screens (iPad,
+        // a folding phone opened up) get the same layout with extra room above and below
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
         gameObject.AddComponent<GraphicRaycaster>();
         gameObject.AddComponent<ContrastPlates>(); // High Contrast: plates behind small text
 
