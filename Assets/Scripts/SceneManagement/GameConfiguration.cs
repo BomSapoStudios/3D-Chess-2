@@ -54,6 +54,7 @@ public class GameConfiguration
     [Header("Queen Blitz")]
     public bool queenBlitz = false;           // puzzle: clear the pawns with a lone queen (QueenBlitzDirector)
     public int blitzPuzzle = 0;               // which puzzle (QueenBlitz.Puzzles)
+    public string saveSlot = "";             // SavedGames slot (Quick Play, Zombies, Blitz, Local); empty = not saved
 
     [Header("Online Multiplayer Settings")]
     public bool isOnlineGame = false;         // Is this an online multiplayer game?
@@ -236,7 +237,8 @@ public class GameConfiguration
             timePerPlayerMinutes = this.timePerPlayerMinutes,
             zombieMode = this.zombieMode,
             queenBlitz = this.queenBlitz,
-            blitzPuzzle = this.blitzPuzzle
+            blitzPuzzle = this.blitzPuzzle,
+            saveSlot = this.saveSlot
         };
 
         // Copy playerTypes list (critical for multi-player games)

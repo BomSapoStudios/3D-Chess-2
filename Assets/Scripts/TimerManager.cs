@@ -326,6 +326,11 @@ public class TimerManager : MonoBehaviour
     /// Get remaining time for a player in seconds
     /// MULTI-PLAYER SUPPORT: Returns time for any player color
     /// </summary>
+    public void SetRemainingTime(PieceColor player, float seconds)
+    {
+        playerTimeRemaining[player] = seconds;
+    }
+
     public float GetRemainingTime(PieceColor player)
     {
         return playerTimeRemaining.ContainsKey(player) ? playerTimeRemaining[player] : 0f;

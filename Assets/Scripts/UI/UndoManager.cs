@@ -126,17 +126,11 @@ public class UndoManager : MonoBehaviour
 
     private static void Restore(Snapshot snap)
     {
-        var board = ChessBoard.Instance;
         if (InputManager.Instance != null) InputManager.Instance.ClearSelection();
 
-        // Clear the board
-        foreach (ChessPiece p in new List<ChessPiece>(BoardPieces()))
-        {
-            board.RemovePieceFromBoard(p, p.CurrentPosition);
-            Destroy(p.gameObject);
-        }
-        // Put every saved piece back
-        foreach (SavedPiece s in snap.pieces) Create(s.type, s.color, s.at);
+        var pieces = new List<(ChessPieceType, PieceColor, BoardPosition)>();
+        foreach (SavedPiece s in snap.pieces) pieces.Add((s.type, s.color, s.at));
+        SetBoard(pieces);
 
         ZombieMode.Rounds = snap.zombieRounds;
         ZombieMode.PawnsDestroyed = snap.zombiePawns;
@@ -148,6 +142,17 @@ public class UndoManager : MonoBehaviour
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();
         TurnManager.Instance.SetCurrentPlayer(snap.turn);
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.SafeUpdateVisualFeedback();
+    }
+
+    /// <summary>Clear the board and put exactly these pieces on it</summary>
+    public static void SetBoard(IEnumerable<(ChessPieceType type, PieceColor color, BoardPosition at)> pieces)
+    {
+        foreach (ChessPiece p in new List<ChessPiece>(BoardPieces()))
+        {
+            ChessBoard.Instance.RemovePieceFromBoard(p, p.CurrentPosition);
+            Destroy(p.gameObject);
+        }
+        foreach (var s in pieces) Create(s.type, s.color, s.at);
     }
 
     public static ChessPiece Create(ChessPieceType type, PieceColor color, BoardPosition at)
@@ -179,7 +184,7 @@ public class UndoManager : MonoBehaviour
         return piece;
     }
 
-    private static IEnumerable<ChessPiece> BoardPieces()
+    public static IEnumerable<ChessPiece> BoardPieces()
     {
         Vector3Int d = BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions() : new Vector3Int(4, 4, 4);
         for (int x = 0; x < d.x; x++)

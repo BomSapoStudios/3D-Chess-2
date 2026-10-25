@@ -332,9 +332,9 @@ public partial class NeonMenu : MonoBehaviour
         quickLayout.childControlWidth = false;
         quickLayout.childControlHeight = false;
         quickLayout.childForceExpandWidth = false;
-        NeonButton(quickRow, "Quick Play!", new Vector2(124, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, ShowSidePicker);
-        NeonButton(quickRow, "Zombies!", new Vector2(108, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 16, ShowZombiePicker);
-        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, ShowBlitzPicker);
+        NeonButton(quickRow, "Quick Play!", new Vector2(124, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, OrResume(SavedGames.QuickPlay, ShowSidePicker));
+        NeonButton(quickRow, "Zombies!", new Vector2(108, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 16, OrResume(SavedGames.Zombies, ShowZombiePicker));
+        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, OrResume(SavedGames.Blitz, ShowBlitzPicker));
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -343,7 +343,7 @@ public partial class NeonMenu : MonoBehaviour
         rowLayout.childControlWidth = false;
         rowLayout.childControlHeight = false;
         rowLayout.childForceExpandWidth = false;
-        NeonButton(row, "Local Game", new Vector2(178, 52), NeonTheme.Lime, NeonTheme.Pink, 1f, 18, ShowSetup);
+        NeonButton(row, "Local Game", new Vector2(178, 52), NeonTheme.Lime, NeonTheme.Pink, 1f, 18, OrResume(SavedGames.Local, ShowSetup));
         onlineMenuLabel = NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline).GetComponentInChildren<TextMeshProUGUI>();
 
         if (PushNotifications.Supported)
@@ -2106,6 +2106,7 @@ public partial class NeonMenu : MonoBehaviour
         config.zombieMode = zombieRun;
         config.queenBlitz = blitzRun;
         config.blitzPuzzle = blitzChoice;
+        config.saveSlot = zombieRun ? SavedGames.Zombies : blitzRun ? SavedGames.Blitz : quickPlay ? SavedGames.QuickPlay : SavedGames.Local;
         config.playerCount = playerCount;
         config.boardSize = boardSize;
         config.aiDifficulty = difficulty;

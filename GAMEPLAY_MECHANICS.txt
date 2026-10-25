@@ -395,6 +395,25 @@ UNDO
   • Not available online, with a chess clock running, or past a Chaos spin
     or a player being knocked out.
 
+SAVED GAMES (RESUME)
+  • Quick Play, Zombies!, Queen Blitz and Local Game each keep one saved
+    game on the phone. It is saved at the start of every turn you play:
+    every piece and square, whose turn it is, the chess clocks (kept current
+    through the turn), the count to the next Chaos spin, players knocked out,
+    the zombie round and score, and the puzzle's move count.
+  • Go back to the home screen at any time (to change Customize or
+    Accessibility settings, for example). The in-game menu's button reads
+    "Main Menu (game saved)".
+  • Tapping that mode again shows GAME IN PROGRESS with a one-line summary
+    ("Playing Black on Snack 4³, 12 moves in", "Walnut run, round 4,
+    score 85", "Puzzle 3, 2 moves so far"). Resume skips setup and puts the
+    saved position back with your current settings. Start new opens the
+    mode as usual; the save is replaced once the new game starts.
+  • A finished game (checkmate, draw, forfeit, a zombie run ending, a
+    cleared puzzle) deletes its save. Online games aren't saved here (the
+    server keeps them).
+  • Undo history and the move list start fresh after Resume.
+
 VIEW BUTTONS (bottom of the screen)
   Swing the camera behind any player's pieces, about 25° up, framing the
   whole cube. Yellow looks up from underneath; Orange looks down from above.
@@ -643,6 +662,9 @@ These are cosmetic only and never change the rules.
         │              │       │ clock     │   Lobby / queue
         │              │       └─────┬─────┘        │
         └──────────────┴──────┬──────┴──────────────┘
+                              ▼
+            (a saved game in that mode: GAME IN PROGRESS,
+             Resume goes straight to PLAY; Start new carries on)
                               ▼
                    ┌──────────────────────┐
                    │  PLACEMENT PHASE     │

@@ -120,6 +120,8 @@ public class ZombieDirector : MonoBehaviour
     /// <summary>Recount the horde after the board was put back (Undo)</summary>
     public void Recount() => CountZombies(out pawnsAfterTurn, out promotedAfterTurn);
 
+    public bool Started => started;
+
     /// <summary>The zombies' turn (called in place of the robot's move)</summary>
     public void TakeTurn()
     {

@@ -471,7 +471,8 @@ public class GameMenuUI : MonoBehaviour
         }
         
         // Return to Main Menu button
-        if (GUILayout.Button("Return to Main Menu", buttonStyle, GUILayout.Height(40)))
+        // Local games are saved as they go: the mode offers Resume when tapped again
+        if (GUILayout.Button(SavedGames.Saving ? "Main Menu (game saved)" : "Return to Main Menu", buttonStyle, GUILayout.Height(40)))
         {
             HandleReturnToMenu();
         }

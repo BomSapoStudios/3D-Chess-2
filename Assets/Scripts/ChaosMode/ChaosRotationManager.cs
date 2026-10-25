@@ -56,6 +56,7 @@ public class ChaosRotationManager : MonoBehaviour
     
     // Chaos timing - configurable interval (default 9 turns)
     private int movesSinceLastChaos = 0;
+    public int MovesSinceLastChaos { get => movesSinceLastChaos; set => movesSinceLastChaos = value; }
     private int chaosInterval = 9; // Default interval, configurable via GameConfiguration
 
     // Animation state

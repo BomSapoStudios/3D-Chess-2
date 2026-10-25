@@ -223,6 +223,14 @@ public class PlayerManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Replace who is knocked out (putting a saved game back)
+    /// </summary>
+    public void SetEliminated(IEnumerable<PieceColor> colors)
+    {
+        eliminatedPlayers = new HashSet<PieceColor>(colors);
+    }
+
+    /// <summary>
     /// Check if a player is eliminated
     /// </summary>
     public bool IsPlayerEliminated(PieceColor color)
