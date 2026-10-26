@@ -1,6 +1,6 @@
 """Tricky Queen Blitz puzzles: set up an expectation, then make the only par route ignore it.
 
-    python3 tricky.py search SIZE PAR TRIES SEED OUT.json   # graded tricky candidates
+    python3 tricky.py search SIZE PAR TRIES SEED OUT.json [bait,wander,plane]   # graded tricky candidates
     python3 tricky.py pack OUT.json CANDIDATES.json...      # pick 10 varied ones into a test pack
 
 The lies, each measured by the solver (see `deceive`):
@@ -10,9 +10,14 @@ The lies, each measured by the solver (see `deceive`):
   start     (place the queen) every par start touches no pawn row of 3 or more
   greedy    taking the biggest sweep each time runs at least 2 over par
   narrow    only one or two first moves (start and first sweep) still reach par
+  plane     every pawn sits on one floor or wall, but staying on it can't make par: the
+            route has to leave that plane and come back through it
+  false     most of the tempting moves (the biggest sweeps, at the start and at the second
+            stop of the real route) are dead ends
 """
 import itertools, json, random, sys
 from solver import Board, DIRS
+from gen import route_puzzle
 import packs
 
 
@@ -109,6 +114,56 @@ def deceive(n, queen, pawns, blocks=(), ice=False, limit=7):
         m["start_lie"] = False
     m["diag3"] = sum(1 for a, c in line if all(a[i] != c[i] for i in range(3)))
     m["pawns"] = len(pawns)
+
+    # Plane: all pawns on one plane, and par can't be made with every stop on it
+    m["plane"] = 0
+    for axis in range(3):
+        values = {p[axis] for p in pawns}
+        if len(values) == 1:
+            v = values.pop()
+            off = [c for c in itertools.product(range(n), repeat=3) if c[axis] != v]
+            flat = Board(n, pawns, list(blocks) + off, ice)
+            q = queen if queen and queen[axis] == v else None
+            if queen and q is None:
+                break  # she starts off the plane: no lie left to tell
+            flat_par = flat.solve(q, limit=par + 2)[0]
+            m["plane"] = (flat_par or par + 3) - par
+            break
+
+    # False paths: of the tempting moves (biggest sweeps) at the start and at the real route's
+    # second stop, the share that can no longer make par
+    def dead_share(at, left, moves_left):
+        bites = [(bin(swept & left).count("1"), to, swept) for to, swept, _, _ in b.moves(at)]
+        top = max((k for k, _, _ in bites), default=0)
+        tempting = {(to, swept & left) for k, to, swept in bites if k >= max(2, top - 1)}
+        if not tempting:
+            return 0.0, 0
+        dead = sum(1 for to, sw in tempting if b.solve_from(to, left & ~sw, moves_left - 1) is None)
+        return dead / len(tempting), len(tempting)
+    first_at = queen or start
+    share1, n1 = dead_share(first_at, b.full, par)
+    a, c = line[0]
+    share2, n2 = dead_share(c, b.full & ~_swept(b, a, c), par - 1) if par > 2 else (0.0, 0)
+    m["false"] = round((share1 * n1 + share2 * n2) / max(1, n1 + n2), 2)
+
+    # Fork: pawns on many sides of where she starts, each about as tempting, only one right.
+    # Counted from the given square, or from the best start when she's placed.
+    rays = []
+    for d in DIRS:
+        c, k = first_at, 0
+        while True:
+            c = tuple(c[i] + d[i] for i in range(3))
+            if not all(0 <= x < n for x in c) or c in b.blockers:
+                break
+            k += c in b.bit
+        if k:
+            rays.append((d, k))
+    right = line[0][1]
+    right_dir = tuple((right[i] > first_at[i]) - (right[i] < first_at[i]) for i in range(3))
+    right_k = next((k for d, k in rays if d == right_dir), 0)
+    m["fork"] = len(rays)                                  # directions with pawns to take
+    m["fork_rivals"] = sum(1 for d, k in rays if d != right_dir and k >= right_k)  # as tempting or more
+    m["tempting"] = n1 + n2
     return m
 
 
@@ -149,6 +204,12 @@ def lies(m):
         out.append("narrow")
     if m["diag3"] >= 2:
         out.append("diagonal")
+    if m.get("plane", 0) >= 1:
+        out.append("plane")
+    if m.get("false", 0) >= 0.75 and m.get("tempting", 0) >= 4:
+        out.append("false")
+    if m.get("fork", 0) >= 4 and m.get("fork_rivals", 0) >= 2:
+        out.append("fork")
     return out
 
 
@@ -238,15 +299,105 @@ def wander_route(n, par, rng):
     return start, sorted(pawns), []
 
 
-def search(n, par, tries, seed, path=None):
+def plane_route(n, par, rng):
+    """Every pawn on one plane, with a few blocks on it. On an open board staying on the plane is
+    never worse (any route squashed flat onto the plane takes the same pawns in as many moves),
+    so the blocks are what make it a lie: the planted route hops over them through the
+    neighbouring planes, while on the plane they're in the way."""
+    axis, v = rng.randrange(3), rng.randrange(n)
+    on = lambda c: c[axis] == v
+    flat = lambda c: tuple(v if i == axis else c[i] for i in range(3))
+    plane = [c for c in itertools.product(range(n), repeat=3) if on(c)]
+    at = start = rng.choice(plane)
+    pawns, walked, shadow, leaves = set(), {start}, set(), 0
+    for move in range(par):
+        options = []
+        for d in DIRS:
+            path, c = [], at
+            while True:
+                c = tuple(c[i] + d[i] for i in range(3))
+                if not all(0 <= x < n for x in c):
+                    break
+                path.append(c)
+            for stop in range(len(path)):
+                seg = path[:stop + 1]
+                hits = [x for x in seg if on(x) and x != start and x not in pawns]
+                if hits or d[axis] != 0:
+                    options.append((d, seg, hits))
+        if not options:
+            return None
+        d, seg, hits = rng.choice(options)
+        if d[axis] != 0:
+            leaves += 1
+            shadow.update(flat(x) for x in seg if not on(x))  # where it would run on the plane
+        else:
+            walked.update(seg)
+        if hits:
+            k = 1 if d[axis] != 0 else rng.randint(1, min(3, len(hits)))
+            pawns.update(rng.sample(hits, k))
+        walked.update(x for x in seg if on(x))
+        at = seg[-1]
+    if leaves < 2:
+        return None
+    pawns.discard(start)
+    spots = sorted(shadow - walked - pawns - {start})
+    if not spots:
+        return None
+    blocks = rng.sample(spots, min(len(spots), rng.randint(1, 4)))
+    return start, sorted(pawns), sorted(blocks)
+
+
+def fork_route(n, par, rng):
+    """A planted route, then decoy pawns on the other lines out of her starting square, placed
+    only where a later move of the route passes. Every side looks like a way to go; the decoys
+    get swept up later from directions nobody expects."""
+    made = None
+    for _ in range(50):
+        made = (wander_route(n, par, rng) if rng.random() < 0.5 else route_puzzle(n, par, 0, rng, per_move=(1, 3)))
+        if made:
+            break
+    if not made:
+        return None
+    start, pawns, _ = made
+    # Re-walk the planted route: the cells each move after the first passes through
+    b = Board(n, pawns)
+    par0, line, _ = b.solve(start, limit=par)
+    if par0 != par:
+        return None
+    first_dir = _dir(start, line[0][1])
+    later = set()
+    for a, c in line[1:]:
+        d = _dir(a, c)
+        x = a
+        while x != c:
+            x = tuple(x[i] + d[i] for i in range(3))
+            later.add(x)
+    by_ray = {}
+    for x in later - set(pawns) - {start}:
+        d = _dir(start, x)
+        if d != first_dir and all((x[i] - start[i]) in (0, d[i] * _dist(start, x)) for i in range(3)):
+            by_ray.setdefault(d, []).append(x)
+    if len(by_ray) < 2:
+        return None
+    rays = rng.sample(sorted(by_ray), min(len(by_ray), rng.randint(2, 4)))
+    decoys = [rng.choice(by_ray[d]) for d in rays]
+    return start, sorted(set(pawns) | set(decoys)), []
+
+
+def _dir(a, c):
+    return tuple((c[i] > a[i]) - (c[i] < a[i]) for i in range(3))
+
+
+def search(n, par, tries, seed, path=None, kinds=("bait", "wander")):
     rng = random.Random(seed)
     out, seen = [], set()
     for t in range(tries):
-        made = (bait_route if t % 2 == 0 else wander_route)(n, par, rng)
+        kind = kinds[t % len(kinds)]
+        made = {"bait": bait_route, "wander": wander_route, "plane": plane_route, "fork": fork_route}[kind](n, par, rng)
         if not made:
             continue
         start, pawns, blocks = made
-        if not 2 * par <= len(pawns) <= 3 * par + 2:
+        if not (par + 2 if kind == "plane" else 2 * par) <= len(pawns) <= 3 * par + 2:
             continue
         given = rng.random() < 0.5
         queen = start if given else None
@@ -261,15 +412,23 @@ def search(n, par, tries, seed, path=None):
         if given and Board(n, pawns, blocks).solve(None, limit=par - 1)[0] is not None:
             continue
         found = lies(m)
-        if "greedy" not in found or len(found) < 3 or m["firsts"] > 3:
+        if kind == "plane":
+            if "plane" not in found or m["firsts"] > 2 or m["false"] < 0.6:
+                continue
+        elif kind == "fork":
+            if "fork" not in found or m["firsts"] > 2 or m["false"] < 0.6:
+                continue
+        elif "greedy" not in found or len(found) < 3 or m["firsts"] > 3 or m["false"] < 0.6:
             continue
         entry = packs.solved("", n, queen, pawns, blocks, "", False)
-        entry.update(lies=found, greedy=m["greedy"], firsts=m["firsts"], starts=m["starts"], bait=m["bait"])
+        entry.update(lies=found, greedy=m["greedy"], firsts=m["firsts"], starts=m["starts"], bait=m["bait"],
+                     plane=m["plane"], false=m["false"], tempting=m["tempting"], fork=m["fork"],
+                     rivals=m["fork_rivals"])
         out.append(entry)
         if path:
             json.dump(out, open(path, "w"))  # saved as we go, so a timeout keeps what was found
         print(f"#{t} {n}³ par {par} pawns {len(pawns)} {'given' if given else 'place'} greedy {m['greedy']} "
-              f"firsts {m['firsts']} {' '.join(found)}", flush=True)
+              f"firsts {m['firsts']} false {m['false']}/{m['tempting']} fork {m['fork']}/{m['fork_rivals']} plane +{m['plane']} {' '.join(found)}", flush=True)
     return out
 
 
@@ -281,6 +440,9 @@ TIPS = {
     "narrow": "There is exactly one way. Find it.",
     "diagonal": "Turn the cube. The lines go through the middle.",
     "greedy": "Big sweeps lose.",
+    "plane": "Every pawn is on one floor. She isn't.",
+    "false": "Most good-looking moves are dead ends.",
+    "fork": "Pawns on every side. Only one way out works.",
 }
 
 
@@ -314,9 +476,37 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "search":
         n, par, tries, seed, path = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), sys.argv[6]
-        found = search(n, par, tries, seed, path)
+        kinds = tuple(sys.argv[7].split(",")) if len(sys.argv) > 7 else ("bait", "wander")
+        found = search(n, par, tries, seed, path, kinds)
         json.dump(found, open(path, "w"))
         print(len(found), "found")
+    elif cmd == "forkpack":
+        # Round 2: every puzzle is a fork. Most rival directions and false paths first, a few
+        # place-the-queen ones, both sizes, no two neighbours with the same size and par.
+        out = sys.argv[2]
+        cands = []
+        for f in sys.argv[3:]:
+            cands += json.load(open(f))
+        cands = [p for p in cands if "fork" in p["lies"]]
+        cands.sort(key=lambda p: (-p["rivals"], -p["false"], p["firsts"], -(p["greedy"] - p["par"])))
+        chosen = []
+        for want_place in (True, False):
+            for p in cands:
+                if p in chosen or bool(p["queen"]) == want_place:
+                    continue
+                if want_place and sum(1 for q in chosen if not q["queen"]) >= 3:
+                    break
+                if not want_place and len(chosen) >= 10:
+                    break
+                chosen.append(p)
+        chosen.sort(key=lambda p: (p["par"], p["size"], -p["rivals"]))
+        for i, p in enumerate(chosen, 1):
+            p["name"] = f"Fork {i}"
+            p["tip"] = TIPS["fork"] if i % 2 else TIPS["false"]
+        print(packs.write({"id": "tricky-2", "name": "Tricky 2 (test)", "free": True, "puzzles": chosen}, out))
+        for p in chosen:
+            print(p["name"], f"{p['size']}³ par {p['par']} pawns {len(p['pawns']) // 3} directions {p['fork']} rivals {p['rivals']} false {p['false']} firsts {p['firsts']}",
+                  "given" if p["queen"] else "place")
     elif cmd == "pack":
         out = sys.argv[2]
         cands = []
