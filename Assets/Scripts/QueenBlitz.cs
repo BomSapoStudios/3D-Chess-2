@@ -697,7 +697,12 @@ public class QueenBlitzDirector : MonoBehaviour
     private float funnelStarted = -1f, tallyBump = -10f;
     private int funnelArrived;
     private const float SlotSize = 26f, SlotGap = 6f, FunnelStep = 0.09f, FunnelFlight = 0.5f;
-    private static readonly Rect TallyRect = new Rect(16f, 16f, 150f, 44f);
+    private static readonly Rect TallyTop = new Rect(16f, 16f, 150f, 44f);
+    // While placing the queen, White's Ready button has the top-left corner: the total sits under
+    // it, where Restart goes once play starts
+    private static readonly Rect TallyUnderReady = new Rect(16f, 80f, 150f, 44f);
+    private static Rect TallyRect => GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.PiecePlacement
+        ? TallyUnderReady : TallyTop;
 
     private Rect Slot(int i) => new Rect(20f + (i % 4) * (SlotSize + 12f), 186f + (i / 4) * (SlotSize + SlotGap), SlotSize, SlotSize);
 
