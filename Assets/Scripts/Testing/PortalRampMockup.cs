@@ -11,7 +11,7 @@ using UnityEngine;
 /// </summary>
 public class PortalRampMockup : MonoBehaviour
 {
-    private readonly List<Transform> swirls = new List<Transform>();
+    private readonly List<(Transform disc, float spin)> swirls = new List<(Transform, float)>();
     private readonly List<Transform> made = new List<Transform>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -27,7 +27,7 @@ public class PortalRampMockup : MonoBehaviour
 
     private void Update()
     {
-        foreach (Transform s in swirls) if (s != null) s.Rotate(0f, 0f, -90f * Time.deltaTime, Space.Self);
+        foreach (var s in swirls) if (s.disc != null) s.disc.Rotate(0f, 0f, s.spin * Time.deltaTime, Space.Self);
         if (built || QueenBlitzDirector.Instance == null || ChessBoard.Instance == null) return;
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
         if (state != GameState.Playing && state != GameState.PiecePlacement) return;
@@ -36,16 +36,18 @@ public class PortalRampMockup : MonoBehaviour
         built = true;
         int n = BoardDimensionsManager.Instance.GetDimensions().x;
         Transform parent = container.transform;
-        // Two pairs: cyan (in on floor 2 facing +z, out on floor 4 facing -x) and orange
-        Portal(parent, Free(new BoardPosition(1, 1, 0), n), Vector3.forward, NeonTheme.Cyan, "A");
-        Portal(parent, Free(new BoardPosition(n - 1, 3, 2), n), Vector3.left, NeonTheme.Cyan, "A");
-        Portal(parent, Free(new BoardPosition(0, 0, n - 2), n), Vector3.right, new Color(1f, 0.55f, 0.1f), "B");
-        Portal(parent, Free(new BoardPosition(n - 2, 2, n - 1), n), Vector3.back, new Color(1f, 0.55f, 0.1f), "B");
+        // Two pairs, each its own colour (not the board's cyan or the blocks' pink): purple and orange.
+        // In each pair the way in and the way out look different
+        Color purple = NeonTheme.Hex("B36BFF"), orange = new Color(1f, 0.55f, 0.1f);
+        Portal(parent, Free(new BoardPosition(1, 1, 0), n), Vector3.forward, purple, "A", false);
+        Portal(parent, Free(new BoardPosition(n - 1, 3, 2), n), Vector3.left, purple, "A", true);
+        Portal(parent, Free(new BoardPosition(0, 0, n - 2), n), Vector3.right, orange, "B", false);
+        Portal(parent, Free(new BoardPosition(2, 0, n - 2), n), Vector3.left, orange, "B", true);
         Ramp(parent, Free(new BoardPosition(2, 0, 1), n), Vector3.right, false);
         Ramp(parent, Free(new BoardPosition(2, 1, n - 2), n), Vector3.forward, true);
         Debug.Log("PORTAL MOCKUP: built");
         int view = PlayerPrefs.GetInt("DebugPortalMockup", 1);
-        if (view >= 2) CloseUp(view == 2 ? made.GetRange(2, 1) : made.GetRange(4, 2));
+        if (view >= 2) CloseUp(view == 2 ? made.GetRange(2, 2) : made.GetRange(4, 2));
     }
 
     /// <summary>The square asked for, or the nearest one on its floor without a piece</summary>
@@ -82,16 +84,20 @@ public class PortalRampMockup : MonoBehaviour
         cam.CopyFrom(main);
         cam.depth = main.depth + 1;
         Vector3 from = (main.transform.position - centre).normalized;
-        cam.transform.position = centre + from * (spread * 2.2f + ChessBoard.Instance.cellSize * 2.5f) + Vector3.up * ChessBoard.Instance.cellSize;
+        cam.transform.position = centre + from * (spread * 1.5f + ChessBoard.Instance.cellSize * 1.6f) + Vector3.up * ChessBoard.Instance.cellSize * 0.6f;
         cam.transform.LookAt(centre);
     }
 
     // ── Portals ──
 
-    private void Portal(Transform parent, BoardPosition at, Vector3 facing, Color color, string pair)
+    /// <summary>
+    /// A way in: a dark, inward-turning hole with a solid rim and chevrons pointing into it.
+    /// A way out: a bright, outward-turning disc with a rim of rays and chevrons pointing out.
+    /// </summary>
+    private void Portal(Transform parent, BoardPosition at, Vector3 facing, Color color, string pair, bool exit)
     {
         float cell = ChessBoard.Instance.cellSize;
-        var root = new GameObject($"Portal {pair} {at}").transform;
+        var root = new GameObject($"Portal {pair} {(exit ? "out" : "in")} {at}").transform;
         made.Add(root);
         root.SetParent(parent, false);
         root.localPosition = Centre(at);
@@ -101,19 +107,31 @@ public class PortalRampMockup : MonoBehaviour
         GameObject disc = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(disc.GetComponent<Collider>());
         disc.transform.SetParent(root, false);
-        disc.transform.localScale = Vector3.one * cell * 0.82f;
-        disc.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Sprites/Default")) { mainTexture = Swirl(color), color = Color.white };
-        swirls.Add(disc.transform);
+        disc.transform.localScale = Vector3.one * cell * 0.86f;
+        disc.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Sprites/Default")) { mainTexture = Swirl(color, exit), color = Color.white };
+        swirls.Add((disc.transform, exit ? 120f : -90f));
 
-        // A bright rim
-        Line(root, Circle(cell * 0.43f, 48), color, cell * 0.05f, true);
-        // The way out: a chevron in front of the face
-        float a = cell * 0.18f, z = cell * 0.32f;
-        Line(root, new[] { new Vector3(-a, a * 0.9f, z * 0.6f), new Vector3(0, 0, z * 1.4f), new Vector3(a, a * 0.9f, z * 0.6f) }, color, cell * 0.06f, false);
-        Line(root, new[] { new Vector3(-a, -a * 0.1f, z * 0.6f), new Vector3(0, -a, z * 1.4f), new Vector3(a, -a * 0.1f, z * 0.6f) }, color, cell * 0.06f, false);
+        float r = cell * 0.45f;
+        if (exit)
+        {
+            // A rim of short rays pointing outward
+            for (int i = 0; i < 12; i++)
+            {
+                float t = i / 12f * Mathf.PI * 2f;
+                Vector3 d = new Vector3(Mathf.Cos(t), Mathf.Sin(t), 0f);
+                Line(root, new[] { d * r * 0.98f, d * r * 1.22f }, color, cell * 0.05f, false);
+            }
+        }
+        else Line(root, Circle(r, 48), color, cell * 0.07f, true);
+
+        // Chevrons in front: pointing out of an exit, into an entrance
+        float a = cell * 0.18f, near = cell * 0.2f, far = cell * 0.45f;
+        float tip = exit ? far : near, wing = exit ? near : far;
+        Line(root, new[] { new Vector3(-a, a * 0.9f, wing), new Vector3(0, 0, tip), new Vector3(a, a * 0.9f, wing) }, color, cell * 0.06f, false);
+        Line(root, new[] { new Vector3(-a, -a * 0.1f, wing), new Vector3(0, -a, tip), new Vector3(a, -a * 0.1f, wing) }, color, cell * 0.06f, false);
     }
 
-    private static Texture2D Swirl(Color color)
+    private static Texture2D Swirl(Color color, bool exit)
     {
         const int size = 128;
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
@@ -127,6 +145,9 @@ public class PortalRampMockup : MonoBehaviour
                 float arm = Mathf.SmoothStep(0.55f, 1f, Mathf.Abs(band - 0.5f) * 2f);
                 float alpha = Mathf.Clamp01((1f - r) * 6f) * Mathf.Lerp(0.35f, 1f, arm);
                 Color c = Color.Lerp(color * 0.5f, Color.Lerp(color, Color.white, 0.5f), arm * (1f - r * 0.6f));
+                // The way in falls away into a dark centre; the way out glows white-hot at its centre
+                float core = Mathf.Clamp01(1f - r / 0.45f);
+                c = exit ? Color.Lerp(c, Color.white, core * core) : Color.Lerp(c, new Color(0.03f, 0f, 0.08f), core);
                 c.a = r < 1f ? alpha : 0f;
                 tex.SetPixel(x, y, c);
             }
