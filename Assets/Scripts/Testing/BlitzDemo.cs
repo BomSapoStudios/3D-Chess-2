@@ -8,7 +8,9 @@ using UnityEngine;
 /// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
 /// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
 /// Auto-place for the queen (each costs a pawn); 97 plays puzzle 2's first move then a wrong one,
-/// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move. Logs "BLITZ DEMO".
+/// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move; 95 opens the
+/// puzzle picker on the pack. `DebugBlitzPack` picks the pack (default starter) and
+/// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
 {
@@ -19,6 +21,8 @@ public class BlitzDemo : MonoBehaviour
     {
         int which = PlayerPrefs.GetInt("DebugBlitzDemo", 0);
         if (which == 0 || FindFirstObjectByType<BlitzDemo>() != null) return;
+        QueenBlitz.PackId = PlayerPrefs.GetString("DebugBlitzPack", "starter");
+        if (which == 95) { QueenBlitz.ReturnToPicker = true; return; } // the menu opens on the pack
         var go = new GameObject("Blitz Demo");
         DontDestroyOnLoad(go);
         go.AddComponent<BlitzDemo>().StartCoroutine(Run(which));
@@ -29,7 +33,7 @@ public class BlitzDemo : MonoBehaviour
         yield return new WaitForSeconds(2f);
         miss = which == 97;
         menu = which == 96;
-        if (miss || menu) which = 2;
+        if (miss || menu) which = PlayerPrefs.GetInt("DebugBlitzMissPuzzle", 2);
         bool all = which >= 98;
         autoPlace = which == 98;
         int first = all ? 0 : which - 1, last = all ? QueenBlitz.Puzzles.Length - 1 : which - 1;

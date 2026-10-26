@@ -112,7 +112,7 @@ public partial class NeonMenu
     {
         ClearBlitzContent();
         blitzTitle.text = "QUEEN BLITZ";
-        BlitzText("One queen. Clear every pawn in as few moves as you can. Your first clear of a puzzle keeps its pawns.",
+        BlitzText("One queen. Clear every pawn within par, the move limit. Your first clear of a puzzle keeps its pawns.",
             15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
 
         blitzView = BlitzView.Packs;
@@ -202,7 +202,7 @@ public partial class NeonMenu
 
         if (chapters == 1)
         {
-            BlitzText("One queen. Clear every pawn in as few moves as you can; she drives straight through them. Your first clear of a puzzle keeps its pawns.",
+            BlitzText("One queen. Clear every pawn within par, the move limit; she drives straight through them. Your first clear of a puzzle keeps its pawns.",
                 15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
         }
         else
