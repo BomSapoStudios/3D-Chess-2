@@ -37,6 +37,12 @@ RECIPES = {
     "ice-easy-5":  (5, True, 1, True, 2, (3, 7), None),
     "ice-med-5":   (5, True, 3, False, 3, (6, 10), 4),
     "block-med-5": (5, False, 2, False, 3, (6, 10), 4),
+    # Gentle three-movers: what follows the warm-ups now that two moves is only for warm-ups
+    "gentle-5":    (5, False, 0, True, 3, (5, 8), None),
+    "gentle-place-5": (5, False, 0, False, 3, (5, 8), 6),
+    # Longer routes with the queen given, so the middle chapters mix 3, 4 and 5 moves
+    "steady4-5":   (5, False, 0, True, 4, (8, 11), None),
+    "steady5-5":   (5, False, 0, True, 5, (10, 13), None),
 }
 
 
@@ -281,19 +287,55 @@ def make(recipe_name, count, seed, seen=None, tries=200000):
 CHAPTER_TARGETS = [(6, 32), (20, 46), (34, 58), (46, 72), (60, 96)]
 
 
-def assemble(candidates, chapters=CHAPTER_TARGETS, size=10):
+def shape(p):
+    """The puzzle's solution as the axes each move changes, e.g. ("y", "xz"): puzzles with the
+    same shape play the same however the cube is turned"""
+    cells = packs.triples(p["line"])
+    return tuple("".join("xyz"[i] for i in range(3) if a[i] != b[i]) for a, b in zip(cells, cells[1:]))
+
+
+def layout_key(p):
+    """Same pawns and blocks up to rotating or mirroring, whether or not the queen is given"""
+    t = packs.triples
+    return canonical(p["size"], p.get("ice", False), None, t(p["pawns"]), t(p["blocks"]))
+
+
+def assemble(candidates, chapters=CHAPTER_TARGETS, size=10, warmups=2):
     """Pick puzzles for each slot nearest its target score, each candidate used once, sorted easy
-    to hard within a chapter. Returns the list in play order."""
-    pool = sorted(candidates, key=lambda p: p["score"])
+    to hard within a chapter. Two-move puzzles are too easy except as warm-ups (Brandon): only the
+    first `warmups` slots take them, each with a different shape, and no two neighbours share a
+    shape. Returns the list in play order."""
+    seen, pool = set(), []
+    for p in sorted(candidates, key=lambda p: p["score"]):
+        key = layout_key(p)
+        if key not in seen:
+            seen.add(key)
+            pool.append(p)
+    short = [p for p in pool if p["par"] <= 2]
+    pool = [p for p in pool if p["par"] > 2]
     chosen = []
-    for lo, hi in chapters:
+    for p in short:
+        if len(chosen) < warmups and all(shape(p) != shape(q) for q in chosen):
+            chosen.append(p)
+    for c, (lo, hi) in enumerate(chapters):
         picks = []
-        for i in range(size):
+        for i in range(len(chosen) if c == 0 else 0, size):
             target = lo + (hi - lo) * i / (size - 1)
-            best = min(pool, key=lambda p: abs(p["score"] - target))
+            # Nearest the target, preferring a shape and a recipe the chapter doesn't have yet
+            best = min(pool, key=lambda p: abs(p["score"] - target)
+                       + (5 if shape(p) in map(shape, picks) else 0)
+                       + 3 * sum(q["recipe"] == p["recipe"] for q in picks))
             pool.remove(best)
             picks.append(best)
-        chosen += sorted(picks, key=lambda p: p["score"])
+        picks.sort(key=lambda p: p["score"])
+        # Neighbours with the same shape: swap the second with the next puzzle that differs
+        run = chosen + picks
+        for j in range(len(chosen) + 1, len(run)):
+            if shape(run[j]) == shape(run[j - 1]):
+                k = next((k for k in range(j + 1, len(run)) if shape(run[k]) != shape(run[j - 1])), None)
+                if k is not None:
+                    run[j], run[k] = run[k], run[j]
+        chosen = run
     return chosen
 
 
