@@ -32,6 +32,7 @@ public class SceneController : MonoBehaviour
     private GameConfiguration pendingGameConfig;
     private GameConfiguration currentGameConfig; // Persistent copy for GetCurrentGameConfiguration
     private bool isLoading = false;
+    private string queuedScene; // asked for while another load was finishing: loaded right after it
     
     public static SceneController Instance { get; private set; }
     
@@ -186,7 +187,11 @@ public class SceneController : MonoBehaviour
     {
         if (isLoading)
         {
-            Debug.LogWarning($"SceneController: Already loading a scene, ignoring request to load {sceneName}");
+            // Still finishing the last load (the menu that just opened holds it for minimumLoadTime):
+            // go as soon as it's done instead of dropping the request, which left a player who picked
+            // a puzzle straight away sitting on the menu
+            Debug.Log($"SceneController: Still loading, {sceneName} goes next");
+            queuedScene = sceneName;
             return;
         }
         
@@ -250,11 +255,17 @@ public class SceneController : MonoBehaviour
         float elapsedTime = Time.time - startTime;
         if (elapsedTime < minimumLoadTime)
         {
-            yield return new WaitForSeconds(minimumLoadTime - elapsedTime);
+            yield return new WaitForSecondsRealtime(minimumLoadTime - elapsedTime);
         }
         
         isLoading = false;
         Debug.Log($"SceneController: Completed async load of scene '{sceneName}' in {Time.time - startTime:F2} seconds");
+        if (queuedScene != null)
+        {
+            string next = queuedScene;
+            queuedScene = null;
+            LoadScene(next);
+        }
     }
     
     /// <summary>
