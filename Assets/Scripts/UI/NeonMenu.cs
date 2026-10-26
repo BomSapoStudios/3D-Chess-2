@@ -402,15 +402,15 @@ public partial class NeonMenu : MonoBehaviour
 
     private void BuildCube(RectTransform parent)
     {
-        // Four stacked levels, each a square seen at an angle
-        float[] heights = { -114, -38, 38, 114 };
-        for (int level = 0; level < 4; level++)
+        // Five stacked levels (the 5x5x5 board), each a square seen at an angle
+        float[] heights = { -120, -60, 0, 60, 120 };
+        for (int level = 0; level < heights.Length; level++)
         {
             RectTransform squash = NewRect($"Level {level + 1}", parent);
             squash.anchorMin = squash.anchorMax = new Vector2(0.5f, 0.5f);
             squash.anchoredPosition = new Vector2(0, heights[level]);
             squash.sizeDelta = Vector2.zero;
-            squash.localScale = new Vector3(1f, 0.58f, 1f);
+            squash.localScale = new Vector3(1f, 0.5f, 1f); // flatter, so five levels still read apart
 
             Image fill = NewImage("Fill", squash, new Color(NeonTheme.Cyan.r, NeonTheme.Cyan.g, NeonTheme.Cyan.b, 0.08f));
             fill.rectTransform.sizeDelta = new Vector2(104, 104);
@@ -425,8 +425,8 @@ public partial class NeonMenu : MonoBehaviour
         // A few pieces
         (float x, float y, Color c)[] pieces =
         {
-            (-30, -105, NeonTheme.Lime), (25, -95, NeonTheme.Lime), (40, -30, NeonTheme.Lime),
-            (-35, 40, NeonTheme.Pink), (10, 110, NeonTheme.Pink), (-45, 100, NeonTheme.Pink)
+            (-30, -112, NeonTheme.Lime), (25, -102, NeonTheme.Lime), (40, -52, NeonTheme.Lime),
+            (-35, 62, NeonTheme.Pink), (10, 118, NeonTheme.Pink), (-45, 108, NeonTheme.Pink)
         };
         foreach (var p in pieces)
         {
@@ -435,7 +435,7 @@ public partial class NeonMenu : MonoBehaviour
             piece.type = Image.Type.Sliced;
             Place(piece.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(13, 22), new Vector2(p.x, p.y + 10));
         }
-        (float x, float y)[] dots = { (0, -40), (30, -40), (-28, -28) };
+        (float x, float y)[] dots = { (0, -62), (30, -62), (-28, -50) };
         foreach (var d in dots)
         {
             Image dot = NewImage("Dot", parent, NeonTheme.Yellow);
