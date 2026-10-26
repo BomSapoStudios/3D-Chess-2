@@ -295,6 +295,18 @@ public class GameMenuUI : MonoBehaviour
     /// <summary>
     /// Handle return to main menu
     /// </summary>
+    /// <summary>Queen Blitz: back to the puzzle picker, on this pack and chapter</summary>
+    private void GoToBlitzPicker()
+    {
+        QueenBlitz.ReturnToPicker = true;
+        HandleReturnToMenu();
+    }
+
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    /// <summary>Tap "Queen Blitz" (BlitzDemo)</summary>
+    public void DebugBlitzPicker() => GoToBlitzPicker();
+#endif
+
     private void HandleReturnToMenu()
     {
         HideMenu();
@@ -354,11 +366,7 @@ public class GameMenuUI : MonoBehaviour
             GUILayout.Space(20);
             if (GUILayout.Button("Resume Game", buttonStyle, GUILayout.Height(45))) HideMenu();
             GUILayout.Space(10);
-            if (GUILayout.Button("Queen Blitz", buttonStyle, GUILayout.Height(45)))
-            {
-                QueenBlitz.ReturnToPicker = true;
-                HandleReturnToMenu();
-            }
+            if (GUILayout.Button("Queen Blitz", buttonStyle, GUILayout.Height(45))) GoToBlitzPicker();
             GUILayout.Space(10);
             if (GUILayout.Button("Main Menu", buttonStyle, GUILayout.Height(45))) HandleReturnToMenu();
             GUILayout.EndVertical();

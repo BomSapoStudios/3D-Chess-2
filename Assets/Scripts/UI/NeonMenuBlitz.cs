@@ -343,6 +343,18 @@ public partial class NeonMenu
         StartBlitz(0);
     }
 
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    /// <summary>Tap a puzzle in the picker (BlitzDemo)</summary>
+    public void DebugStartBlitz(int index) => StartBlitz(index);
+
+    /// <summary>Tap Queen Blitz! on the menu, then Start new if a puzzle is saved (BlitzDemo)</summary>
+    public void DebugBlitzFromMenu()
+    {
+        OrResume(SavedGames.Blitz, ShowBlitzPicker)();
+        if (resumePicker != null && resumePicker.activeSelf) { resumePicker.SetActive(false); resumeStartNew?.Invoke(); }
+    }
+#endif
+
     private void StartBlitz(int index)
     {
         Haptics.Selection();

@@ -76,7 +76,7 @@ public class HowToPlayUI : MonoBehaviour
         "On an ice floor the Queen can't stop partway: every move slides until the edge of the board " +
         "or the square before a block.\n\n" +
         "HELP\n" +
-        "Undo takes back a move. Restart starts the puzzle again. The floor buttons on the right show one " +
+        "Undo takes back a move. Restart starts the puzzle again. Tap the title bar to jump to another puzzle or pack. The floor buttons on the right show one " +
         "floor at a time, and the View buttons look from either side.";
 
     /// <summary>The guide for the game being played: its title, seen-key, and two columns</summary>

@@ -493,7 +493,7 @@ public class QueenBlitzBlock : MonoBehaviour
 /// places the queen when the puzzle gives her a square, keeps the turn with the player, counts
 /// moves, and ends the puzzle when the last pawn falls.
 /// </summary>
-public class QueenBlitzDirector : MonoBehaviour
+public partial class QueenBlitzDirector : MonoBehaviour
 {
     public static QueenBlitzDirector Instance { get; private set; }
 
@@ -829,8 +829,11 @@ public class QueenBlitzDirector : MonoBehaviour
         bool playing = !ended && (state == GameState.Playing || state == GameState.PiecePlacement);
         bool finishing = ended && state != GameState.GameOver;
         bool over = state == GameState.GameOver;   // the result is up: just the total stays
+        if (!playing) selectorOpen = false;
+        GUI.depth = selectorOpen ? -30 : 0; // the puzzle selector sits over every other control
         if (!playing && !finishing && !over) return;
         Vector2 ui = TouchGUI.Begin();
+        GUI.enabled = !selectorOpen; // under the selector nothing here takes a tap
         if (playing)
         {
             QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
@@ -843,15 +846,20 @@ public class QueenBlitzDirector : MonoBehaviour
             // At the very top (the turn line is hidden in puzzles), between the pawn total on the
             // left and the "?" on the right with a clear gap to each; smaller text, then two lines,
             // on narrow screens
+            // on narrow screens. A grid icon at its end: tap the bar for the puzzle selector
             float from = TallyTop.xMax + 12f, to = ui.x - 82f - 12f;
             float w = Mathf.Min(460f, to - from);
+            const float icon = 26f;
             GUIStyle style = NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter);
             style.richText = true;
-            while (style.fontSize > 12 && style.CalcSize(new GUIContent(text)).x > w - 16f) style.fontSize--;
-            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(text), w - 16f) + 8f);
+            while (style.fontSize > 12 && style.CalcSize(new GUIContent(text)).x > w - 16f - icon) style.fontSize--;
+            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(text), w - 16f - icon) + 8f);
             Rect rect = new Rect(from + (to - from - w) / 2f, 6f, w, h);
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
-            GUI.Label(new Rect(rect.x + 8f, rect.y, rect.width - 16f, rect.height), text, style);
+            GUI.Label(new Rect(rect.x + 8f, rect.y, rect.width - 16f - icon, rect.height), text, style);
+            DrawGridIcon(new Rect(rect.xMax - 8f - 16f, rect.center.y - 8f, 16f, 16f));
+            TouchGUI.Block(rect);
+            if (!selectorOpen && GUI.Button(rect, GUIContent.none, GUIStyle.none)) OpenSelector();
             if (QueenBlitz.Moves == 0)
             {
                 GUIStyle tip = NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.UpperCenter);
@@ -863,6 +871,8 @@ public class QueenBlitzDirector : MonoBehaviour
         }
         DrawTally();
         if (!over) DrawTracker();
+        GUI.enabled = true;
         TouchGUI.End();
+        if (selectorOpen) DrawSelector();
     }
 }

@@ -170,6 +170,18 @@ public class RematchUI : MonoBehaviour
     public void DebugRematch() => Rematch();
 #endif
 
+    /// <summary>Queen Blitz: back to the puzzle picker, on this pack and chapter</summary>
+    private void ToPuzzles()
+    {
+        QueenBlitz.ReturnToPicker = true;
+        GoHome(null);
+    }
+
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    /// <summary>Tap Puzzles on the result panel (BlitzDemo)</summary>
+    public void DebugPuzzles() => ToPuzzles();
+#endif
+
     private void GoHome(string note)
     {
         if (leaving) return;
@@ -237,11 +249,7 @@ public class RematchUI : MonoBehaviour
             // Out of moves: try again, or pick another puzzle
             float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 404f);
             if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
-            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Puzzles", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18))
-            {
-                QueenBlitz.ReturnToPicker = true;
-                GoHome(null);
-            }
+            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Puzzles", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18)) ToPuzzles();
             if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
             GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), "Clear every pawn within par to keep its pawns.", NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
             TouchGUI.End();

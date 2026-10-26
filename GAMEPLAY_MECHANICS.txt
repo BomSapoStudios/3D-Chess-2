@@ -377,6 +377,11 @@ Scoring:
     what each one pays). Replays pay nothing; the card then shows your best moves vs par.
   • Undo, Restart, Retry and Next puzzle. The in-game Menu shows only Resume Game, Queen
     Blitz (back to the puzzle picker, on that pack and chapter) and Main Menu.
+  • Puzzle selector: tap the title bar (grid icon at its end), during placement or play, for a
+    card with the pack's puzzles a chapter at a time (Playing, Best moves/par, Par, or Locked by
+    the 7-of-10 chapter rule), Prev / Next, and chips to switch pack (review packs only after
+    the five taps). Picking one starts it like Next puzzle; the one you leave is just abandoned
+    (no fail, no pawns). X or a tap outside closes it.
 
 PAWNS
   Pawns are what you collect, for a future store (piece sets, puzzle packs). They live in

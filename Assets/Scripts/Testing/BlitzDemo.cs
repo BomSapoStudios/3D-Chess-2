@@ -9,7 +9,9 @@ using UnityEngine;
 /// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
 /// Auto-place for the queen (each costs a pawn); 97 plays puzzle 2's first move then a wrong one,
 /// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move; 95 opens the
-/// puzzle picker on the pack. `DebugBlitzPack` picks the pack (default starter) and
+/// puzzle picker on the pack; 94 goes puzzle > Menu > Queen Blitz > another puzzle, 93 runs out
+/// of moves then Puzzles > another puzzle, 92 Main Menu > Queen Blitz! > Start new > another puzzle;
+/// 91 opens the in-puzzle selector, 90 the same on the next pack's chip, 89 jumps to Tricky 2's 6³ puzzle 5. `DebugBlitzPack` picks the pack (default starter) and
 /// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
@@ -30,6 +32,32 @@ public class BlitzDemo : MonoBehaviour
 
     private static IEnumerator Run(int which)
     {
+        if (which >= 92 && which <= 94) { yield return Hop(which); yield break; }
+        if (which == 91 || which == 90 || which == 89)
+        {
+            // 91: open the puzzle selector on puzzle 2; 90: the same, showing the next pack's chip
+            yield return new WaitForSeconds(2f);
+            QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[1];
+            var config = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(puzzle.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = 1, saveSlot = SavedGames.Blitz };
+            config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            config.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(config);
+            while (QueenBlitzDirector.Instance == null || GameStateManager.Instance.currentState != GameState.PiecePlacement && GameStateManager.Instance.currentState != GameState.Playing) yield return null;
+            yield return new WaitForSeconds(3f);
+            var packs = QueenBlitz.Available();
+            string other = which == 90 && packs.Count > 1 ? packs[(packs.FindIndex(p => p.id == QueenBlitz.PackId) + 1) % packs.Count].id : null;
+            QueenBlitzDirector.Instance.DebugOpenSelector(other);
+            Debug.Log($"BLITZ DEMO: selector open on {other ?? QueenBlitz.PackId}");
+            if (which == 89)
+            {
+                // Jump to puzzle 5 of Tricky 2 (a 6³ board) from the selector
+                yield return new WaitForSeconds(2f);
+                QueenBlitzDirector.Instance.DebugJump("tricky-2", 4);
+                yield return new WaitForSeconds(6f);
+                Debug.Log($"BLITZ DEMO: jumped to {QueenBlitz.PackId} {QueenBlitz.Index + 1}, board {BoardDimensionsManager.Instance.GetDimensions()}");
+            }
+            yield break;
+        }
         yield return new WaitForSeconds(2f);
         miss = which == 97;
         menu = which == 96;
@@ -45,6 +73,51 @@ public class BlitzDemo : MonoBehaviour
             if (ok) passed++;
         }
         Debug.Log($"BLITZ DEMO: done, {passed}/{last - first + 1} puzzles cleared at par");
+    }
+
+    /// <summary>94: open puzzle 1, Menu > Queen Blitz, then pick puzzle 3 in the picker,
+    /// the way a player does; logs where it ends up</summary>
+    private static IEnumerator Hop(int route)
+    {
+        yield return new WaitForSeconds(2f);
+        QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[0];
+        var config = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(puzzle.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = 0, saveSlot = SavedGames.Blitz };
+        config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+        config.ApplyToLegacyFields();
+        SceneController.Instance.LoadGameScene(config);
+        float wait = 0f;
+        while ((GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) && wait < 20f) { wait += Time.deltaTime; yield return null; }
+        yield return new WaitForSeconds(2f);
+        Debug.Log($"BLITZ DEMO: hop 1, in {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, puzzle {QueenBlitz.Index + 1}, state {GameStateManager.Instance.currentState}");
+        if (route == 93)
+        {
+            // Run out of moves: a sweep that takes nothing, until par is used up
+            while (!QueenBlitz.OutOfMoves && QueenBlitz.Moves < 10)
+            {
+                BoardPosition at = puzzle.line[0];
+                foreach (ChessPiece p in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None)) if (p.pieceType == ChessPieceType.Queen && !p.IsInTray()) at = p.CurrentPosition;
+                ChessPiece queen = ChessBoard.Instance.GetPieceAt(at);
+                BoardPosition to = queen.GetValidMoves().Find(c => ChessBoard.Instance.GetPieceAt(c) == null && System.Linq.Enumerable.All(QueenBlitz.Between(at, c), b => ChessBoard.Instance.GetPieceAt(b) == null));
+                while (!GameStateManager.Instance.CanMovePieces()) yield return null;
+                ChessBoard.Instance.MovePiece(at, to);
+                yield return new WaitForSeconds(1.5f);
+            }
+            yield return new WaitForSeconds(4f);
+            Debug.Log($"BLITZ DEMO: hop out of moves {QueenBlitz.OutOfMoves}, state {GameStateManager.Instance.currentState}");
+            FindFirstObjectByType<RematchUI>().DebugPuzzles();
+        }
+        else if (route == 92) SceneController.Instance.LoadMainMenu(); // Menu > Main Menu
+        else GameMenuUI.Instance.DebugBlitzPicker();
+        yield return new WaitForSeconds(4f);
+        NeonMenu menu = FindFirstObjectByType<NeonMenu>();
+        Debug.Log($"BLITZ DEMO: hop 2, in {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, menu {(menu != null)}");
+        if (menu != null && route == 92) { menu.DebugBlitzFromMenu(); yield return new WaitForSeconds(1f); }
+        if (menu != null) menu.DebugStartBlitz(2);
+        for (int i = 0; i < 8; i++)
+        {
+            yield return new WaitForSeconds(1f);
+            Debug.Log($"BLITZ DEMO: hop 3 +{i + 1}s, in {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, puzzle {QueenBlitz.Index + 1}, active {QueenBlitz.Active}, state {(GameStateManager.Instance != null ? GameStateManager.Instance.currentState.ToString() : "none")}");
+        }
     }
 
     private static IEnumerator Play(int index, System.Action<bool> result, bool stay)
