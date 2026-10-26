@@ -7,7 +7,8 @@ through or stops on is taken. Placing the queen (when the puzzle asks) is not a 
 On ice the queen can't stop partway: every move slides to the edge or the square before a block.
 
 Portals (Brandon, Oct 26) come in pairs, each pair its own colour, with a distinct in and out
-end: she can only go in the in end (the out end is a block from every side). Each is a vertical
+end: she can only go in the in end (the out end is a block from every side). A pair can
+instead be two-way, with its own look, and then either end takes her in. Each is a vertical
 disc on its own square, facing one level direction. The queen enters only through the front (moving against its facing, straight
 or diagonally); from the back or the side it's a block. She comes out of the paired portal
 heading away from its face: her move is turned the way the entry facing turns into the exit
@@ -44,13 +45,14 @@ def _turn(d, face_in, face_out):
 
 
 class Board:
-    def __init__(self, n, pawns, blockers=(), ice=False, portals=(), ramps=None, two_way=False):
-        """portals: [(in cell, facing, out cell, facing)]; ramps: {cell: [rising directions]}.
-        two_way lets her go in either end."""
+    def __init__(self, n, pawns, blockers=(), ice=False, portals=(), ramps=None):
+        """portals: [(in cell, facing, out cell, facing[, two_way])]; ramps: {cell: [rising
+        directions]}. A two-way pair lets her go in either end (its own look in the app)."""
         self.n = n
         self.ice = ice
         self.portal = {}
-        for a, fa, b, fb in portals:
+        for a, fa, b, fb, *rest in portals:
+            two_way = bool(rest and rest[0])
             self.portal[tuple(a)] = (tuple(fa), tuple(b), tuple(fb))
             self.portal[tuple(b)] = (tuple(fb), tuple(a), tuple(fa)) if two_way else None
         self.ramp = {tuple(c): {tuple(d) for d in ds} for c, ds in (ramps or {}).items()}
