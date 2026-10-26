@@ -1,7 +1,7 @@
 """Queen Blitz puzzle engine: make candidates with every trick generator, keep the ones the
 shortcut players (players.py) can't solve in par, and tag each with the tricks it uses.
 
-    python3 engine.py run SECONDS SEED OUT.json [SIZES] [PARS]   # e.g. run 1200 1 out.json 5,6 4,5,6
+    python3 engine.py run SECONDS SEED OUT.json [SIZES] [PARS] [KINDS]   # e.g. run 1200 1 out.json 5,6 4,5,6 walls,fork
     python3 engine.py pack OUT_PACK.json ID "Name" CANDIDATES.json...   # 10 varied puzzles, trickiest first-pass
 
 A candidate is kept when all three lure players (greedy, liner, lookahead) miss par. Its tags
@@ -20,6 +20,7 @@ MAKERS = {
     "ice": lambda n, par, rng: (lambda m: m and m[:3])(tricky.icebrake_make(n, par, rng)),
     "blocks": lambda n, par, rng: tricky._any_route(n, par, rng, blockers=rng.randint(2, 5)),
     "mirror": lambda n, par, rng: (lambda m: m and m[:3])(tricky.symmetry_make(n, par, rng)),
+    "walls": lambda n, par, rng: wall_make(n, par, rng),
 }
 ICE = {"ice"}
 
@@ -32,14 +33,66 @@ def mirrored(n, pawns):
     return False
 
 
+def wall_make(n, par, rng):
+    """Walls (Brandon, Oct 26: blocks that force you to change your path, no ice). Plant an
+    open-board puzzle one or two moves shorter than par, then keep blocking a cell on the
+    solver's best route until par rises to the target. Every wall cuts a route that worked."""
+    made = tricky._any_route(n, par - rng.choice((1, 2)), rng)
+    if not made:
+        return None
+    start, pawns, _ = made
+    taken, blocks = set(pawns) | {start}, []
+    for _ in range(8):
+        p, line, _ = Board(n, pawns, blocks).solve(start, limit=par)
+        if p is None:
+            return None
+        if p == par:
+            return (start, pawns, blocks) if len(blocks) >= 2 else None
+        cells = []
+        for a, c in line:
+            d, x = tricky._dir(a, c), a
+            while x != c:
+                x = tuple(x[i] + d[i] for i in range(3))
+                if x not in taken:
+                    cells.append(x)
+        if not cells:
+            return None
+        blk = rng.choice(cells)
+        blocks.append(blk)
+        taken.add(blk)
+    return None
+
+
+def add_decoys(n, queen, pawns, blocks, ice, par, rng, count):
+    """Up to `count` decoy blocks (Brandon, Oct 26: keep 1-2 decoys in some puzzles). A decoy
+    sits next to the pawns where it looks like it's in the way, but proves to change nothing:
+    same par, same openings."""
+    b = Board(n, pawns, blocks, ice)
+    base = (fewest(b, [queen], par), frozenset(tricky.par_first_moves(b, [queen], par)))
+    taken = set(pawns) | set(blocks) | {queen}
+    near = sorted({tuple(p[i] + d[i] for i in range(3)) for p in pawns for d in
+                   [(x, y, z) for x in (-1, 0, 1) for y in (-1, 0, 1) for z in (-1, 0, 1)]} - taken)
+    near = [c for c in near if all(0 <= v < n for v in c)]
+    rng.shuffle(near)
+    out = list(blocks)
+    for c in near[:30]:
+        trial = out + [c]
+        tb = Board(n, pawns, trial, ice)
+        if (fewest(tb, [queen], par), frozenset(tricky.par_first_moves(tb, [queen], par))) == base:
+            out = trial
+            if len(out) - len(blocks) == count:
+                break
+    return out[len(blocks):]
+
+
 def tags(n, p, r):
     """The recipe: board and setup features plus every player the puzzle beats"""
     t = {f"{n}³"}
     t.add("given" if p["queen"] else "place")
     if p["ice"]:
         t.add("ice")
-    if p["blocks"]:
-        t.add("blocks")
+    if len(p["blocks"]) > len(p.get("decoys", [])):
+        t.add("walls" if not p["ice"] else "blocks")
     pawns = [tuple(p["pawns"][i:i + 3]) for i in range(0, len(p["pawns"]), 3)]
     if mirrored(n, pawns):
         t.add("mirror")
@@ -72,6 +125,26 @@ def fewest(b, starts, limit, budget=200000):
             raise TooBig
         frontier = nxt
     return None
+
+
+def working_blocks(n, queen, pawns, blocks, ice, par, starts):
+    """Drop every block that changes nothing (Brandon, Oct 26: he couldn't tell whether the
+    blocks in Tricky 3 mattered, and almost none did). A block stays only if taking it away
+    lowers par, makes par unreachable, or changes which openings (or starts) keep par."""
+    def openings(bl):
+        b = Board(n, pawns, bl, ice)
+        if queen:
+            return fewest(b, [queen], par), frozenset(tricky.par_first_moves(b, [queen], par))
+        return fewest(b, b.starts(), par), frozenset(s for s in b.starts() if fewest(b, [s], par, budget=60000) == par)
+    keep = list(blocks)
+    if not keep:
+        return keep
+    base = openings(keep)
+    for blk in list(keep):
+        rest = [x for x in keep if x != blk]
+        if openings(rest) == base:
+            keep = rest
+    return keep
 
 
 def attempt(job):
@@ -110,18 +183,23 @@ def _attempt(job):
                     return None
     if given and len(tricky.par_first_moves(b, starts, par)) > 2:
         return None
-    entry = packs.solved("", n, queen, pawns, blocks, "", ice)
+    blocks = working_blocks(n, queen, pawns, blocks, ice, par, starts)
+    if kind == "walls" and len(blocks) < 2:
+        return None
+    decoys = add_decoys(n, queen, pawns, blocks, ice, par, rng, rng.choice((1, 2))) if given and rng.random() < 0.3 else []
+    entry = packs.solved("", n, queen, pawns, blocks + decoys, "", ice)
+    entry["decoys"] = [v for c in decoys for v in c]
     r = players.assess(entry)
     if players.lured(entry, r) < 3:
         return None
-    entry.update(kind=kind, score=players.score(entry, r), tags=tags(n, entry, r),
+    entry.update(kind=kind, score=players.score(entry, r), tags=tags(n, entry, r) + (["decoy"] if decoys else []),
                  players={k: (v - par if not k.endswith("_kept") else v) for k, v in r.items()})
     return entry
 
 
-def run(seconds, seed, out, sizes=(5, 6), pars=(4, 5, 6)):
+def run(seconds, seed, out, sizes=(5, 6), pars=(4, 5, 6), kinds=None):
     rng = random.Random(seed)
-    kinds = list(MAKERS)
+    kinds = kinds or list(MAKERS)
     found, seen, tried = [], set(), 0
     end = time.time() + seconds
 
@@ -194,6 +272,7 @@ if __name__ == "__main__":
     if cmd == "run":
         sizes = tuple(int(x) for x in sys.argv[5].split(",")) if len(sys.argv) > 5 else (5, 6)
         pars = tuple(int(x) for x in sys.argv[6].split(",")) if len(sys.argv) > 6 else (4, 5, 6)
-        run(float(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sizes, pars)
+        kinds = sys.argv[7].split(",") if len(sys.argv) > 7 else None
+        run(float(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sizes, pars, kinds)
     elif cmd == "pack":
         make_pack(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:])
