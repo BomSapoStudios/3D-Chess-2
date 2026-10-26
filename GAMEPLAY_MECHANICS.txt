@@ -354,7 +354,7 @@ Zombie Hunt (the Turn Planner in this mode):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 A single-player puzzle mode on the "Queen Blitz" button. Clear every pawn with a lone Queen
-in as few moves as possible.
+within par, the fewest moves possible.
 
 Moves:
   • The Queen slides any distance along any of her 26 lines and knocks out every pawn she
@@ -370,10 +370,13 @@ Placing the Queen:
 
 Scoring:
   • Par is the true fewest moves, found by the solver in Tools/QueenBlitz (with free
-    placement when you place the Queen). The goal is to match it.
+    placement when you place the Queen). It is also the move limit: the top bar shows
+    "Moves left" (pink at 1), and when it reaches 0 with pawns still standing the puzzle
+    ends "OUT OF MOVES" (Retry, Puzzles, Home). Nothing is paid or recorded for a miss.
   • The first time you clear a puzzle you keep all of its pawns (the puzzle card shows
     what each one pays). Replays pay nothing; the card then shows your best moves vs par.
-  • Undo, Restart, Retry and Next puzzle.
+  • Undo, Restart, Retry and Next puzzle. The in-game Menu shows only Resume Game, Queen
+    Blitz (back to the puzzle picker, on that pack and chapter) and Main Menu.
 
 PAWNS
   Pawns are what you collect, for a future store (piece sets, puzzle packs). They live in
@@ -383,8 +386,8 @@ PAWNS
   The numbers are all in Assets/Scripts/PawnBank.cs.
 
 Screen:
-  • The puzzle name, moves, par and pawns left sit at the very top, with the puzzle's tip
-    under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
+  • The puzzle name, moves left and par sit at the very top, between your pawn total and
+    the "?" (smaller text or two lines on narrow phones), with the puzzle's tip under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
 
 The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place
 her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);

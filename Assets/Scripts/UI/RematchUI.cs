@@ -232,6 +232,22 @@ public class RematchUI : MonoBehaviour
             x += 66f;
         }
 
+        if (QueenBlitz.Active && QueenBlitz.OutOfMoves)
+        {
+            // Out of moves: try again, or pick another puzzle
+            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 404f);
+            if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
+            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Puzzles", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18))
+            {
+                QueenBlitz.ReturnToPicker = true;
+                GoHome(null);
+            }
+            if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
+            GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), "Clear every pawn within par to keep its pawns.", NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
+            TouchGUI.End();
+            return;
+        }
+
         if (QueenBlitz.Active)
         {
             // Puzzles: try again, or on to the next one
@@ -266,7 +282,7 @@ public class RematchUI : MonoBehaviour
     private (string, Color) Headline()
     {
         if (ZombieMode.Active) return ("OVERRUN!", NeonTheme.Pink);
-        if (QueenBlitz.Active) return QueenBlitz.Cleared ? ("CLEARED!", NeonTheme.Lime) : ("GAVE UP", NeonTheme.Pink);
+        if (QueenBlitz.Active) return QueenBlitz.Cleared ? ("CLEARED!", NeonTheme.Lime) : QueenBlitz.OutOfMoves ? ("OUT OF MOVES", NeonTheme.Pink) : ("GAVE UP", NeonTheme.Pink);
         PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
         string reason = Reason() ?? "";
         bool draw = winner == null || reason.IndexOf("draw", StringComparison.OrdinalIgnoreCase) >= 0;

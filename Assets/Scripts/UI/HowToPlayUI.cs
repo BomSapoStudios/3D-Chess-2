@@ -60,7 +60,8 @@ public class HowToPlayUI : MonoBehaviour
     // Queen Blitz
     private const string BlitzLeft =
         "THE GOAL\n" +
-        "Clear every pawn with your lone Queen in as few moves as you can (par is the fewest possible). The first time you clear a puzzle, you keep all its pawns.\n\n" +
+        "Clear every pawn with your lone Queen within par, the fewest moves possible. The top bar counts the moves you have left; " +
+        "run out with pawns still standing and the puzzle is lost, so Retry. The first time you clear a puzzle, you keep all its pawns.\n\n" +
         "SWEEPING\n" +
         "Tap the Queen, then a dot. She slides any distance along any straight line or diagonal (26 directions) " +
         "and knocks out every pawn she passes through, not just the one she stops on.\n\n" +

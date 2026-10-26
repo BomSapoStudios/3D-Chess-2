@@ -100,6 +100,14 @@ public partial class NeonMenu
 
     // ── Packs ──
 
+    /// <summary>Back from a puzzle: the picker, open on that puzzle's pack and chapter</summary>
+    private void ReturnToBlitzPicker(string packId, int index)
+    {
+        ShowBlitzPicker();
+        if (QueenBlitz.IsDaily(packId)) ShowBlitzDaily(0);
+        else if (QueenBlitz.Owns(QueenBlitz.Info(packId))) ShowBlitzPuzzles(packId, index / QueenBlitz.ChapterSize);
+    }
+
     private void ShowBlitzPacks()
     {
         ClearBlitzContent();

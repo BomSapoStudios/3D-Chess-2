@@ -149,7 +149,7 @@ public class SavedGames : MonoBehaviour
         if (!setUp || finished) return;
 
         // Over: nothing to come back to
-        if (state == GameState.GameOver || (QueenBlitz.Active && QueenBlitz.Cleared))
+        if (state == GameState.GameOver || (QueenBlitz.Active && (QueenBlitz.Cleared || QueenBlitz.OutOfMoves)))
         {
             finished = true;
             Delete(slot);

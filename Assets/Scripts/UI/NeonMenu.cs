@@ -93,6 +93,8 @@ public partial class NeonMenu : MonoBehaviour
 
         // Back from a game's result panel: a note to show, or a rematch room to go straight into
         if (!string.IsNullOrEmpty(RematchUI.PendingNote)) { ShowToast(RematchUI.PendingNote); RematchUI.PendingNote = null; }
+        // Back from a puzzle to the puzzle picker
+        if (QueenBlitz.ReturnToPicker) { QueenBlitz.ReturnToPicker = false; ReturnToBlitzPicker(QueenBlitz.PackId, QueenBlitz.Index); }
         if (!string.IsNullOrEmpty(RematchUI.PendingRoom))
         {
             string rematchRoom = RematchUI.PendingRoom;

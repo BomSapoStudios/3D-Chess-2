@@ -326,6 +326,11 @@ public static class QueenBlitz
     public static Puzzle Current => Puzzles[Mathf.Clamp(Index, 0, Puzzles.Length - 1)];
     public static int Moves { get; set; }
     public static bool Cleared { get; set; }
+    /// <summary>Par is the move limit: the moves ran out with pawns still on the board</summary>
+    public static bool OutOfMoves { get; set; }
+    /// <summary>Set when leaving a puzzle for the puzzle picker: the menu opens on this pack</summary>
+    public static bool ReturnToPicker { get; set; }
+    public static int MovesLeft => Mathf.Max(0, Current.par - Moves);
     /// <summary>Pawns the last clear paid (0 if the puzzle had already paid out)</summary>
     public static int LastPaid { get; set; }
     /// <summary>The player paid for Auto-place to put the queen on a best square</summary>
@@ -341,6 +346,7 @@ public static class QueenBlitz
         Index = index;
         Moves = 0;
         Cleared = false;
+        OutOfMoves = false;
         AutoPlaced = false;
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
@@ -630,8 +636,23 @@ public class QueenBlitzDirector : MonoBehaviour
 
     public void AfterMove()
     {
-        if (ended || PawnsLeft() > 0) return;
-        StartCoroutine(Finish());
+        if (ended) return;
+        if (PawnsLeft() == 0) StartCoroutine(Finish());
+        else if (QueenBlitz.MovesLeft == 0) StartCoroutine(Fail()); // par is the limit
+    }
+
+    /// <summary>Out of moves with pawns left: nothing is paid or recorded, Retry tries again</summary>
+    private IEnumerator Fail()
+    {
+        ended = true;
+        QueenBlitz.OutOfMoves = true;
+        float until = Time.time + 3f;
+        while (Time.time < until && GameStateManager.Instance != null && !GameStateManager.Instance.CanMovePieces()) yield return null;
+        yield return new WaitForSeconds(0.6f);
+        int left = PawnsLeft();
+        string reason = $"{left} pawn{(left == 1 ? "" : "s")} left. Par is the limit.";
+        if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PawnColor, reason);
+        else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
 
     private IEnumerator Finish()
@@ -811,15 +832,30 @@ public class QueenBlitzDirector : MonoBehaviour
         if (playing)
         {
             QueenBlitz.Puzzle puzzle = QueenBlitz.Current;
+            int left = QueenBlitz.MovesLeft;
+            string movesLeft = $"Moves left {left}";
+            if (left <= 1) movesLeft = $"<color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Pink)}>{movesLeft}</color>";
             string text = state == GameState.PiecePlacement
-                ? $"{QueenBlitz.PuzzleTitle}    ·    Place your queen    ·    Par {puzzle.par}"
-                : $"{QueenBlitz.PuzzleTitle}    ·    Moves {QueenBlitz.Moves}    ·    Par {puzzle.par}";
-            // At the very top (the turn line is hidden in puzzles), clear of the board
-            Rect rect = new Rect(ui.x / 2f - 230f, 6f, 460f, 32f);
+                ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  Par {puzzle.par}"
+                : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}  ·  Par {puzzle.par}";
+            // At the very top (the turn line is hidden in puzzles), between the pawn total on the
+            // left and the "?" on the right with a clear gap to each; smaller text, then two lines,
+            // on narrow screens
+            float from = TallyTop.xMax + 12f, to = ui.x - 82f - 12f;
+            float w = Mathf.Min(460f, to - from);
+            GUIStyle style = NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter);
+            style.richText = true;
+            while (style.fontSize > 12 && style.CalcSize(new GUIContent(text)).x > w - 16f) style.fontSize--;
+            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(text), w - 16f) + 8f);
+            Rect rect = new Rect(from + (to - from - w) / 2f, 6f, w, h);
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
-            GUI.Label(rect, text, NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter));
+            GUI.Label(new Rect(rect.x + 8f, rect.y, rect.width - 16f, rect.height), text, style);
             if (QueenBlitz.Moves == 0)
-                NeonTheme.SceneLabel(new Rect(ui.x / 2f - 250f, 38f, 500f, 22f), puzzle.tip, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.MiddleCenter));
+            {
+                GUIStyle tip = NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.UpperCenter);
+                float tw = to - from;
+                NeonTheme.SceneLabel(new Rect(from, rect.yMax + 2f, tw, tip.CalcHeight(new GUIContent(puzzle.tip), tw) + 2f), puzzle.tip, tip);
+            }
             if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
                 Restart(QueenBlitz.Index);
         }

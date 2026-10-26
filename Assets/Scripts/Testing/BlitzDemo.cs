@@ -7,11 +7,12 @@ using UnityEngine;
 /// puzzle's "line" in its pack file) and checks
 /// that each one clears in exactly its par. `defaults write BomSapo.Chess3D DebugBlitzDemo -int N`
 /// plays puzzle N (1-10) and stays on it; 99 plays them all in turn; 98 plays them all using
-/// Auto-place for the queen (each costs a pawn). Logs "BLITZ DEMO".
+/// Auto-place for the queen (each costs a pawn); 97 plays puzzle 2's first move then a wrong one,
+/// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move. Logs "BLITZ DEMO".
 /// </summary>
 public class BlitzDemo : MonoBehaviour
 {
-    private static bool autoPlace;
+    private static bool autoPlace, miss, menu;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Boot()
@@ -26,6 +27,9 @@ public class BlitzDemo : MonoBehaviour
     private static IEnumerator Run(int which)
     {
         yield return new WaitForSeconds(2f);
+        miss = which == 97;
+        menu = which == 96;
+        if (miss || menu) which = 2;
         bool all = which >= 98;
         autoPlace = which == 98;
         int first = all ? 0 : which - 1, last = all ? QueenBlitz.Puzzles.Length - 1 : which - 1;
@@ -88,6 +92,18 @@ public class BlitzDemo : MonoBehaviour
             if (queen == null || queen.pieceType != ChessPieceType.Queen) { Debug.Log($"BLITZ DEMO: FAIL no queen at {solution[m - 1]}"); good = false; break; }
             if (!queen.GetValidMoves().Contains(solution[m])) { Debug.Log($"BLITZ DEMO: FAIL {solution[m]} isn't a legal sweep from {solution[m - 1]}"); good = false; break; }
             while (!GameStateManager.Instance.CanMovePieces()) yield return null;
+            if ((miss || menu) && m == 2)
+            {
+                yield return new WaitForSeconds(4f); // the moves-left counter, pink at 1
+                if (menu) { GameMenuUI.Instance.ShowMenu(); Debug.Log("BLITZ DEMO: menu open"); yield break; }
+                // A legal sweep off the solver's line that leaves pawns: the last move runs out
+                BoardPosition wrong = queen.GetValidMoves().Find(to => !to.Equals(solution[m]));
+                Debug.Log($"BLITZ DEMO: {index + 1} missing on purpose: {solution[m - 1]} > {wrong}");
+                ChessBoard.Instance.MovePiece(solution[m - 1], wrong);
+                yield return new WaitForSeconds(5f);
+                Debug.Log($"BLITZ DEMO: {index + 1} out of moves {QueenBlitz.OutOfMoves}, cleared {QueenBlitz.Cleared}, state {GameStateManager.Instance.currentState}, pawns {PawnBank.Total}");
+                yield break;
+            }
             ChessBoard.Instance.MovePiece(solution[m - 1], solution[m]);
             yield return new WaitForSeconds(1.2f);
             Debug.Log($"BLITZ DEMO: {index + 1} move {QueenBlitz.Moves}: {solution[m - 1]} > {solution[m]}, pawns left {(QueenBlitzDirector.Instance != null ? QueenBlitzDirector.Instance.PawnsLeft() : -1)}, turn {TurnManager.Instance.GetCurrentPlayer()}");

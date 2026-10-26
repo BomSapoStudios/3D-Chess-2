@@ -346,6 +346,27 @@ public class GameMenuUI : MonoBehaviour
         
         // Check if game is over and show appropriate content
         bool gameOver = IsGameOver();
+
+        if (QueenBlitz.Active && !gameOver)
+        {
+            // Puzzles: no draws or forfeits, just back to the puzzle, the puzzle picker or the menu
+            GUILayout.Label("GAME MENU", titleStyle);
+            GUILayout.Space(20);
+            if (GUILayout.Button("Resume Game", buttonStyle, GUILayout.Height(45))) HideMenu();
+            GUILayout.Space(10);
+            if (GUILayout.Button("Queen Blitz", buttonStyle, GUILayout.Height(45)))
+            {
+                QueenBlitz.ReturnToPicker = true;
+                HandleReturnToMenu();
+            }
+            GUILayout.Space(10);
+            if (GUILayout.Button("Main Menu", buttonStyle, GUILayout.Height(45))) HandleReturnToMenu();
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+            NeonTheme.GUIPanel(menuRect, NeonTheme.Cyan, 0f);
+            TouchGUI.End();
+            return;
+        }
         
         if (gameOver)
         {
