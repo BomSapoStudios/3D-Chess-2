@@ -6,8 +6,9 @@ through or stops on is taken. Placing the queen (when the puzzle asks) is not a 
 
 On ice the queen can't stop partway: every move slides to the edge or the square before a block.
 
-Portals (Brandon, Oct 26) come in pairs. Each is a vertical disc on its own square, facing one
-level direction. The queen enters only through the front (moving against its facing, straight
+Portals (Brandon, Oct 26) come in pairs, each pair its own colour, with a distinct in and out
+end: she can only go in the in end (the out end is a block from every side). Each is a vertical
+disc on its own square, facing one level direction. The queen enters only through the front (moving against its facing, straight
 or diagonally); from the back or the side it's a block. She comes out of the paired portal
 heading away from its face: her move is turned the way the entry facing turns into the exit
 facing, and her climb or fall is kept. One trip through is one continuous move, sweeping pawns
@@ -43,14 +44,15 @@ def _turn(d, face_in, face_out):
 
 
 class Board:
-    def __init__(self, n, pawns, blockers=(), ice=False, portals=(), ramps=None):
-        """portals: [(cell, facing, cell, facing)] pairs; ramps: {cell: [rising directions]}"""
+    def __init__(self, n, pawns, blockers=(), ice=False, portals=(), ramps=None, two_way=False):
+        """portals: [(in cell, facing, out cell, facing)]; ramps: {cell: [rising directions]}.
+        two_way lets her go in either end."""
         self.n = n
         self.ice = ice
         self.portal = {}
         for a, fa, b, fb in portals:
             self.portal[tuple(a)] = (tuple(fa), tuple(b), tuple(fb))
-            self.portal[tuple(b)] = (tuple(fb), tuple(a), tuple(fa))
+            self.portal[tuple(b)] = (tuple(fb), tuple(a), tuple(fa)) if two_way else None
         self.ramp = {tuple(c): {tuple(d) for d in ds} for c, ds in (ramps or {}).items()}
         self.pawns = [tuple(p) for p in pawns]
         self.blockers = {tuple(b) for b in blockers}
@@ -74,6 +76,8 @@ class Board:
             if not self._open(nxt):
                 return None
             if nxt in self.portal:
+                if self.portal[nxt] is None:
+                    return None  # an out end: a block
                 face, other, out_face = self.portal[nxt]
                 ax = [i for i in range(3) if face[i]][0]
                 if d[ax] != -face[ax] or (nxt, d) in seen:
