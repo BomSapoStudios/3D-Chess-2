@@ -74,6 +74,26 @@ def fewest(b, starts, limit, budget=200000):
     return None
 
 
+def working_blocks(n, queen, pawns, blocks, ice, par, starts):
+    """Drop every block that changes nothing (Brandon, Oct 26: he couldn't tell whether the
+    blocks in Tricky 3 mattered, and almost none did). A block stays only if taking it away
+    lowers par, makes par unreachable, or changes which openings (or starts) keep par."""
+    def openings(bl):
+        b = Board(n, pawns, bl, ice)
+        if queen:
+            return fewest(b, [queen], par), frozenset(tricky.par_first_moves(b, [queen], par))
+        return fewest(b, b.starts(), par), frozenset(s for s in b.starts() if fewest(b, [s], par, budget=60000) == par)
+    keep = list(blocks)
+    if not keep:
+        return keep
+    base = openings(keep)
+    for blk in list(keep):
+        rest = [x for x in keep if x != blk]
+        if openings(rest) == base:
+            keep = rest
+    return keep
+
+
 def attempt(job):
     try:
         return _attempt(job)
@@ -110,6 +130,7 @@ def _attempt(job):
                     return None
     if given and len(tricky.par_first_moves(b, starts, par)) > 2:
         return None
+    blocks = working_blocks(n, queen, pawns, blocks, ice, par, starts)
     entry = packs.solved("", n, queen, pawns, blocks, "", ice)
     r = players.assess(entry)
     if players.lured(entry, r) < 3:
