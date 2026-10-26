@@ -14,7 +14,7 @@ using UnityEngine.SceneManagement;
 ///
 /// Puzzles load from JSON pack files; pars come from the solver in Tools/QueenBlitz (packs.py checks them all).
 /// </summary>
-public static class QueenBlitz
+public static partial class QueenBlitz
 {
     public class Puzzle
     {
@@ -30,6 +30,8 @@ public static class QueenBlitz
         public BoardPosition[] line;     // one par solution: the queen's start, then each square she stops on
         public int score;                // difficulty 1-100 from the pipeline (0 for hand-made puzzles)
         public string tier;
+        public PortalPair[] portals;     // see QueenBlitzRoutes
+        public RampRise[] ramps;
     }
 
     // ───────────────────────── Packs ─────────────────────────
@@ -51,6 +53,8 @@ public static class QueenBlitz
         public int[] line;
         public int score;
         public string tier;
+        public int[] portals;  // 13 a pair: in x,y,z, its facing, out x,y,z, its facing, two-way 0/1
+        public int[] ramps;    // 6 a rising direction: x,y,z, dx,0,dz (a square repeats for each way it rises)
     }
 
     [System.Serializable]
@@ -91,6 +95,7 @@ public static class QueenBlitz
         new PackInfo { id = "tricky-2", name = "Tricky 2 (test)", free = true, review = true },
         new PackInfo { id = "tricky-3", name = "Tricky 3 (test)", free = true, review = true },
         new PackInfo { id = "tricky-4", name = "Tricky 4 (test)", free = true, review = true },
+        new PackInfo { id = "portal-test", name = "Portals & Ramps (test)", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
@@ -304,8 +309,30 @@ public static class QueenBlitz
                 queen = queen.Length > 0 ? queen[0] : (BoardPosition?)null,
                 best = best.Length > 0 ? best[0] : default,
                 pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line), score = d.score, tier = d.tier,
+                portals = Portals(d.portals), ramps = Ramps(d.ramps),
             });
         }
+        return list.ToArray();
+    }
+
+    private static PortalPair[] Portals(int[] f)
+    {
+        var list = new List<PortalPair>();
+        for (int i = 0; f != null && i + 12 < f.Length; i += 13)
+            list.Add(new PortalPair
+            {
+                a = new BoardPosition(f[i], f[i + 1], f[i + 2]), faceA = new Vector3Int(f[i + 3], f[i + 4], f[i + 5]),
+                b = new BoardPosition(f[i + 6], f[i + 7], f[i + 8]), faceB = new Vector3Int(f[i + 9], f[i + 10], f[i + 11]),
+                twoWay = f[i + 12] != 0,
+            });
+        return list.ToArray();
+    }
+
+    private static RampRise[] Ramps(int[] f)
+    {
+        var list = new List<RampRise>();
+        for (int i = 0; f != null && i + 5 < f.Length; i += 6)
+            list.Add(new RampRise { at = new BoardPosition(f[i], f[i + 1], f[i + 2]), dir = new Vector3Int(f[i + 3], f[i + 4], f[i + 5]) });
         return list.ToArray();
     }
 
@@ -354,9 +381,11 @@ public static class QueenBlitz
         AutoPlaced = false;
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
+        SetUpFeatures(Current);
     }
 
-    public static bool IsBlocked(BoardPosition p) => Active && blocked.Contains(p);
+    /// <summary>Nothing can be placed here: a block, a portal or a ramp</summary>
+    public static bool IsBlocked(BoardPosition p) => Active && (blocked.Contains(p) || portalAt.ContainsKey(p) || rampAt.ContainsKey(p));
 
     /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
     public static int Reward(int index) => Puzzles[index].pawns.Length;
@@ -408,26 +437,8 @@ public static class QueenBlitz
     {
         var moves = new List<BoardPosition>();
         if (ChessBoard.Instance == null) return moves;
-        BoardPosition from = queen.CurrentPosition;
-        for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-        for (int dz = -1; dz <= 1; dz++)
-        {
-            if (dx == 0 && dy == 0 && dz == 0) continue;
-            var at = from;
-            BoardPosition? last = null;
-            while (true)
-            {
-                at = new BoardPosition(at.x + dx, at.y + dy, at.z + dz);
-                if (!ChessBoard.Instance.IsValidPosition(at) || blocked.Contains(at)) break;
-                ChessPiece there = ChessBoard.Instance.GetPieceAt(at);
-                if (there != null && there.pieceColor == queen.pieceColor) break;
-                if (!Current.ice) moves.Add(at);
-                last = at;
-            }
-            // On ice she can't stop partway: only the end of the slide
-            if (Current.ice && last.HasValue) moves.Add(last.Value);
-        }
+        FindRoutes(queen.CurrentPosition);
+        foreach (var key in routes.Keys) moves.Add(key.Item2);
         return moves;
     }
 
@@ -447,13 +458,27 @@ public static class QueenBlitz
     /// <summary>The queen is sliding from → to: sweep up the pawns she passes through (the one she lands on is taken as usual)</summary>
     public static void SweepPath(ChessPiece queen, BoardPosition from, BoardPosition to)
     {
-        foreach (BoardPosition p in Between(from, to))
+        Route route = RouteFor(from, to);
+        PendingRoute = route != null && route.special ? route : null; // the slide follows it through portals and up ramps
+        if (route == null)
         {
-            ChessPiece pawn = ChessBoard.Instance.GetPieceAt(p);
-            if (pawn == null || pawn.pieceColor == queen.pieceColor) continue;
-            KnockAway(pawn, queen, from, to);
-            ChessBoard.Instance.RemovePieceFromBoard(pawn, p);
+            foreach (BoardPosition p in Between(from, to)) Sweep(queen, p, from, to);
+            return;
         }
+        for (int i = 0; i < route.swept.Count; i++)
+        {
+            Vector3Int d = route.sweptDir[i];
+            BoardPosition p = route.swept[i];
+            Sweep(queen, p, new BoardPosition(p.x - d.x, p.y - d.y, p.z - d.z), p);
+        }
+    }
+
+    private static void Sweep(ChessPiece queen, BoardPosition p, BoardPosition from, BoardPosition to)
+    {
+        ChessPiece pawn = ChessBoard.Instance.GetPieceAt(p);
+        if (pawn == null || pawn.pieceColor == queen.pieceColor) return;
+        KnockAway(pawn, queen, from, to);
+        ChessBoard.Instance.RemovePieceFromBoard(pawn, p);
     }
 
     /// <summary>Knock a pawn flying the way the queen is sliding</summary>
@@ -567,6 +592,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         }
         Transform container = GameObject.Find("Pieces Container").transform;
         foreach (BoardPosition b in puzzle.blocks) blockObjects.Add(MakeBlock(container, b));
+        MakeFeatures(container, puzzle); // portals and ramps
         Debug.Log($"Queen Blitz: puzzle {QueenBlitz.Index + 1} laid out, {made.Count} pawns, {puzzle.blocks.Length} blocks");
         return true;
     }

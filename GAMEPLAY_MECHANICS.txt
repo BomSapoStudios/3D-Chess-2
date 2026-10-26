@@ -362,6 +362,18 @@ Moves:
   • Blocks can't be entered or passed; they stop her on the square before them.
   • Ice floor: she can't stop partway. Every move slides to the board's edge or the square
     before a block.
+  • Portals (paired colours, several pairs a puzzle): an upright disc on its own square. The
+    way in is a dark inward swirl; the way out a bright outward one with an arrow on the floor.
+    She enters only through the front (straight or diagonal); the out end and the back and sides
+    are blocks. She leaves the partner turned by how the facings turn, keeping her climb or fall,
+    in one continuous move sweeping pawns on both sides. No stopping on a portal; no entry if
+    the square after the exit is blocked or off the board; portals can chain; ice keeps sliding.
+  • Ramps: a lime slope rises the ways she can climb (a wedge, or a peak with several). Moving
+    straight along a rising direction she lands one floor up, one square on, and carries on
+    level. Every other way in (pink wall faces, diagonals, from above or below) is a wall, as
+    is a ramp whose landing square is blocked, off the board, a portal or a ramp. No stopping
+    on a ramp, and no riding down yet.
+  • The rules match Tools/QueenBlitz/solver.py exactly (BlitzDemo 88 compares every move).
 
 Placing the Queen:
   • Early puzzles place her for you. Later ones let you put her on any free square

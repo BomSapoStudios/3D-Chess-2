@@ -519,7 +519,9 @@ public abstract class ChessPiece : MonoBehaviour
         bool boardMove = context == AnimationContext.UserMove || context == AnimationContext.AIMove;
         if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
         {
-            yield return SlideCoroutine(startPos, endPos);
+            QueenBlitz.Route route = QueenBlitz.TakeRoute(targetPosition);
+            if (route != null) yield return SlideRouteCoroutine(route);
+            else yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;
             isMoving = false;
             Haptics.Medium(); // she comes to rest
@@ -631,6 +633,48 @@ public abstract class ChessPiece : MonoBehaviour
                 PieceEffects.SlideTrail(transform.position, worldDir, ice);
             }
             yield return null;
+        }
+        PieceEffects.SetSquash(transform, 1f, 1f);
+    }
+
+    /// <summary>
+    /// Queen Blitz through portals and up ramps: she slides from point to point at an even pace,
+    /// shrinks into a portal and grows out of its partner
+    /// </summary>
+    private System.Collections.IEnumerator SlideRouteCoroutine(QueenBlitz.Route route)
+    {
+        float cell = ChessBoard.Instance != null ? ChessBoard.Instance.cellSize : 2.8f;
+        bool ice = QueenBlitz.Current.ice;
+        Transform parent = transform.parent;
+        const float perCell = 0.13f, through = 0.14f;
+        for (int i = 0; i + 1 < route.points.Count; i++)
+        {
+            Vector3 a = route.points[i], b = route.points[i + 1];
+            if (route.teleport[i])
+            {
+                // Into the portal...
+                for (float t = 0f; t < through; t += Time.deltaTime) { float k = 1f - t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
+                transform.localPosition = b;
+                Haptics.Light();
+                // ...and out of its partner
+                for (float t = 0f; t < through; t += Time.deltaTime) { float k = t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
+                PieceEffects.SetSquash(transform, 1f, 1f);
+                continue;
+            }
+            float duration = Mathf.Max(0.06f, Vector3.Distance(a, b) / cell * perCell);
+            Vector3 worldDir = parent != null ? parent.TransformDirection(b - a) : b - a;
+            float nextTrail = 0f;
+            for (float time = 0f; time < duration; time += Time.deltaTime)
+            {
+                transform.localPosition = Vector3.Lerp(a, b, time / duration);
+                if (!AccessibilityPrefs.ReduceMotion && time >= nextTrail)
+                {
+                    nextTrail = time + 0.035f;
+                    PieceEffects.SlideTrail(transform.position, worldDir, ice);
+                }
+                yield return null;
+            }
+            transform.localPosition = b;
         }
         PieceEffects.SetSquash(transform, 1f, 1f);
     }
