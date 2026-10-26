@@ -161,6 +161,11 @@ def deceive(n, queen, pawns, blocks=(), ice=False, limit=7):
     right = line[0][1]
     right_dir = tuple((right[i] > first_at[i]) - (right[i] < first_at[i]) for i in range(3))
     right_k = next((k for d, k in rays if d == right_dir), 0)
+    # Greed trap: the right first move takes fewer pawns than other sweeps on offer
+    bites = [bin(sw).count("1") for _, sw, _, _ in b.moves(first_at)]
+    m["right_bite"] = bin(_swept(b, *line[0])).count("1")
+    m["bigger"] = len({(to, sw) for to, sw, _, _ in b.moves(first_at) if bin(sw).count("1") > m["right_bite"]})
+    m["top_bite"] = max(bites, default=0)
     m["fork"] = len(rays)                                  # directions with pawns to take
     m["fork_rivals"] = sum(1 for d, k in rays if d != right_dir and k >= right_k)  # as tempting or more
     m["tempting"] = n1 + n2
@@ -393,7 +398,8 @@ def search(n, par, tries, seed, path=None, kinds=("bait", "wander")):
     out, seen = [], set()
     for t in range(tries):
         kind = kinds[t % len(kinds)]
-        made = {"bait": bait_route, "wander": wander_route, "plane": plane_route, "fork": fork_route}[kind](n, par, rng)
+        made = {"bait": bait_route, "wander": wander_route, "plane": plane_route, "fork": fork_route,
+                "greedfork": fork_route}[kind](n, par, rng)
         if not made:
             continue
         start, pawns, blocks = made
@@ -418,17 +424,176 @@ def search(n, par, tries, seed, path=None, kinds=("bait", "wander")):
         elif kind == "fork":
             if "fork" not in found or m["firsts"] > 2 or m["false"] < 0.6:
                 continue
+        elif kind == "greedfork":
+            # Brandon's picks (Tricky 2 #6, #9, #10): a fork where bigger sweeps than the right
+            # one are on offer, and the route stops on empty squares
+            if "fork" not in found or m["firsts"] > 2 or m["false"] < 0.75 or m["bigger"] < 2 or m["stop"] < 2:
+                continue
         elif "greedy" not in found or len(found) < 3 or m["firsts"] > 3 or m["false"] < 0.6:
             continue
         entry = packs.solved("", n, queen, pawns, blocks, "", False)
         entry.update(lies=found, greedy=m["greedy"], firsts=m["firsts"], starts=m["starts"], bait=m["bait"],
                      plane=m["plane"], false=m["false"], tempting=m["tempting"], fork=m["fork"],
-                     rivals=m["fork_rivals"])
+                     rivals=m["fork_rivals"], bigger=m["bigger"], right_bite=m["right_bite"], top_bite=m["top_bite"],
+                     stop=m["stop"])
         out.append(entry)
         if path:
             json.dump(out, open(path, "w"))  # saved as we go, so a timeout keeps what was found
         print(f"#{t} {n}³ par {par} pawns {len(pawns)} {'given' if given else 'place'} greedy {m['greedy']} "
-              f"firsts {m['firsts']} false {m['false']}/{m['tempting']} fork {m['fork']}/{m['fork_rivals']} plane +{m['plane']} {' '.join(found)}", flush=True)
+              f"firsts {m['firsts']} bigger {m['bigger']} ({m['right_bite']}<{m['top_bite']}) stop {m['stop']} false {m['false']}/{m['tempting']} fork {m['fork']}/{m['fork_rivals']} plane +{m['plane']} {' '.join(found)}", flush=True)
+    return out
+
+
+# ───────────────────────── Round 3: one generator per trick ─────────────────────────
+# Each returns (start, pawns, blocks, ice, queen given?) or None; each trick has its own check.
+
+def _any_route(n, par, rng, blockers=0, ice=False):
+    for _ in range(30):
+        made = route_puzzle(n, par, blockers, rng, per_move=(1, 3), ice=ice)
+        if made:
+            return made
+    return None
+
+
+def twostep_make(n, par, rng):
+    made = fork_route(n, par, rng) or _any_route(n, par, rng)
+    return made and (*made, False, True)
+
+
+def twostep_check(n, queen, pawns, blocks, ice, m):
+    """The obvious first move (the one biggest sweep) is right; at the next stop the biggest
+    sweep is a dead end and bigger than the right second move"""
+    if m["bigger"] != 0 or m["firsts"] > 2:
+        return False
+    b = Board(n, pawns, blocks, ice)
+    (a1, c1), (a2, c2) = m["line"][0], m["line"][1]
+    top_first = [sw for to, sw, _, _ in b.moves(a1) if bin(sw).count("1") == m["top_bite"]]
+    if len(top_first) != 1:
+        return False
+    left = b.full & ~_swept(b, a1, c1)
+    right2 = bin(_swept(b, a2, c2) & left).count("1")
+    seconds = [(bin(sw & left).count("1"), to, sw) for to, sw, _, _ in b.moves(c1)]
+    big = [(k, to, sw) for k, to, sw in seconds if k > right2]
+    return len(big) >= 2 and all(b.solve_from(to, left & ~sw, m["par"] - 2) is None for k, to, sw in big)
+
+
+def cold_make(n, par, rng):
+    made = fork_route(n, par, rng) or _any_route(n, par, rng)
+    return made and (*made, False, False)
+
+
+def cold_check(n, queen, pawns, blocks, ice, m):
+    """Place the queen: every par start is away from the pawns (no pawn next to it, and not on
+    any line holding 3+ pawns), while the squares that look right fail"""
+    b = Board(n, pawns, blocks, ice)
+    starts = b.optimal_starts(m["par"])
+    if not starts or len(starts) > 3:
+        return False
+    rows3 = bait_rows(n, pawns, 3)
+    for st in starts:
+        if any(_dist(st, p) <= 1 for p in pawns) or any(_collinear(st, r) for r in rows3):
+            return False
+    return m["false"] >= 0.6
+
+
+def symmetry_make(n, par, rng):
+    """Half a layout, mirrored across the middle of the cube"""
+    made = _any_route(n, max(2, par - 1), rng)
+    if not made:
+        return None
+    start, pawns, _ = made
+    axis = rng.randrange(3)
+    mirror = lambda c: tuple(n - 1 - c[i] if i == axis else c[i] for i in range(3))
+    full = sorted(set(pawns) | {mirror(p) for p in pawns})
+    if len(full) > 3 * par + 2:
+        return None
+    return start, full, [], False, False
+
+
+def symmetry_check(n, queen, pawns, blocks, ice, m):
+    """The layout is a mirror image, but no par route is: the mirror of the route found is a
+    different route, and 'the same on both sides' (each half on its own) costs more"""
+    if m["firsts"] > 2 or m["false"] < 0.6:
+        return False
+    for axis in range(3):
+        mirror = lambda c: tuple(n - 1 - c[i] if i == axis else c[i] for i in range(3))
+        if set(map(mirror, pawns)) == set(pawns):
+            half = [p for p in pawns if p[axis] < (n - 1) / 2]
+            if not half:
+                return False
+            hb = Board(n, half)
+            half_par = hb.solve(None, limit=m["par"])[0]
+            return half_par is None or 2 * half_par > m["par"]
+    return False
+
+
+def icebrake_make(n, par, rng):
+    made = _any_route(n, par, rng, blockers=rng.randint(2, 4), ice=True)
+    return made and (*made, True, True)
+
+
+def icebrake_check(n, queen, pawns, blocks, ice, m):
+    """On ice the blocks look like obstacles, but they're the brakes: without any one of them par
+    is out of reach"""
+    if m["firsts"] > 2:
+        return False
+    for blk in blocks:
+        rest = [x for x in blocks if x != blk]
+        if Board(n, pawns, rest, True).solve(queen, limit=m["par"])[0] is not None:
+            return False
+    return True
+
+
+def planeblock_make(n, par, rng):
+    made = plane_route(n, par, rng)
+    return made and (*made, False, rng.random() < 0.6)
+
+
+def planeblock_check(n, queen, pawns, blocks, ice, m):
+    return m.get("plane", 0) >= 1 and m["firsts"] <= 2
+
+
+KINDS = {
+    "twostep": (twostep_make, twostep_check, "The first move is easy. The second isn't."),
+    "cold": (cold_make, cold_check, "She doesn't start anywhere near the pawns."),
+    "symmetry": (symmetry_make, symmetry_check, "It looks the same on both sides. The route isn't."),
+    "icebrake": (icebrake_make, icebrake_check, "On ice, the blocks are your brakes."),
+    "planeblock": (planeblock_make, planeblock_check, "Every pawn is on one floor. She isn't."),
+}
+
+
+def search3(n, par, tries, seed, path, kind):
+    make, check, tip = KINDS[kind]
+    rng = random.Random(seed)
+    out, seen = [], set()
+    for t in range(tries):
+        made = make(n, par, rng)
+        if not made:
+            continue
+        start, pawns, blocks, ice, given = made
+        if not par + 1 <= len(pawns) <= 3 * par + 2:
+            continue
+        key = (tuple(sorted(pawns)), tuple(sorted(blocks)))
+        if key in seen:
+            continue
+        seen.add(key)
+        queen = start if given else None
+        if queen and (queen in pawns or queen in blocks):
+            continue
+        m = deceive(n, queen, pawns, blocks, ice, limit=par)
+        if not m or m["par"] != par:
+            continue
+        if given and Board(n, pawns, blocks, ice).solve(None, limit=par - 1)[0] is not None:
+            continue  # Brandon's rule
+        if not check(n, queen, pawns, blocks, ice, m):
+            continue
+        entry = packs.solved("", n, queen, pawns, blocks, tip, ice)
+        entry.update(trick=kind, lies=lies(m), firsts=m["firsts"], false=m["false"], bigger=m["bigger"],
+                     right_bite=m["right_bite"], top_bite=m["top_bite"], stop=m["stop"], fork=m["fork"])
+        out.append(entry)
+        json.dump(out, open(path, "w"))
+        print(f"#{t} {kind} {n}³ par {par} pawns {len(pawns)} blocks {len(blocks)} {'ice ' if ice else ''}"
+              f"{'given' if given else 'place'} firsts {m['firsts']} bigger {m['bigger']} false {m['false']}", flush=True)
     return out
 
 
@@ -480,6 +645,9 @@ if __name__ == "__main__":
         found = search(n, par, tries, seed, path, kinds)
         json.dump(found, open(path, "w"))
         print(len(found), "found")
+    elif cmd == "search3":
+        n, par, tries, seed, path, kind = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), sys.argv[6], sys.argv[7]
+        print(len(search3(n, par, tries, seed, path, kind)), "found")
     elif cmd == "forkpack":
         # Round 2: every puzzle is a fork. Most rival directions and false paths first, a few
         # place-the-queen ones, both sizes, no two neighbours with the same size and par.
