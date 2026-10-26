@@ -90,6 +90,7 @@ public static class QueenBlitz
         new PackInfo { id = "tricky", name = "Tricky (test)", free = true, review = true },
         new PackInfo { id = "tricky-2", name = "Tricky 2 (test)", free = true, review = true },
         new PackInfo { id = "tricky-3", name = "Tricky 3 (test)", free = true, review = true },
+        new PackInfo { id = "tricky-4", name = "Tricky 4 (test)", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
