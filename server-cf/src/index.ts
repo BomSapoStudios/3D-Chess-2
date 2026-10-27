@@ -30,6 +30,7 @@ export { Accounts } from './accounts.js';
 //   POST /friends/remove  { friendId }  POST /friends/block   { friendId }
 //   POST /friends/challenge { friendId, config? } → { code } private room for you two
 //   POST /friends/dismiss { roomCode }
+//   POST /players/report { userId, reason }  reason: cheating | stalling | other
 //
 //   Games
 //   POST /rooms        { config, isPublic? }   (Authorization: Bearer <token>)
@@ -197,6 +198,8 @@ export default {
       if (path === '/leaderboard') return account('leaderboard', { mode: url.searchParams.get('mode'), scope: url.searchParams.get('scope') });
       return account('cooldown');
     }
+
+    if (request.method === 'POST' && path === '/players/report') return user ? account('report', { reportedId: body.userId, reason: body.reason }) : needUser();
 
     if (path.startsWith('/friends')) {
       if (!user) return needUser();

@@ -24,7 +24,7 @@ const ONLINE_WINDOW_MS = 45_000;           // "online" = checked in within this 
 const CHALLENGE_LIFETIME_MS = 10 * 60_000; // an unanswered challenge disappears after 10 minutes
 const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60_000; // an unanswered friend request expires after 30 days (and can be sent again)
 const LINK_CODE_LIFETIME_MS = 10 * 60_000;
-const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60, room: 100, block: 100 } as const; // per account per day
+const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60, room: 100, block: 100, report: 20 } as const; // per account per day
 const NETWORK_LIMITS = {                   // per network per day (homes, schools and phone carriers share addresses)
   guest: 50,                               // new accounts
   linkMiss: 20,                            // wrong device link codes
@@ -59,6 +59,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS active_games (account_id TEXT, room_code TEXT, joined_at INTEGER, PRIMARY KEY (account_id, room_code));
       CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
+      CREATE TABLE IF NOT EXISTS reports (reporter_id TEXT, reported_id TEXT, reason TEXT, created_at INTEGER, PRIMARY KEY (reporter_id, reported_id, reason));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
       CREATE TABLE IF NOT EXISTS network_limits (address TEXT, kind TEXT, day INTEGER, count INTEGER, PRIMARY KEY (address, kind, day));
       DROP TABLE IF EXISTS guest_addresses;
@@ -104,6 +105,7 @@ export class Accounts extends DurableObject<Env> {
       case 'friend-respond': return this.respond(userId, String(b.friendId ?? ''), b.accept === true);
       case 'friend-remove': return this.removeFriend(userId, String(b.friendId ?? ''));
       case 'block': return this.block(userId, String(b.friendId ?? ''));
+      case 'report': return this.report(userId, String(b.reportedId ?? ''), String(b.reason ?? ''));
       case 'can-challenge': return this.canChallenge(userId, String(b.friendId ?? ''));
       case 'challenge': return this.challenge(userId, String(b.friendId ?? ''), String(b.roomCode ?? ''));
       case 'challenge-dismiss': return this.dismiss(userId, String(b.roomCode ?? ''));
@@ -478,6 +480,21 @@ export class Accounts extends DurableObject<Env> {
     if (!this.sql.exec('SELECT 1 FROM blocks WHERE account_id = ? AND blocked_id = ?', userId, friendId).toArray().length) this.spend(userId, 'block');
     this.removeFriend(userId, friendId);
     this.sql.exec('INSERT OR IGNORE INTO blocks (account_id, blocked_id) VALUES (?, ?)', userId, friendId);
+    return { ok: true };
+  }
+
+  private static readonly REPORT_REASONS = ['cheating', 'stalling', 'other'];
+
+  /** A player reporting another. Kept for review; the same report twice counts once. */
+  private report(userId: string, reportedId: string, reason: string) {
+    this.account(userId);
+    if (!Accounts.REPORT_REASONS.includes(reason)) throw new HttpError(400, 'Pick what happened');
+    if (!reportedId || reportedId === userId || !this.sql.exec('SELECT 1 FROM accounts WHERE id = ?', reportedId).toArray().length) throw new HttpError(404, 'Player not found');
+    if (this.sql.exec('SELECT 1 FROM reports WHERE reporter_id = ? AND reported_id = ? AND reason = ?', userId, reportedId, reason).toArray().length) return { ok: true };
+    this.spend(userId, 'report');
+    this.sql.exec('INSERT INTO reports (reporter_id, reported_id, reason, created_at) VALUES (?, ?, ?, ?)', userId, reportedId, reason, Date.now());
+    const total = this.sql.exec('SELECT COUNT(DISTINCT reporter_id) AS n FROM reports WHERE reported_id = ?', reportedId).one().n;
+    console.log(`[report] ${reportedId} (${this.nameOf(reportedId)}) for ${reason}; reported by ${total} player(s) so far`);
     return { ok: true };
   }
 
