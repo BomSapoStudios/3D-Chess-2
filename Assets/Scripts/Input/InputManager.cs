@@ -145,17 +145,44 @@ public class InputManager : MonoBehaviour
         
         // Process each tap or click exactly once. On iOS a touch also raises
         // simulated mouse events, so handling both would run the same tap 2-3 times.
+        // A tap counts when the finger lifts, and only if it stayed put and no second finger
+        // joined: putting a finger down to turn the board or pinch must never select or move.
         if (InputHelper.TouchCount > 0)
         {
             Touch touch = InputHelper.GetTouch(0);
-            if (touch.phase == TouchPhase.Began)
+            if (InputHelper.TouchCount > 1) tapPending = false;
+            switch (touch.phase)
             {
-                ProcessTouch(touch.position);
+                case TouchPhase.Began:
+                    tapPending = InputHelper.TouchCount == 1;
+                    tapStart = touch.position;
+                    break;
+                case TouchPhase.Moved:
+                case TouchPhase.Stationary:
+                    if (Vector2.Distance(touch.position, tapStart) > TapSlop) tapPending = false;
+                    break;
+                case TouchPhase.Ended:
+                    if (tapPending && Vector2.Distance(touch.position, tapStart) <= TapSlop) ProcessTouch(tapStart);
+                    tapPending = false;
+                    break;
+                case TouchPhase.Canceled:
+                    tapPending = false;
+                    break;
             }
         }
         else if (InputHelper.GetMouseButtonDown(0))
         {
-            ProcessTouch(InputHelper.MousePosition);
+            mouseTapPending = true;
+            tapStart = InputHelper.MousePosition;
+        }
+        else if (mouseTapPending && InputHelper.GetMouseButton(0))
+        {
+            if (Vector2.Distance(InputHelper.MousePosition, tapStart) > TapSlop) mouseTapPending = false;
+        }
+        else if (mouseTapPending)
+        {
+            mouseTapPending = false;
+            if (Vector2.Distance(InputHelper.MousePosition, tapStart) <= TapSlop) ProcessTouch(tapStart);
         }
         
         // Keyboard testing
@@ -170,6 +197,13 @@ public class InputManager : MonoBehaviour
         }
     }
     
+    // Tap tracking (see HandleInput)
+    private bool tapPending, mouseTapPending;
+    private Vector2 tapStart;
+
+    /// <summary>How far, in pixels, a finger may wander and still be a tap (about 2 mm)</summary>
+    private static float TapSlop => Mathf.Max(10f, (Screen.dpi > 0f ? Screen.dpi : 160f) * 0.08f);
+
     private void ProcessTouch(Vector2 screenPosition)
     {
         // Online: during play, input only works on your own turn
@@ -340,21 +374,8 @@ public class InputManager : MonoBehaviour
             Component[] components = hit.collider.GetComponents<Component>();
             Debug.Log($"   Hit object components: {string.Join(", ", System.Array.ConvertAll(components, c => c.GetType().Name))}");
         }
-        else
-        {
-            Debug.Log($"❌ Raycast hit NOTHING - check collider setup and layers");
-            
-            // Clicked empty space - if piece is selected, try to move to that world position
-            if (selectedPiece != null && ChessBoard.Instance != null)
-            {
-                BoardPosition targetPos = ChessBoard.Instance.WorldToBoard(ray.GetPoint(10f)); // 10 units from camera
-                if (targetPos.IsValid())
-                {
-                    Debug.Log($"Clicked empty space at world position, converted to board position: {targetPos}");
-                    TryMovePiece(targetPos);
-                }
-            }
-        }
+        // A tap that hits nothing is off the board: it does nothing (it used to guess a square
+        // 10 units in front of the camera and move there)
     }
     
     public void OnPieceClicked(ChessPiece piece)
@@ -549,7 +570,7 @@ public class InputManager : MonoBehaviour
         if (GameStateManager.Instance == null || !GameStateManager.Instance.CanMovePiece(piece)) return false;
         DeselectPiece();
         SelectPiece(piece);
-        TryMovePiece(target);
+        TryMovePiece(target, confirmed: true);
         return true;
     }
 
@@ -563,6 +584,11 @@ public class InputManager : MonoBehaviour
         if (GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
         TouchGUI.Begin();
         if (TouchGUI.NeonButton(new Rect(16, 130, 150, 44), "Deselect", NeonTheme.Cyan, NeonTheme.Pink, fontSize: 16)) DeselectPiece();
+        // Move! goes under Deselect, or under Queen Blitz's pawn tracker, which has that spot in a puzzle
+        float moveY = QueenBlitzDirector.Instance != null ? Mathf.Max(182f, QueenBlitzDirector.Instance.TrackerBottom + 10f) : 182f;
+        if (armedTarget.HasValue
+            && TouchGUI.NeonButton(new Rect(16, moveY, 150, 44), "Move!", NeonTheme.Lime, NeonTheme.Pink, fontSize: 16))
+            TryMovePiece(armedTarget.Value, confirmed: true);
         TouchGUI.End();
     }
 
@@ -1022,8 +1048,51 @@ public class InputManager : MonoBehaviour
         Debug.Log($"ShowValidMoveIndicators: Total indicators created: {moveIndicators.Count} out of {validMoves.Count} moves");
     }
     
+    // ── Tap Twice to Move ──
+    // The marked square (null when none) and its dot as it looked before it was marked
+    private BoardPosition? armedTarget;
+    private GameObject armedIndicator;
+    private Vector3 armedScale;
+    private Color armedColor;
+
+    /// <summary>Mark a legal square: its dot grows and turns lime until tapped again or Move! is pressed</summary>
+    private void ArmMove(BoardPosition target)
+    {
+        DisarmMove();
+        armedTarget = target;
+        foreach (GameObject indicator in moveIndicators)
+        {
+            MoveTargetData data = indicator != null ? indicator.GetComponent<MoveTargetData>() : null;
+            if (data == null || data.targetPosition != target) continue;
+            armedIndicator = indicator;
+            armedScale = indicator.transform.localScale;
+            Renderer r = indicator.GetComponent<Renderer>();
+            if (r != null)
+            {
+                armedColor = r.material.color;
+                r.material.color = new Color(NeonTheme.Lime.r, NeonTheme.Lime.g, NeonTheme.Lime.b, Mathf.Max(armedColor.a, 0.75f));
+            }
+            indicator.transform.localScale = armedScale * 1.35f;
+            break;
+        }
+        Haptics.Selection();
+    }
+
+    private void DisarmMove()
+    {
+        if (armedIndicator != null)
+        {
+            armedIndicator.transform.localScale = armedScale;
+            Renderer r = armedIndicator.GetComponent<Renderer>();
+            if (r != null) r.material.color = armedColor;
+        }
+        armedIndicator = null;
+        armedTarget = null;
+    }
+
     private void HideValidMoveIndicators()
     {
+        DisarmMove();
         Debug.Log($"HideValidMoveIndicators: Cleaning up {moveIndicators.Count} indicators");
         
         int destroyedCount = 0;
@@ -1112,7 +1181,7 @@ public class InputManager : MonoBehaviour
         return null;
     }
 
-    private void TryMovePiece(BoardPosition targetPosition)
+    private void TryMovePiece(BoardPosition targetPosition, bool confirmed = false)
     {
         Debug.Log($"🚀 TryMovePiece: Called with targetPosition {targetPosition}");
         
@@ -1168,8 +1237,18 @@ public class InputManager : MonoBehaviour
         }
         Debug.Log($"TryMovePiece: CanMoveTo({targetPosition}) returned {canMove}");
         
+        // Tap Twice to Move: the first tap on a legal square only marks it
+        if (canMove && !confirmed && AccessibilityPrefs.TapTwiceToMove
+            && GameStateManager.Instance != null && GameStateManager.Instance.CanMovePieces()
+            && !(armedTarget.HasValue && armedTarget.Value == targetPosition))
+        {
+            ArmMove(targetPosition);
+            return;
+        }
+
         if (canMove)
         {
+            DisarmMove();
             Debug.Log($"✅ TryMovePiece: Move is valid, starting ProcessMoveCoroutine");
             StartCoroutine(ProcessMoveCoroutine(targetPosition));
         }

@@ -795,6 +795,9 @@ public partial class QueenBlitzDirector : MonoBehaviour
 
     private Rect Slot(int i) => new Rect(20f + (i % 4) * (SlotSize + 12f), 186f + (i / 4) * (SlotSize + SlotGap), SlotSize, SlotSize);
 
+    /// <summary>The bottom of the pawn tracker under Deselect (0 before it is laid out), so Move! can sit below it</summary>
+    public float TrackerBottom => filledAt == null || filledAt.Length == 0 ? 0f : Slot(filledAt.Length - 1).yMax;
+
     /// <summary>Fly each newly earned pawn from its slot into the tally, one after another</summary>
     private IEnumerator Funnel(int paid)
     {

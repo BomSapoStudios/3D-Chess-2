@@ -470,6 +470,13 @@ LEVEL BUTTONS (right edge)
 OFFER DRAW / FORFEIT / HOME
   Offer Draw and Forfeit ask for confirmation first (see section 5).
 
+TAPS VS DRAGS
+  • A tap on the board counts when the finger lifts, and only if it stayed
+    put (about 2 mm) and no second finger joined. Dragging to turn the board
+    or pinching to zoom never selects or moves a piece, wherever it starts.
+  • A tap off the board does nothing. Moves are made by tapping a lit
+    destination (or the enemy piece to capture), not a bare board square.
+
 ON-BOARD FEEDBACK
   • Legal destinations light up when a piece is selected.
   • A King in check, and the pieces checking it, are highlighted with a
@@ -648,6 +655,11 @@ one on here. Choices are kept on the phone (PlayerPrefs, keys A11y.*).
                          (error), your turn coming back to you, and a light tick
                          per pawn a Queen Blitz sweep knocks out (bunched up so a
                          long sweep doesn't buzz nonstop).
+  Tap Twice to Move    — the first tap on a lit destination marks it (the dot
+                         grows and turns lime, and a Move! button appears under
+                         Deselect); a second tap on it, or Move!, makes the move.
+                         Tapping another destination marks that one instead.
+                         Placement and Turn Planner moves are unaffected.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
