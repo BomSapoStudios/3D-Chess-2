@@ -43,7 +43,7 @@ def special(b, at, d, dest):
 def random_features(n, rng, want):
     cells = [(x, y, z) for x in range(n) for y in range(n) for z in range(n)]
     portals, ramps, used = [], {}, set()
-    if want in ("portal", "both"):
+    if want in ("portal", "both", "brake"):
         a, c = rng.sample(cells, 2)
         portals.append((a, rng.choice(LEVEL), c, rng.choice(LEVEL)))
         used |= {a, c}
@@ -65,12 +65,16 @@ def plant(n, par, rng, want, ice):
         opts = [(to, d) for to, _, d, _ in b0.moves(at)]
         if not opts:
             return None
-        sp = [(to, d) for to, d in opts if special(b0, at, d, to)]
+        if want == "brake":
+            sp = [(to, d) for to, d in opts if tuple(to[i] + d[i] for i in range(3)) in b0.portal
+                  and not special(b0, at, d, to)]
+        else:
+            sp = [(to, d) for to, d in opts if special(b0, at, d, to)]
         to, d = rng.choice(sp) if sp and (specials == 0 or rng.random() < 0.4) else rng.choice(opts)
         cells = [c for c in path_of(b0, at, d, to) if c not in used and c != start]
         if not cells:
             return None
-        if special(b0, at, d, to):
+        if (to, d) in sp:
             specials += 1
         pawns.update(rng.sample(cells, min(len(cells), rng.randint(1, 3))))
         at = to
@@ -107,6 +111,19 @@ def taps_ok(b, line, left):
             return False
         left &= ~best[1]
     return left == 0
+
+
+def brakes(b, line):
+    """Moves of the line that stop on ice because a portal's back or side is in the way"""
+    out = 0
+    for a, c in line:
+        for to, _, d, _ in b.moves(a):
+            if to == c:
+                nxt = tuple(c[i] + d[i] for i in range(3))
+                if nxt in b.portal:
+                    out += 1
+                break
+    return out
 
 
 def flat(cells):
@@ -150,8 +167,14 @@ def _attempt(job):
     e, b, line = to_entry(n, start, pawns, blocks, ice, portals, ramps)
     if e["par"] != par or not taps_ok(b, line, b.full):
         return None
-    e.update(want=want, lured=None)
+    braked = brakes(b, line) if ice else 0
+    if want == "brake" and not braked:
+        return None
+    e.update(want="brake" if braked else want, lured=None)
     return e
+
+
+WANTS = ("portal", "portal", "ramp", "both", "brake")
 
 
 def gen(seconds, seed, out, sizes, pars):
@@ -160,8 +183,11 @@ def gen(seconds, seed, out, sizes, pars):
     end = time.time() + seconds
     with Pool(4) as pool:
         while time.time() < end:
-            batch = [(rng.choice(sizes), rng.choice(pars), rng.choice(("portal", "portal", "ramp", "both")),
-                      rng.random() < 0.25, rng.randrange(1 << 30)) for _ in range(16)]
+            batch = []
+            for _ in range(16):
+                want = rng.choice(WANTS)
+                batch.append((rng.choice(sizes), rng.choice(pars), want, want == "brake" or rng.random() < 0.25,
+                              rng.randrange(1 << 30)))
             for e in pool.imap_unordered(attempt, batch):
                 tried += 1
                 if not e:
@@ -197,7 +223,8 @@ def add_decoy_portal(e, rng):
     return None
 
 
-TIPS = {"portal": "Step into a portal and come out somewhere else.",
+TIPS = {"brake": "On ice, the back of a portal is as good as a wall.",
+        "portal": "Step into a portal and come out somewhere else.",
         "ramp": "Ramps lift the queen up a floor.",
         "both": "Portals and ramps work together.",
         "ice": "On ice she keeps sliding, even through a portal.",
