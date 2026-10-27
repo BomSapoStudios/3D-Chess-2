@@ -11,8 +11,7 @@ end: she can only go in the in end (the out end is a block from every side). A p
 instead be two-way, with its own look, and then either end takes her in. Each is a vertical
 disc on its own square, facing one level direction. The queen enters only through the front (moving against its facing, straight
 or diagonally); from the back or the side it's a block. She comes out of the paired portal
-heading away from its face: her move is turned the way the entry facing turns into the exit
-facing, and her climb or fall is kept. One trip through is one continuous move, sweeping pawns
+heading straight out of its face, level, whatever angle she went in at (Brandon, Oct 27). One trip through is one continuous move, sweeping pawns
 on both sides; she can't stop on a portal square. If the square after the exit is a block or
 the edge, she can't go in. Portals may chain.
 
@@ -86,7 +85,7 @@ class Board:
                     return None
                 seen.add((nxt, d))
                 passed.append(nxt)
-                d = _turn(d, face, out_face)
+                d = out_face  # always straight out of the exit disc
                 passed.append(other)
                 c = other
                 continue
