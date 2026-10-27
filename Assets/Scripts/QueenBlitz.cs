@@ -356,6 +356,8 @@ public static partial class QueenBlitz
     public static int Index { get; set; }
     public static Puzzle Current => Puzzles[Mathf.Clamp(Index, 0, Puzzles.Length - 1)];
     public static int Moves { get; set; }
+    /// <summary>Pawns the queen has swept this puzzle: the tracker never shows more as taken</summary>
+    public static int Swept { get; set; }
     public static bool Cleared { get; set; }
     /// <summary>Par is the move limit: the moves ran out with pawns still on the board</summary>
     public static bool OutOfMoves { get; set; }
@@ -376,6 +378,7 @@ public static partial class QueenBlitz
     {
         Index = index;
         Moves = 0;
+        Swept = 0;
         Cleared = false;
         OutOfMoves = false;
         AutoPlaced = false;
@@ -484,6 +487,7 @@ public static partial class QueenBlitz
     /// <summary>Knock a pawn flying the way the queen is sliding</summary>
     public static void KnockAway(ChessPiece pawn, ChessPiece queen, BoardPosition from, BoardPosition to)
     {
+        if (pawn.pieceColor == PawnColor) Swept++;
         Vector3 local = ChessBoard.Instance.BoardToLocalPosition(to) - ChessBoard.Instance.BoardToLocalPosition(from);
         Transform parent = queen.transform.parent;
         PieceEffects.KnockAway(pawn, queen, parent != null ? parent.TransformDirection(local) : local, Current.ice);
@@ -732,7 +736,22 @@ public partial class QueenBlitzDirector : MonoBehaviour
             shownTotal = PawnBank.Total;
         }
         if (funnelStarted >= 0f) return; // the pawns are flying to the tally
-        int taken = Mathf.Clamp(total - PawnsLeft(), 0, total);
+        int left = PawnsLeft();
+        // Guard: pieces gone that no move took (never expected) start the puzzle again cleanly
+        // rather than showing pawns as collected or a board with no queen
+        var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        bool missing = !ended && state == GameState.Playing && GameStateManager.Instance.CanMovePieces() && !restarting
+            && (left < total - QueenBlitz.Swept || !QueenOnBoard());
+        if (!missing) missingSince = -1f;
+        else if (missingSince < 0f) missingSince = Time.time;
+        if (missing && Time.time - missingSince > 1f) // not just a frame between a restore's steps
+        {
+            Debug.LogError($"Queen Blitz: pieces went missing ({left} pawns, {QueenBlitz.Swept} swept of {total}, queen {QueenOnBoard()}): starting the puzzle again");
+            restarting = true;
+            Restart(QueenBlitz.Index);
+            return;
+        }
+        int taken = Mathf.Clamp(Mathf.Min(total - left, QueenBlitz.Swept), 0, total);
         if (taken < shownTaken) shownTaken = taken;
         else if (taken > shownTaken && Time.time >= nextFill)
         {
@@ -743,6 +762,17 @@ public partial class QueenBlitzDirector : MonoBehaviour
     }
 
     // ── The left column: your pawn total, Restart, Undo (UndoManager), then the puzzle's pawns ──
+    private bool restarting;
+    private float missingSince = -1f;
+
+    private static bool QueenOnBoard()
+    {
+        foreach (ChessPiece p in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
+            if (p.pieceType == ChessPieceType.Queen && p.pieceColor == QueenBlitz.PlayerColor && !p.IsInTray() && p.CurrentPosition.IsValid()
+                && ChessBoard.Instance.GetPieceAt(p.CurrentPosition) == p) return true;
+        return false;
+    }
+
     private bool alreadyCollected;    // cleared before: its pawns show filled but greyed out
     private int shownTotal;           // the total as shown (it counts up as earned pawns arrive)
     private float funnelStarted = -1f, tallyBump = -10f;

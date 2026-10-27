@@ -28,6 +28,10 @@ public class UndoManager : MonoBehaviour
 
     private readonly List<Snapshot> history = new List<Snapshot>();
     private int turnsSeen, savedAtTurn = -1, activeCount = -1;
+    // This scene's game has reached its setup. The game state outlives scenes, so a puzzle opened
+    // from another one mid-play starts out "Playing" before its pieces exist; saving then kept an
+    // empty board, and Undo after the first move cleared the queen and every pawn
+    private bool setUp;
     private ChaosRotationManager subscribedChaos;
     private TurnManager subscribedTurns;
 
@@ -81,7 +85,13 @@ public class UndoManager : MonoBehaviour
             subscribedChaos = ChaosRotationManager.Instance;
             subscribedChaos.OnChaosRotationCompleted += t => history.Clear(); // the cube was reshaped: no going back past it
         }
-        if (!Allowed()) return;
+        if (GameStateManager.Instance != null && GameStateManager.Instance.currentState == GameState.PiecePlacement)
+        {
+            // Setup (this game's, or a rematch's in the same scene): a fresh start
+            setUp = true;
+            if (history.Count > 0 || savedAtTurn >= 0) { history.Clear(); savedAtTurn = -1; }
+        }
+        if (!Allowed() || !setUp) return;
 
         // Someone knocked out: no going back past that either
         int active = PlayerManager.Instance != null ? PlayerManager.Instance.GetActivePlayerCount() : 2;
@@ -89,13 +99,21 @@ public class UndoManager : MonoBehaviour
         activeCount = active;
 
         // Save once at the start of each turn a person plays, after the last move has settled
-        if (savedAtTurn != TurnKey && PersonToMove() && GameStateManager.Instance.CanMovePieces())
+        if (savedAtTurn != TurnKey && PersonToMove() && GameStateManager.Instance.CanMovePieces() && HasOwnPieces())
         {
             savedAtTurn = TurnKey;
             history.Add(Capture());
             if (history.Count > MaxSaved) history.RemoveAt(0);
             Debug.Log($"Undo: saved the start of turn {TurnKey} ({history.Count} saved)");
         }
+    }
+
+    /// <summary>The player to move has pieces on the board (an empty position is never a real one to go back to)</summary>
+    private static bool HasOwnPieces()
+    {
+        PieceColor me = TurnManager.Instance.GetCurrentPlayer();
+        foreach (ChessPiece p in BoardPieces()) if (p.pieceColor == me) return true;
+        return false;
     }
 
     private static Snapshot Capture()
@@ -136,7 +154,13 @@ public class UndoManager : MonoBehaviour
         ZombieMode.PawnsDestroyed = snap.zombiePawns;
         ZombieMode.PromotedDestroyed = snap.zombiePromoted;
         if (ZombieDirector.Instance != null) ZombieDirector.Instance.Recount();
-        if (QueenBlitz.Active) QueenBlitz.Moves = snap.blitzMoves;
+        if (QueenBlitz.Active)
+        {
+            QueenBlitz.Moves = snap.blitzMoves;
+            int pawns = 0;
+            foreach (SavedPiece s in snap.pieces) if (s.color == QueenBlitz.PawnColor) pawns++;
+            QueenBlitz.Swept = QueenBlitz.Current.pawns.Length - pawns; // the pawns swept up to that point
+        }
 
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.ClearDrawOffer();
         if (CheckDetectionManager.Instance != null) CheckDetectionManager.Instance.InvalidateCache();

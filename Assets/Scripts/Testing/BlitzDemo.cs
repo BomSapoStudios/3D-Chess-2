@@ -11,7 +11,7 @@ using UnityEngine;
 /// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move; 95 opens the
 /// puzzle picker on the pack; 94 goes puzzle > Menu > Queen Blitz > another puzzle, 93 runs out
 /// of moves then Puzzles > another puzzle, 92 Main Menu > Queen Blitz! > Start new > another puzzle;
-/// 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
+/// 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
 /// 91 opens the in-puzzle selector, 90 the same on the next pack's chip, 89 jumps to Tricky 2's 6³ puzzle 5. `DebugBlitzPack` picks the pack (default starter) and
 /// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
@@ -34,6 +34,33 @@ public class BlitzDemo : MonoBehaviour
     private static IEnumerator Run(int which)
     {
         if (which >= 92 && which <= 94) { yield return Hop(which); yield break; }
+        if (which == 87)
+        {
+            // Walls 2, jump to Walls 3 from the selector, make its first move, then Undo: the board must come back as it started
+            yield return new WaitForSeconds(2f);
+            QueenBlitz.Puzzle p2 = QueenBlitz.Puzzles[1];
+            var cfg = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(p2.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = 1, saveSlot = SavedGames.Blitz };
+            cfg.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            cfg.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(cfg);
+            while (QueenBlitzDirector.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) yield return null;
+            yield return new WaitForSeconds(2f);
+            QueenBlitzDirector.Instance.DebugJump(QueenBlitz.PackId, 2);
+            yield return new WaitForSeconds(0.5f);
+            while (QueenBlitzDirector.Instance == null || QueenBlitz.Index != 2 || GameStateManager.Instance.currentState != GameState.Playing) yield return null;
+            yield return new WaitForSeconds(2f);
+            BoardPosition[] line = QueenBlitz.Puzzles[2].line;
+            Debug.Log($"BLITZ DEMO: undo check before, pawns {QueenBlitzDirector.Instance.PawnsLeft()}, queen {(ChessBoard.Instance.GetPieceAt(line[0]) != null)}");
+            ChessBoard.Instance.MovePiece(line[0], line[1]);
+            yield return new WaitForSeconds(2f);
+            Debug.Log($"BLITZ DEMO: undo check after move, pawns {QueenBlitzDirector.Instance.PawnsLeft()}, can undo {UndoManager.Instance.CanUndo}");
+            UndoManager.Instance.Undo();
+            yield return new WaitForSeconds(1.5f);
+            int pawns = QueenBlitzDirector.Instance.PawnsLeft();
+            bool queen = ChessBoard.Instance.GetPieceAt(line[0]) != null;
+            Debug.Log($"BLITZ DEMO: undo check {(pawns == QueenBlitz.Puzzles[2].pawns.Length && queen ? "PASS" : "FAIL")}, pawns {pawns}, queen back {queen}, moves {QueenBlitz.Moves}");
+            yield break;
+        }
         if (which == 88)
         {
             // Every stop from every free square of every puzzle in the pack, for comparing with the solver

@@ -283,7 +283,12 @@ public class SavedGames : MonoBehaviour
         ZombieMode.PawnsDestroyed = save.zombiePawns;
         ZombieMode.PromotedDestroyed = save.zombiePromoted;
         if (ZombieDirector.Instance != null) ZombieDirector.Instance.Recount();
-        if (QueenBlitz.Active) QueenBlitz.Moves = save.blitzMoves;
+        if (QueenBlitz.Active)
+        {
+            QueenBlitz.Moves = save.blitzMoves;
+            int pawns = save.pieces.FindAll(s => (PieceColor)s.color == QueenBlitz.PawnColor).Count;
+            QueenBlitz.Swept = QueenBlitz.Current.pawns.Length - pawns; // swept before it was saved
+        }
         if (ChaosRotationManager.Instance != null) ChaosRotationManager.Instance.MovesSinceLastChaos = save.chaosCount;
         if (PlayerManager.Instance != null) PlayerManager.Instance.SetEliminated(save.knockedOut.ConvertAll(c => (PieceColor)c));
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.enableGameEndDetection = !ZombieMode.Active && !QueenBlitz.Active;
