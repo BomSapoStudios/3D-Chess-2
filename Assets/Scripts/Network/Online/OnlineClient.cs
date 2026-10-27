@@ -17,6 +17,17 @@ public class OnlineClient : MonoBehaviour
 
     public static OnlineClient Instance { get; private set; }
 
+    /// <summary>
+    /// This build's online version, sent with every request. To retire older builds: raise this, ship
+    /// the build, then set the server's MIN_CLIENT_VERSION to the new number once it's out. Older
+    /// builds then get "Please update" instead of breaking.
+    /// </summary>
+    public const int ClientVersion = 1;
+
+    /// <summary>The server said this build is too old to play online (until the app restarts)</summary>
+    public static bool UpdateRequired { get; private set; }
+    public static event Action UpdateNeeded;
+
     public string ServerUrl
     {
         get
@@ -409,9 +420,15 @@ public class OnlineClient : MonoBehaviour
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
             if (!string.IsNullOrEmpty(token)) request.SetRequestHeader("Authorization", "Bearer " + token);
+            request.SetRequestHeader("X-Client-Version", ClientVersion.ToString());
             request.timeout = 15;
             yield return request.SendWebRequest();
             long status = request.result == UnityWebRequest.Result.ConnectionError ? 0 : request.responseCode;
+            if (status == 426 && !UpdateRequired)
+            {
+                UpdateRequired = true;
+                UpdateNeeded?.Invoke();
+            }
             done(status, request.downloadHandler.text);
         }
     }
@@ -463,7 +480,7 @@ public class OnlineClient : MonoBehaviour
         RoomCode = upper;
         intentionalClose = false;
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
-                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}&reveal=1"; // we handle private setup
+                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}&reveal=1&cv={ClientVersion}"; // we handle private setup
 
         var opened = socket = new GameSocket(url);
         opened.OnMessage += Handle;
@@ -499,7 +516,7 @@ public class OnlineClient : MonoBehaviour
     {
         await CloseMatchmaking();
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
-                     $"/matchmaking/connect?token={UnityWebRequest.EscapeURL(Token)}";
+                     $"/matchmaking/connect?token={UnityWebRequest.EscapeURL(Token)}&cv={ClientVersion}";
         var queue = matchSocket = new GameSocket(url);
         queue.OnOpen += () =>
             queue.SendText("{\"type\":\"matchmaking:join\",\"config\":{\"boardSize\":\"" + boardSize + "\",\"playerCount\":2}}");
