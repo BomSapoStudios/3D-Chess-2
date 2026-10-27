@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
 
 /// <summary>
@@ -11,8 +13,14 @@ public class AppleSignIn : MonoBehaviour
     private const string ReceiverName = "AppleSignInReceiver";
     private static Action<string, string> pending; // (token, error)
 
+    /// <summary>
+    /// The one-time value behind the last sign-in. Apple's token carries its SHA-256; the server
+    /// gets the value itself with the token and checks they match, so a copied token is useless.
+    /// </summary>
+    public static string Nonce { get; private set; }
+
 #if UNITY_IOS && !UNITY_EDITOR
-    [DllImport("__Internal")] private static extern void AppleSignIn_Start(string receiver);
+    [DllImport("__Internal")] private static extern void AppleSignIn_Start(string receiver, string nonceHash);
     public static bool IsAvailable => true;
 #else
     public static bool IsAvailable => false;
@@ -29,7 +37,10 @@ public class AppleSignIn : MonoBehaviour
             go.AddComponent<AppleSignIn>();
         }
         pending = done;
-        AppleSignIn_Start(ReceiverName);
+        var bytes = new byte[32];
+        using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(bytes);
+        Nonce = Hex(bytes);
+        using (var sha = SHA256.Create()) AppleSignIn_Start(ReceiverName, Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(Nonce))));
 #else
         done(null, "Sign in with Apple is only available on iPhone");
 #endif
@@ -37,6 +48,13 @@ public class AppleSignIn : MonoBehaviour
 
     public void OnAppleSignIn(string token) => Finish(token, null);
     public void OnAppleSignInError(string message) => Finish(null, message);
+
+    private static string Hex(byte[] bytes)
+    {
+        var sb = new StringBuilder(bytes.Length * 2);
+        foreach (byte b in bytes) sb.Append(b.ToString("x2"));
+        return sb.ToString();
+    }
 
     private static void Finish(string token, string error)
     {

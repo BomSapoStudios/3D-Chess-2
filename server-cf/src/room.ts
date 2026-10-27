@@ -6,7 +6,7 @@ import {
 } from './types/game.js';
 import { accounts, createRoom, type Env } from './index.js';
 import type { PushMessage } from './push.js';
-import { asPosition } from './validate.js';
+import { asPosition, floodedBy } from './validate.js';
 import type { GameResult, RatingChange } from './ratings.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +227,10 @@ export class Room extends DurableObject<Env> {
   // ── Messages ─────────────────────────────────────────────────────────────────
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    if (floodedBy(ws)) {
+      try { ws.close(4008, 'Too many messages'); } catch { /* already closed */ }
+      return;
+    }
     const me = ws.deserializeAttachment() as Attachment;
     let msg: Record<string, unknown>;
     try {
@@ -236,7 +240,7 @@ export class Room extends DurableObject<Env> {
     }
     const requestId = msg.requestId;
     const reply = (ok: boolean, error?: string, extra: object = {}) => {
-      if (!ok) console.log(`[room ${this.meta?.code}] ${me.color} ${String(msg.type)} refused: ${error} ${JSON.stringify(msg)}`);
+      if (!ok) console.log(`[room ${this.meta?.code}] ${me.color} ${String(msg.type)} refused: ${error} ${JSON.stringify(msg).slice(0, 300)}`);
       this.send(ws, { type: 'ack', requestId, ok, ...(error ? { error } : {}), ...extra });
     };
 
