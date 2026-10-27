@@ -75,11 +75,12 @@ public static partial class QueenBlitz
         public readonly List<Vector3> points = new List<Vector3>();           // board-local, floor level
         public readonly List<bool> teleport = new List<bool>();               // teleport[i]: points[i] to points[i + 1] is a jump
         public bool special;                                                    // through a portal or up a ramp
+        public readonly List<BoardPosition> entered = new List<BoardPosition>(); // portals she goes into
 
         public Route Copy()
         {
             var r = new Route { from = from, to = to, special = special };
-            r.swept.AddRange(swept); r.sweptDir.AddRange(sweptDir); r.points.AddRange(points); r.teleport.AddRange(teleport);
+            r.swept.AddRange(swept); r.sweptDir.AddRange(sweptDir); r.points.AddRange(points); r.teleport.AddRange(teleport); r.entered.AddRange(entered);
             return r;
         }
 
@@ -170,6 +171,7 @@ public static partial class QueenBlitz
         {
             if (pts.Count > 0) route.special = true;
             foreach (BoardPosition e in entered) EnterablePortals.Add(e);
+            route.entered.AddRange(entered);
             route.swept.AddRange(swept);
             route.sweptDir.AddRange(sweptDir);
             foreach (var (p, jump) in pts) route.Point(p, jump);
@@ -226,6 +228,24 @@ public static partial class QueenBlitz
         ChessPiece end = ChessBoard.Instance.GetPieceAt(r.to);
         return count + (end != null && end.pieceColor == PawnColor ? 1 : 0);
     }
+
+    /// <summary>Every move from a square, with its route (for the trails and portal taps)</summary>
+    public static ICollection<Route> RoutesFrom(BoardPosition from)
+    {
+        bool fresh = routes.Count > 0;
+        foreach (var key in routes.Keys) { fresh = key.Item1 == from; break; }
+        if (!fresh) FindRoutes(from);
+        return routes.Values;
+    }
+
+    /// <summary>The square in front of a portal's way in (where its floor pad is), if it's a way in</summary>
+    public static BoardPosition? PortalApproach(BoardPosition portal)
+    {
+        if (!portalAt.TryGetValue(portal, out PortalLink link) || link == null) return null;
+        return new BoardPosition(portal.x + link.face.x, portal.y + link.face.y, portal.z + link.face.z);
+    }
+
+    public static IEnumerable<BoardPosition> PortalSquares => portalAt.Keys;
 
     /// <summary>The route for a move the queen is making (worked out again if her moves weren't asked for first)</summary>
     public static Route RouteFor(BoardPosition from, BoardPosition to)

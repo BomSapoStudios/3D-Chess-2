@@ -214,8 +214,16 @@ public class InputManager : MonoBehaviour
         
         Ray ray = gameCamera.ScreenPointToRay(screenPosition);
         RaycastHit hit;
+        bool anyHit = RaycastForInteractable(ray, out hit);
 
-        if (RaycastForInteractable(ray, out hit))
+        // Queen Blitz with the queen picked up: a tap that isn't on a dot or a piece of hers may be on a
+        // portal, its pad, or a square she slides past (QueenBlitzTrails)
+        if (QueenBlitz.Active && QueenBlitzTrails.Instance != null
+            && !(anyHit && (hit.collider.GetComponent<MoveTargetData>() != null || hit.collider.GetComponent<ChessPiece>() == selectedPiece))
+            && QueenBlitzTrails.Instance.OnTap(screenPosition, gameCamera))
+            return;
+
+        if (anyHit)
         {
             // Check for placement target clicks first (during placement phase)
             PlacementTargetData placementData = hit.collider.GetComponent<PlacementTargetData>();
@@ -486,6 +494,9 @@ public class InputManager : MonoBehaviour
         }
     }
     
+    /// <summary>Queen Blitz: play the selected queen's move to this square (a portal tap)</summary>
+    public void PlayBlitzMove(BoardPosition to) => TryMovePiece(to);
+
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
     /// <summary>Pick up a piece as a tap would (BlitzDemo screenshots)</summary>
     public void DebugSelect(ChessPiece piece) => SelectPiece(piece);

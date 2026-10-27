@@ -11,7 +11,7 @@ using UnityEngine;
 /// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move; 95 opens the
 /// puzzle picker on the pack; 94 goes puzzle > Menu > Queen Blitz > another puzzle, 93 runs out
 /// of moves then Puzzles > another puzzle, 92 Main Menu > Queen Blitz! > Start new > another puzzle;
-/// 86 opens puzzle DebugBlitzMissPuzzle with the queen picked up; 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
+/// 85 checks portal and slide taps; 86 opens puzzle DebugBlitzMissPuzzle with the queen picked up; 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
 /// 91 opens the in-puzzle selector, 90 the same on the next pack's chip, 89 jumps to Tricky 2's 6³ puzzle 5. `DebugBlitzPack` picks the pack (default starter) and
 /// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
@@ -34,6 +34,41 @@ public class BlitzDemo : MonoBehaviour
     private static IEnumerator Run(int which)
     {
         if (which >= 92 && which <= 94) { yield return Hop(which); yield break; }
+        if (which == 85)
+        {
+            // Portal taps: pick the queen up, tap a square a slide passes (ice), then a portal she can go into
+            yield return new WaitForSeconds(2f);
+            int idx = PlayerPrefs.GetInt("DebugBlitzMissPuzzle", 1) - 1;
+            QueenBlitz.Puzzle pz = QueenBlitz.Puzzles[idx];
+            var c85 = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(pz.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = idx };
+            c85.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            c85.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(c85);
+            while (QueenBlitzDirector.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) yield return null;
+            yield return new WaitForSeconds(2f);
+            ChessPiece q = ChessBoard.Instance.GetPieceAt(pz.line[0]);
+            InputManager.Instance.DebugSelect(q);
+            yield return new WaitForSeconds(3f); // screenshot: the trails
+            var routes = new System.Collections.Generic.List<QueenBlitz.Route>(QueenBlitz.RoutesFrom(q.CurrentPosition));
+            QueenBlitz.Route slide = routes.Find(r => r.swept.Count > 1 && r.entered.Count == 0);
+            if (pz.ice && slide != null)
+            {
+                bool took = QueenBlitzTrails.Instance.DebugTap(slide.swept[0]);
+                Debug.Log($"BLITZ DEMO: tap past {slide.swept[0]} -> handled {took}, picked out {QueenBlitzTrails.Instance.LitCount} (landing {slide.to})");
+                yield return new WaitForSeconds(3f); // screenshot: one move picked out
+            }
+            QueenBlitz.Route through = routes.Find(r => r.entered.Count > 0);
+            if (through != null)
+            {
+                int movesBefore = QueenBlitz.Moves;
+                int count = routes.FindAll(r => r.entered.Contains(through.entered[0])).Count;
+                bool took = QueenBlitzTrails.Instance.DebugTap(through.entered[0]);
+                yield return new WaitForSeconds(3f);
+                Debug.Log($"BLITZ DEMO: tap portal {through.entered[0]} ({count} moves go in) -> handled {took}, moves {movesBefore} > {QueenBlitz.Moves}, picked out {QueenBlitzTrails.Instance.LitCount}");
+            }
+            else Debug.Log("BLITZ DEMO: no portal reachable from the start");
+            yield break;
+        }
         if (which == 86)
         {
             // Open puzzle DebugBlitzMissPuzzle and pick the queen up (portal entry glow and dots), for screenshots

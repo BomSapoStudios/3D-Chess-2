@@ -554,7 +554,11 @@ public partial class QueenBlitzDirector : MonoBehaviour
         new GameObject("Queen Blitz Director").AddComponent<QueenBlitzDirector>();
     }
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        Instance = this;
+        gameObject.AddComponent<QueenBlitzTrails>();
+    }
 
     private void OnDestroy()
     {
@@ -764,6 +768,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
 
     // ── The left column: your pawn total, Restart, Undo (UndoManager), then the puzzle's pawns ──
     private bool restarting;
+    private const string PortalHintKey = "QueenBlitz.PortalHintSeen";
     private float missingSince = -1f;
 
     private static bool QueenOnBoard()
@@ -921,9 +926,17 @@ public partial class QueenBlitzDirector : MonoBehaviour
             if (!selectorOpen && GUI.Button(rect, GUIContent.none, GUIStyle.none)) OpenSelector();
             if (QueenBlitz.Moves == 0)
             {
-                GUIStyle tip = NeonTheme.GUILabelStyle(NeonTheme.Lavender, 14, true, TextAnchor.UpperCenter);
+                // The first portal puzzle explains how to start a move through one
+                bool portalHint = puzzle.portals != null && puzzle.portals.Length > 0 && PlayerPrefs.GetInt(PortalHintKey, 0) == 0;
+                string line = portalHint ? "Tap where the queen will stop, or tap a portal to go through it." : puzzle.tip;
+                GUIStyle tip = NeonTheme.GUILabelStyle(portalHint ? NeonTheme.Yellow : NeonTheme.Lavender, 14, true, TextAnchor.UpperCenter);
                 float tw = to - from;
-                NeonTheme.SceneLabel(new Rect(from, rect.yMax + 2f, tw, tip.CalcHeight(new GUIContent(puzzle.tip), tw) + 2f), puzzle.tip, tip);
+                NeonTheme.SceneLabel(new Rect(from, rect.yMax + 2f, tw, tip.CalcHeight(new GUIContent(line), tw) + 2f), line, tip);
+            }
+            else if (puzzle.portals != null && puzzle.portals.Length > 0 && PlayerPrefs.GetInt(PortalHintKey, 0) == 0)
+            {
+                PlayerPrefs.SetInt(PortalHintKey, 1); // seen, and a move made
+                PlayerPrefs.Save();
             }
             if (state == GameState.Playing && TouchGUI.NeonButton(new Rect(16, 76, 150, 44), "Restart", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 16))
                 Restart(QueenBlitz.Index);
