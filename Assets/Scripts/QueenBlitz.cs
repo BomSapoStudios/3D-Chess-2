@@ -85,6 +85,8 @@ public static partial class QueenBlitz
     private static readonly PackInfo[] Catalog =
     {
         new PackInfo { id = "starter", name = "Starter", free = true },
+        new PackInfo { id = "blitz-5", name = "High Five", free = true },
+        new PackInfo { id = "blitz-6", name = "Six Shooter", free = true },
         new PackInfo { id = "cube-run", name = "Cube Run", pawnPrice = PackPawnPrice },
         new PackInfo { id = "deep-freeze", name = "Deep Freeze", pawnPrice = PackPawnPrice },
         new PackInfo { id = "blockade", name = "Blockade", pawnPrice = PackPawnPrice },
