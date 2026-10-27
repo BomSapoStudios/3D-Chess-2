@@ -201,6 +201,10 @@ public class RematchUI : MonoBehaviour
         GUI.depth = -15;
 
         float w = Mathf.Min(500f, ui.x - 32f), h = 158f;
+        // Queen Blitz cleared: the puzzle's pawns as a row (or rows) of silhouettes instead of a line of text
+        bool tally = QueenBlitz.Active && QueenBlitz.Cleared;
+        int tallyRows = tally ? Mathf.CeilToInt(QueenBlitz.Current.pawns.Length / (float)TallyPerRow(w)) : 0;
+        if (tallyRows > 1) h += (tallyRows - 1) * (TallySize + 4f);
         Rect panel = new Rect((ui.x - w) / 2f, ui.y - h - 12f, w, h);
         TouchGUI.Block(panel);
         NeonTheme.GUIPanel(panel, NeonTheme.Pink, 0.94f);
@@ -226,10 +230,11 @@ public class RematchUI : MonoBehaviour
             GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), line, NeonTheme.GUILabelStyle(change >= 0 ? NeonTheme.Lime : NeonTheme.PinkSoft, 16, true, TextAnchor.MiddleRight));
         }
         string reason = Reason();
-        if (!string.IsNullOrEmpty(reason))
+        if (tally) DrawTally(new Rect(panel.x + 18, panel.y + 40, w - 36, tallyRows * (TallySize + 4f)));
+        else if (!string.IsNullOrEmpty(reason))
             GUI.Label(new Rect(panel.x + 18, panel.y + 40, w - 36, 20), reason, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 13, false));
 
-        float rowY = panel.y + 66f;
+        float rowY = panel.y + 66f + Mathf.Max(0, tallyRows - 1) * (TallySize + 4f);
         NetRematch r = Online && Bridge != null ? Bridge.Rematch : null;
         bool possible = !Online || CanRematch(r);
         float x = panel.x + 18f;
@@ -285,6 +290,31 @@ public class RematchUI : MonoBehaviour
         string status = Online ? OnlineStatus(r) : ZombieMode.Active ? $"Another run on {ZombieMode.DifficultyName(ZombieMode.Difficulty)}?" : "Same players, same settings.";
         GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), status, NeonTheme.GUILabelStyle(possible ? NeonTheme.Yellow : NeonTheme.PinkSoft, 14, true));
         TouchGUI.End();
+    }
+
+    private const float TallySize = 20f;
+    private static int TallyPerRow(float w) => Mathf.Max(1, Mathf.FloorToInt((w - 36f + 4f) / (TallySize + 4f)));
+
+    /// <summary>
+    /// The cleared puzzle's pawns, like the in-puzzle tracker: yellow if this clear collected them,
+    /// grey if an earlier clear already had (a replay pays nothing)
+    /// </summary>
+    private static void DrawTally(Rect area)
+    {
+        int total = QueenBlitz.Current.pawns.Length;
+        int perRow = TallyPerRow(area.width + 36f);
+        bool fresh = QueenBlitz.LastPaid > 0;
+        Color grey = new Color(0.62f, 0.58f, 0.7f);
+        Color before = GUI.color;
+        for (int i = 0; i < total; i++)
+        {
+            int row = i / perRow, col = i % perRow;
+            Rect r = new Rect(area.x + col * (TallySize + 4f), area.y + row * (TallySize + 4f), TallySize, TallySize);
+            bool taken = i < QueenBlitz.Swept || QueenBlitz.Cleared;
+            GUI.color = !taken ? new Color(NeonTheme.Lavender.r, NeonTheme.Lavender.g, NeonTheme.Lavender.b, 0.55f) : fresh ? NeonTheme.Yellow : grey;
+            GUI.DrawTexture(r, taken ? NeonIcons.Pawn : NeonIcons.PawnOutline);
+        }
+        GUI.color = before;
     }
 
     private (string, Color) Headline()
