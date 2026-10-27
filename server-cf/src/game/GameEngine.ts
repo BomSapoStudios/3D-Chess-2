@@ -315,6 +315,8 @@ export class GameEngine {
       return { success: false, error: 'Kings cannot be taken until everyone who started in check has moved' };
     }
     this.startedInCheck = this.startedInCheck.filter(c => c !== color);
+    // Moving instead of answering a draw offer turns it down
+    if (this.drawOffer && this.drawOffer.from !== color) this.drawOffer = null;
 
     // Execute the move
     const captured = this.board.movePiece(from, to);
@@ -648,7 +650,7 @@ export class GameEngine {
   }
 
   respondDraw(color: PlayerColor, accept: boolean): MoveResult | null {
-    if (!this.drawOffer || this.drawOffer.from === color) return null;
+    if (this.phase !== 'playing' || !this.drawOffer || this.drawOffer.from === color) return null;
     if (accept) {
       this.phase = 'gameover';
       this.drawOffer = null;
