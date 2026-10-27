@@ -54,6 +54,18 @@ def export(pack_id, name, free, puzzles, path=None):
     return write({"id": pack_id, "name": name, "free": free, "puzzles": entries}, path)
 
 
+def board(p):
+    """The solver Board for a pack entry, with its portals and ramps"""
+    v = p.get("portals") or []
+    portals = [(tuple(v[i:i + 3]), tuple(v[i + 3:i + 6]), tuple(v[i + 6:i + 9]), tuple(v[i + 9:i + 12]), bool(v[i + 12]))
+               for i in range(0, len(v), 13)]
+    r = p.get("ramps") or []
+    ramps = {}
+    for i in range(0, len(r), 6):
+        ramps.setdefault(tuple(r[i:i + 3]), []).append(tuple(r[i + 3:i + 6]))
+    return Board(p["size"], triples(p["pawns"]), triples(p["blocks"]), p.get("ice", False), portals, ramps)
+
+
 def check(path):
     """Re-solve every puzzle in a pack file. Returns a list of problems (empty means all good)."""
     pack = json.load(open(path, encoding="utf-8"))
@@ -61,7 +73,7 @@ def check(path):
     for i, p in enumerate(pack["puzzles"], 1):
         n, ice = p["size"], p.get("ice", False)
         start = tuple(p["queen"]) if p["queen"] else None
-        b = Board(n, triples(p["pawns"]), triples(p["blocks"]), ice)
+        b = board(p)
         par = b.solve(start, limit=8)[0]
         tag = f"{pack['id']} {i} {p['name']}"
         if par != p["par"]:
@@ -78,7 +90,8 @@ def check(path):
             if not move:
                 problems.append(f"{tag}: {a} > {c} isn't a legal move")
                 break
-            left &= ~move[0][1]
+            # A tap picks a square, not a route: like the app, take the biggest sweep there
+            left &= ~max(move, key=lambda m: bin(m[1]).count("1"))[1]
         if left or len(line) - 1 != par:
             problems.append(f"{tag}: line doesn't clear the board in par")
     return problems
