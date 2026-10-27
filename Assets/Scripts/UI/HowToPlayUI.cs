@@ -70,28 +70,45 @@ public class HowToPlayUI : MonoBehaviour
         "placing her isn't a move. \"Auto-place\" picks a best square for 1 pawn.";
 
     private const string BlitzRight =
-        "BLOCKS\n" +
-        "Glowing blocks can't be entered or passed. They stop the Queen on the square before them.\n\n" +
-        "ICE\n" +
-        "On an ice floor the Queen can't stop partway: every move slides until the edge of the board " +
-        "or the square before a block.\n\n" +
+        "TAPPING MOVES\n" +
+        "Tap where the Queen will stop. On ice, tap any square on a slide to see where it ends. Tap a portal to go through it.\n\n" +
         "HELP\n" +
         "Undo takes back a move. Restart starts the puzzle again. Tap the title bar to jump to another puzzle or pack. The floor buttons on the right show one " +
         "floor at a time, and the View buttons look from either side.";
 
+    // Queen Blitz, page 2: what's on the board
+    private const string BlitzLeft2 =
+        "BLOCKS\n" +
+        "Blocks stop the Queen. She can't pass through or stop on them, so some routes have to go the long way round.\n\n" +
+        "ICE\n" +
+        "On ice the Queen can't stop partway. Every move slides to the edge or to the square before a block.";
+
+    private const string BlitzRight2 =
+        "PORTALS\n" +
+        "Portals come in coloured pairs. Go in the dark swirl (look for the floor arrow) and you come out of the bright swirl of the " +
+        "same colour, heading straight out of it. A trip through is one move and sweeps pawns on both sides. The back and sides of a " +
+        "portal are solid, and on ice they stop you just like a block. You can't stop on a portal.\n\n" +
+        "RAMPS\n" +
+        "Slide straight up a ramp's slope and the Queen climbs one floor and carries on. The pink sides are walls. You can't stop on a ramp.";
+
     /// <summary>The guide for the game being played: its title, seen-key, and two columns</summary>
     private static (string title, string key, string left, string right) Guide()
     {
-        if (QueenBlitz.Active) return ("QUEEN BLITZ", "HowToPlaySeen.Blitz", BlitzLeft, BlitzRight);
+        if (QueenBlitz.Active) return Instance != null && Instance.page == 1
+            ? ("BLOCKS, ICE, PORTALS & RAMPS", "HowToPlaySeen.Blitz", BlitzLeft2, BlitzRight2)
+            : ("QUEEN BLITZ", "HowToPlaySeen.Blitz", BlitzLeft, BlitzRight);
         if (ZombieMode.Active) return ("ZOMBIE SURVIVAL", "HowToPlaySeen.Zombies", ZombieLeft, ZombieRight);
         return ("HOW TO PLAY", SeenKey, GuideLeft, GuideRight);
     }
+
+    private static HowToPlayUI Instance;
+    private int page; // Queen Blitz has a second page for the board's features
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Create()
     {
         GameObject go = new GameObject("How To Play UI");
-        go.AddComponent<HowToPlayUI>();
+        Instance = go.AddComponent<HowToPlayUI>();
         DontDestroyOnLoad(go);
     }
 
@@ -112,6 +129,11 @@ public class HowToPlayUI : MonoBehaviour
         if (!autoShownThisGame)
         {
             autoShownThisGame = true;
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+            // Screenshots: `DebugHowToPage -int 1` (or 2) opens the guide on that page
+            int debugPage = PlayerPrefs.GetInt("DebugHowToPage", 0);
+            if (debugPage > 0) { showing = true; page = debugPage - 1; return; }
+#endif
             string key = Guide().key; // each mode's guide opens by itself the first time
             if (PlayerPrefs.GetInt(key, 0) == 0)
             {
@@ -164,8 +186,11 @@ public class HowToPlayUI : MonoBehaviour
         float top = panel.y + 40f;
         if (zoom > 1f)
         {
+            // One scrolling column; Queen Blitz's two pages run on, one after the other
             Rect view = new Rect(panel.x + 16f, top, panel.width - 32f, panel.yMax - 58f - top);
-            ScrollingText(view, guide.left + "\n\n" + guide.right, body);
+            string text = guide.left + "\n\n" + guide.right;
+            if (QueenBlitz.Active) text = BlitzLeft + "\n\n" + BlitzRight + "\n\n" + BlitzLeft2 + "\n\n" + BlitzRight2;
+            ScrollingText(view, text, body);
         }
         else
         {
@@ -179,6 +204,15 @@ public class HowToPlayUI : MonoBehaviour
         {
             showing = false;
             scroll = 0f;
+            page = 0;
+        }
+        if (QueenBlitz.Active && zoom <= 1f)
+        {
+            // Page 2: blocks, ice, portals and ramps
+            string label = page == 0 ? "Ice, portals & ramps >" : "< The basics";
+            float w = 190f; // clear of "Got it!" on the smallest phones
+            float x = page == 0 ? panel.xMax - 16f - w : panel.x + 16f;
+            if (NeonTheme.GUIButton(new Rect(x, panel.yMax - 50f, w, 38f), label, NeonTheme.Cyan, NeonTheme.Pink, true, 14)) page = 1 - page;
         }
 
         TouchGUI.End();
