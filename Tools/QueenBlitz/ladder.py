@@ -11,6 +11,7 @@ player it's aimed at (players.py):
     walls      blocks that force a different route (no ice)  (removing one changes par or openings)
 
     python3 ladder.py gen SECONDS SEED OUT.json SIZES PARS         # candidates with their tricks
+    python3 ladder.py single SECONDS SEED OUT.json SIZES PARS      # only one-real-trick or every-lure-fails ones
     python3 ladder.py assemble ID "Name" NAMES.txt OUT.json SIZE_PLAN CANDIDATES.json...
         SIZE_PLAN: one size per chapter, e.g. 4,6,6,6,6 or 5,5,5,5,5
 """
@@ -30,6 +31,7 @@ TIPS = {
     "walls": "The blocks are there for a reason.",
 }
 MAKERS = ["fork", "wander", "bait", "walls", "blocks", "plain"]
+WANT = "any"
 
 
 def plain(n, par, rng):
@@ -84,6 +86,12 @@ def _attempt(job):
     found = tricks_of(entry, r, bool(walls))
     if not found and par > 2:
         return None
+    if WANT == "single":
+        # only what the pool is short of: one real trick (not just a 3D diagonal), or a
+        # puzzle every lure player fails
+        eff = [t for t in found if t != "diagonal"]
+        if len(eff) != 1 and players.lured(entry, r) < 3:
+            return None
     m = pipeline.measure(n, False, queen, pawns, walls)
     entry.update(kind=kind, tricks=found, lured=players.lured(entry, r), trick_score=players.score(entry, r),
                  grade=pipeline.grade(m),
@@ -123,19 +131,34 @@ CHAPTERS = [
 ]
 
 
+ENGINE_TAGS = {"beats-greedy": "greed", "beats-liner": "bait", "beats-stopper": "stop", "beats-eager": "quiet",
+               "beats-flat": "diagonal", "beats-placer": "cold", "walls": "walls"}
+
+
+def effective(p):
+    """3D diagonals are in almost every route (the flat player fails most puzzles), so a
+    diagonal only counts as the trick when nothing else is"""
+    rest = [t for t in p["tricks"] if t != "diagonal"]
+    return rest or list(p["tricks"])
+
+
 def difficulty(p):
     return len(p["tricks"]) * 10 + p["lured"] * 6 + p["par"] * 4 + p["trick_score"]
 
 
 def assemble(cands, sizes):
+    for p in cands:
+        p["tricks"] = effective(p)
     pool = sorted(cands, key=difficulty)
     chosen, used = [], set()
     for c, slots in enumerate(CHAPTERS):
         picks = []
         for i, (lo, hi, pars) in enumerate(slots):
             last_in_pack = c == len(CHAPTERS) - 1 and i >= len(slots) - 3
+            flat_only = sum(q["tricks"] == ["diagonal"] for q in picks)
             fits = [p for p in pool if id(p) not in used and p["size"] == sizes[c] and p["par"] in pars
-                    and lo <= len(p["tricks"]) <= hi and (not last_in_pack or p["lured"] == 3)]
+                    and lo <= len(p["tricks"]) <= hi and (not last_in_pack or p["lured"] == 3)
+                    and not (hi == 1 and p["tricks"] == ["diagonal"] and flat_only >= 3)]
             if not fits:
                 # Nearest fallback: same size, any par in reach, closest trick count
                 fits = [p for p in pool if id(p) not in used and p["size"] == sizes[c] and p["par"] >= min(pars) - 1
@@ -161,7 +184,8 @@ def assemble(cands, sizes):
 
 if __name__ == "__main__":
     cmd = sys.argv[1]
-    if cmd == "gen":
+    if cmd in ("gen", "single"):
+        WANT = "single" if cmd == "single" else "any"
         gen(float(sys.argv[2]), int(sys.argv[3]), sys.argv[4],
             tuple(int(x) for x in sys.argv[5].split(",")), tuple(int(x) for x in sys.argv[6].split(",")))
     elif cmd == "assemble":
@@ -169,7 +193,11 @@ if __name__ == "__main__":
         sizes = [int(x) for x in plan.split(",")]
         cands = []
         for f in sys.argv[7:]:
-            cands += json.load(open(f))
+            for e in json.load(open(f)):
+                if "tricks" not in e:  # an engine.py candidate: every lure fails
+                    e["tricks"] = sorted({ENGINE_TAGS[t] for t in e["tags"] if t in ENGINE_TAGS})
+                    e["lured"], e["trick_score"] = 3, e["score"]
+                cands.append(e)
         chosen = assemble(cands, sizes)
         names = [l.strip() for l in open(names_path, encoding="utf-8") if l.strip()]
         for i, p in enumerate(chosen):
