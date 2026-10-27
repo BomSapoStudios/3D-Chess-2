@@ -52,9 +52,14 @@ public partial class QueenBlitzDirector
         root.localRotation = Quaternion.LookRotation(new Vector3(face.x, 0f, face.z), Vector3.up); // +z out of the front
         bool way_out = end != PortalEnd.In;
 
+        // A solid pink housing behind and beside the disc (the same pink as blocks and ramp walls):
+        // from the back or the sides it reads as a wall, and the swirl only shows from the front
+        Housing(root, cell);
+
         GameObject disc = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(disc.GetComponent<Collider>());
         disc.transform.SetParent(root, false);
+        disc.transform.localPosition = new Vector3(0f, 0f, cell * 0.02f);
         disc.transform.localScale = Vector3.one * cell * 0.86f;
         disc.GetComponent<MeshRenderer>().material = Unlit(Color.white, Swirl(color, end == PortalEnd.Out));
         disc.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -70,21 +75,59 @@ public partial class QueenBlitzDirector
                 Line(root, new[] { d * r * 0.98f, d * r * 1.22f }, color, cell * 0.05f, false);
             }
         }
-        else Line(root, Circle(r, 48), color, cell * 0.07f, true);
+        else Line(root, Circle(r, 48), color, cell * 0.08f, true);
 
-        // Chevrons in front: into the way in, out of the way out (both, two-way)
-        float a = cell * 0.18f, near = cell * 0.2f, far = cell * 0.45f;
-        if (end != PortalEnd.Out) Chevrons(root, color, a, near, far, cell);
-        if (way_out) Chevrons(root, color, a, far, near, cell);
+        float y = -cell * 0.48f;
+        if (end != PortalEnd.Out)
+        {
+            // The way in: big chevrons pointing into the face, and a glowing pad and arrow on the
+            // floor of the square in front, pointing in
+            Chevrons(root, color, cell * 0.24f, cell * 0.6f, cell * 0.12f, cell);
+            GameObject pad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(pad.GetComponent<Collider>());
+            pad.transform.SetParent(root, false);
+            pad.transform.localPosition = new Vector3(0f, y, cell);
+            pad.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            pad.transform.localScale = Vector3.one * cell * 0.82f;
+            pad.GetComponent<MeshRenderer>().material = Unlit(new Color(color.r, color.g, color.b, 0.22f));
+            pad.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            root.gameObject.AddComponent<PortalGlow>().Set(pad.GetComponent<MeshRenderer>().material, color);
+            Line(root, new[] { new Vector3(0, y, cell * 1.38f), new Vector3(0, y, cell * 0.62f) }, color, cell * 0.08f, false);
+            Line(root, new[] { new Vector3(-cell * 0.2f, y, cell * 0.84f), new Vector3(0, y, cell * 0.6f), new Vector3(cell * 0.2f, y, cell * 0.84f) }, color, cell * 0.08f, false);
+        }
         if (way_out)
         {
+            Chevrons(root, color, cell * 0.18f, cell * 0.2f, cell * 0.45f, cell);
             // An arrow on the floor, the way she leaves
-            float y = -cell * 0.48f;
             Line(root, new[] { new Vector3(0, y, cell * 0.05f), new Vector3(0, y, cell * 0.42f) }, color, cell * 0.06f, false);
             Line(root, new[] { new Vector3(-cell * 0.15f, y, cell * 0.28f), new Vector3(0, y, cell * 0.44f), new Vector3(cell * 0.15f, y, cell * 0.28f) }, color, cell * 0.06f, false);
         }
         root.gameObject.AddComponent<QueenBlitzBlock>().at = at; // shown with its floor
         return root.gameObject;
+    }
+
+    /// <summary>A back plate and two side plates, block pink, around the disc</summary>
+    private static void Housing(Transform root, float cell)
+    {
+        Material pink = new Material(Shader.Find("Standard")) { color = new Color(0.35f, 0.25f, 0.55f) };
+        pink.EnableKeyword("_EMISSION");
+        pink.SetColor("_EmissionColor", NeonTheme.Pink * 0.45f);
+        void Plate(Vector3 at, Vector3 size)
+        {
+            GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Destroy(plate.GetComponent<Collider>());
+            plate.transform.SetParent(root, false);
+            plate.transform.localPosition = at;
+            plate.transform.localScale = size;
+            var mr = plate.GetComponent<MeshRenderer>();
+            mr.material = pink;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        float w = cell * 0.9f, t = cell * 0.06f;
+        Plate(new Vector3(0f, 0f, -t / 2f), new Vector3(w, w, t));                       // the back
+        Plate(new Vector3(-w / 2f, 0f, cell * 0.12f), new Vector3(t, w, cell * 0.3f));     // the sides
+        Plate(new Vector3(w / 2f, 0f, cell * 0.12f), new Vector3(t, w, cell * 0.3f));
+        Line(root, new[] { new Vector3(-w / 2f, -w / 2f, -t), new Vector3(-w / 2f, w / 2f, -t), new Vector3(w / 2f, w / 2f, -t), new Vector3(w / 2f, -w / 2f, -t), new Vector3(-w / 2f, -w / 2f, -t) }, NeonTheme.Pink, cell * 0.04f, false);
     }
 
     /// <summary>Two stacked chevrons in front of the disc; the point at `tip`, the wings at `wing` (local z)</summary>
@@ -110,7 +153,8 @@ public partial class QueenBlitzDirector
                 Color c = Color.Lerp(color * 0.5f, Color.Lerp(color, Color.white, 0.5f), arm * (1f - r * 0.6f));
                 // The way in falls away into a dark centre; the way out glows white-hot at its centre
                 float core = Mathf.Clamp01(1f - r / 0.45f);
-                c = exit ? Color.Lerp(c, Color.white, core * core) : Color.Lerp(c, new Color(0.03f, 0f, 0.08f), core);
+                c = exit ? Color.Lerp(c, Color.white, core * core)
+                    : Color.Lerp(Color.Lerp(c, Color.white, arm * 0.35f), new Color(0.03f, 0f, 0.08f), core * 0.85f); // brighter arms, dark drain
                 c.a = r < 1f ? Mathf.Max(alpha, core) : 0f;
                 tex.SetPixel(x, y, c);
             }
@@ -223,6 +267,31 @@ public partial class QueenBlitzDirector
         lr.startColor = lr.endColor = color;
         lr.numCapVertices = 2;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+}
+
+/// <summary>
+/// The glow on the floor in front of a way in: brighter, and pulsing, while the queen is picked up
+/// and can reach this portal (Reduce Motion: steady)
+/// </summary>
+public class PortalGlow : MonoBehaviour
+{
+    private Material pad;
+    private Color color;
+    private BoardPosition at;
+
+    public void Set(Material material, Color c) { pad = material; color = c; }
+
+    private void Start() => at = GetComponent<QueenBlitzBlock>().at;
+
+    private void Update()
+    {
+        if (pad == null) return;
+        ChessPiece held = InputManager.Instance != null ? InputManager.Instance.SelectedPiece : null;
+        bool lit = held != null && held.pieceType == ChessPieceType.Queen && QueenBlitz.EnterablePortals.Contains(at);
+        float a = !lit ? 0.22f : AccessibilityPrefs.ReduceMotion ? 0.6f : 0.45f + 0.25f * Mathf.Sin(Time.time * 6f);
+        pad.color = new Color(color.r, color.g, color.b, a);
+        transform.localScale = Vector3.one * (lit && !AccessibilityPrefs.ReduceMotion ? 1f + 0.04f * Mathf.Sin(Time.time * 6f) : 1f);
     }
 }
 

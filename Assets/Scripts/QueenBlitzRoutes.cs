@@ -93,6 +93,8 @@ public static partial class QueenBlitz
     // The routes from the queen's square, worked out with her moves; the one she takes animates
     private static readonly Dictionary<(BoardPosition, BoardPosition), Route> routes = new Dictionary<(BoardPosition, BoardPosition), Route>();
     public static Route PendingRoute { get; private set; }
+    /// <summary>The portals the queen can go into from where she stands (lit up while she's picked up)</summary>
+    public static readonly HashSet<BoardPosition> EnterablePortals = new HashSet<BoardPosition>();
 
     private static readonly Vector3Int Up = new Vector3Int(0, 1, 0);
 
@@ -125,6 +127,7 @@ public static partial class QueenBlitz
         var swept = new List<BoardPosition>();
         var sweptDir = new List<Vector3Int>();
         var pts = new List<(Vector3 p, bool jump)>();
+        var entered = new List<BoardPosition>();
         float cell = ChessBoard.Instance.cellSize;
         while (true)
         {
@@ -137,6 +140,7 @@ public static partial class QueenBlitz
                 int against = alongX ? -link.face.x : -link.face.z;
                 if ((alongX ? d.x : d.z) != against || !seen.Add((next, d))) return false;
                 swept.Add(next); sweptDir.Add(d);
+                entered.Add(next);
                 pts.Add((Floor(next), false));          // into the disc
                 d = Turn(d, link.face, link.outFace);
                 swept.Add(link.other); sweptDir.Add(d);
@@ -165,6 +169,7 @@ public static partial class QueenBlitz
         void Commit(BoardPosition end)
         {
             if (pts.Count > 0) route.special = true;
+            foreach (BoardPosition e in entered) EnterablePortals.Add(e);
             route.swept.AddRange(swept);
             route.sweptDir.AddRange(sweptDir);
             foreach (var (p, jump) in pts) route.Point(p, jump);
@@ -176,6 +181,7 @@ public static partial class QueenBlitz
     private static void FindRoutes(BoardPosition from)
     {
         routes.Clear();
+        EnterablePortals.Clear();
         int n = Current.size;
         for (int dx = -1; dx <= 1; dx++)
         for (int dy = -1; dy <= 1; dy++)

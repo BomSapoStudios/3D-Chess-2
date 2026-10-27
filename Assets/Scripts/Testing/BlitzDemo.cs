@@ -11,7 +11,7 @@ using UnityEngine;
 /// so it runs out of moves; 96 opens the in-game menu after puzzle 2's first move; 95 opens the
 /// puzzle picker on the pack; 94 goes puzzle > Menu > Queen Blitz > another puzzle, 93 runs out
 /// of moves then Puzzles > another puzzle, 92 Main Menu > Queen Blitz! > Start new > another puzzle;
-/// 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
+/// 86 opens puzzle DebugBlitzMissPuzzle with the queen picked up; 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
 /// 91 opens the in-puzzle selector, 90 the same on the next pack's chip, 89 jumps to Tricky 2's 6³ puzzle 5. `DebugBlitzPack` picks the pack (default starter) and
 /// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
@@ -34,6 +34,40 @@ public class BlitzDemo : MonoBehaviour
     private static IEnumerator Run(int which)
     {
         if (which >= 92 && which <= 94) { yield return Hop(which); yield break; }
+        if (which == 86)
+        {
+            // Open puzzle DebugBlitzMissPuzzle and pick the queen up (portal entry glow and dots), for screenshots
+            yield return new WaitForSeconds(2f);
+            int idx = PlayerPrefs.GetInt("DebugBlitzMissPuzzle", 1) - 1;
+            QueenBlitz.Puzzle pz = QueenBlitz.Puzzles[idx];
+            var c86 = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(pz.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = idx };
+            c86.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            c86.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(c86);
+            while (QueenBlitzDirector.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) yield return null;
+            yield return new WaitForSeconds(2f);
+            ChessPiece q = ChessBoard.Instance.GetPieceAt(pz.line[0]);
+            if (q != null) InputManager.Instance.DebugSelect(q);
+            Debug.Log($"BLITZ DEMO: queen picked up on {pz.name}");
+            // DebugCloseup 1: a camera close on the first portal's way in, from the front; 2: from behind and to the side
+            int view = PlayerPrefs.GetInt("DebugCloseup", 0);
+            if (view > 0 && pz.portals != null && pz.portals.Length > 0 && Camera.main != null)
+            {
+                GameObject container = GameObject.Find("Pieces Container");
+                float cell = ChessBoard.Instance.cellSize;
+                QueenBlitz.PortalPair pair = pz.portals[0];
+                Vector3 local = ChessBoard.Instance.BoardToLocalPosition(pair.a) + Vector3.up * cell * 0.5f;
+                Vector3 face = new Vector3(pair.faceA.x, 0f, pair.faceA.z);
+                Vector3 side = Vector3.Cross(Vector3.up, face);
+                Vector3 eye = local + (view == 1 ? face * 2.6f + side * 1.2f : -face * 2.2f + side * 1.8f) * cell + Vector3.up * cell * 1.6f;
+                var cam = new GameObject("Demo Close-up").AddComponent<Camera>();
+                cam.CopyFrom(Camera.main);
+                cam.depth = Camera.main.depth + 1;
+                cam.transform.position = container.transform.TransformPoint(eye);
+                cam.transform.LookAt(container.transform.TransformPoint(local + face * cell * 0.4f));
+            }
+            yield break;
+        }
         if (which == 87)
         {
             // Walls 2, jump to Walls 3 from the selector, make its first move, then Undo: the board must come back as it started

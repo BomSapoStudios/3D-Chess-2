@@ -9,6 +9,7 @@ public class InputManager : MonoBehaviour
     public LayerMask interactableLayer = -1;
     
     private ChessPiece selectedPiece;
+    public ChessPiece SelectedPiece => selectedPiece;
     private bool isProcessingInput = false;
     
     public static InputManager Instance { get; private set; }
@@ -485,6 +486,11 @@ public class InputManager : MonoBehaviour
         }
     }
     
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    /// <summary>Pick up a piece as a tap would (BlitzDemo screenshots)</summary>
+    public void DebugSelect(ChessPiece piece) => SelectPiece(piece);
+#endif
+
     private void SelectPiece(ChessPiece piece)
     {
         if (piece == null) return;
