@@ -684,7 +684,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         while (Time.time < until && GameStateManager.Instance != null && !GameStateManager.Instance.CanMovePieces()) yield return null;
         yield return new WaitForSeconds(0.6f);
         int left = PawnsLeft();
-        string reason = $"{left} pawn{(left == 1 ? "" : "s")} left. Par is the limit.";
+        string reason = $"Out of moves. {left} pawn{(left == 1 ? "" : "s")} left.";
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PawnColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
@@ -699,13 +699,13 @@ public partial class QueenBlitzDirector : MonoBehaviour
         yield return new WaitForSeconds(0.3f);
         while (filledAt != null && shownTaken < filledAt.Length) yield return null; // let the last silhouettes fill in
         yield return new WaitForSeconds(0.35f);
-        int par = QueenBlitz.Current.par;
-        var (paid, best) = QueenBlitz.RecordClear();
+        var (paid, _) = QueenBlitz.RecordClear();
         GameCenter.CheckPuzzles();
         QueenBlitz.LastPaid = paid;
         // New pawns fly into the tally before the result shows (the pawns speak for themselves there)
         if (paid > 0) yield return Funnel(paid);
-        string reason = $"Cleared in {QueenBlitz.Moves} move{(QueenBlitz.Moves == 1 ? "" : "s")}, par {par}." + (best ? " New best!" : "");
+        // Every clear uses exactly the moves given, so there is no score to report beyond the clear
+        string reason = "Cleared!";
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(QueenBlitz.PlayerColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
     }
@@ -878,7 +878,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         GUI.color = before;
     }
 
-    // Puzzle name, moves and par along the top with the tip under it; down the left your pawn
+    // Puzzle name and moves left along the top with the tip under it; down the left your pawn
     // total, Restart and the puzzle's pawns. After a clear, only the pawns and total stay while
     // new pawns fly into it.
     private void OnGUI()
@@ -899,8 +899,8 @@ public partial class QueenBlitzDirector : MonoBehaviour
             string movesLeft = $"Moves left {left}";
             if (left <= 1) movesLeft = $"<color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Pink)}>{movesLeft}</color>";
             string text = state == GameState.PiecePlacement
-                ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  Par {puzzle.par}"
-                : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}  ·  Par {puzzle.par}";
+                ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  {puzzle.par} moves"
+                : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}";
             // At the very top (the turn line is hidden in puzzles), between the pawn total on the
             // left and the "?" on the right with a clear gap to each; smaller text, then two lines,
             // on narrow screens

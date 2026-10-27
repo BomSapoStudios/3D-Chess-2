@@ -112,7 +112,7 @@ public partial class NeonMenu
     {
         ClearBlitzContent();
         blitzTitle.text = "QUEEN BLITZ";
-        BlitzText("One queen. Clear every pawn within par, the move limit. Your first clear of a puzzle keeps its pawns.",
+        BlitzText("One queen. Clear every pawn before your moves run out. Your first clear of a puzzle keeps its pawns.",
             15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
 
         blitzView = BlitzView.Packs;
@@ -202,7 +202,7 @@ public partial class NeonMenu
 
         if (chapters == 1)
         {
-            BlitzText("One queen. Clear every pawn within par, the move limit; she drives straight through them. Your first clear of a puzzle keeps its pawns.",
+            BlitzText("One queen. Clear every pawn before your moves run out; she drives straight through them. Your first clear of a puzzle keeps its pawns.",
                 15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
         }
         else
@@ -240,9 +240,9 @@ public partial class NeonMenu
             if (pack.review && puzzle.score > 0) name = $"{puzzle.tier} {puzzle.score}"; // for playtest notes
             TextMeshProUGUI label = BlitzText(name, 12, NeonTheme.Lavender, new Vector2(0.5f, 0f), new Vector2(108, 18), new Vector2(x, y - 14));
             label.enableWordWrapping = false;
-            // Not yet cleared: the pawns it pays. Cleared: your best against par
+            // Not yet cleared: the pawns it pays. Cleared: just that (every clear takes exactly its moves)
             bool done = QueenBlitz.EverCleared(index, packId);
-            string stars = done ? $"Best {QueenBlitz.BestMoves(index, packId)} / par {puzzle.par}" : $"{puzzle.pawns.Length} pawns";
+            string stars = done ? "Cleared!" : $"{puzzle.pawns.Length} pawns";
             BlitzText(stars, 14, done ? NeonTheme.Lavender : NeonTheme.Yellow, new Vector2(0.5f, 0f), new Vector2(108, 20), new Vector2(x, y - 32));
         }
     }
@@ -290,7 +290,7 @@ public partial class NeonMenu
             if (have)
             {
                 QueenBlitz.Puzzle p = QueenBlitz.PuzzlesOf(QueenBlitz.DailyId(day))[0];
-                string under = done ? $"Best {QueenBlitz.BestMoves(0, QueenBlitz.DailyId(day))}/{p.par}" : $"{p.pawns.Length} pawns";
+                string under = done ? "Cleared!" : $"{p.pawns.Length} pawns";
                 BlitzText(under, 12, done ? NeonTheme.Lavender : NeonTheme.Yellow, new Vector2(0.5f, 0.5f), new Vector2(78, 18), new Vector2(x, -48));
             }
         }

@@ -174,7 +174,7 @@ public partial class QueenBlitzDirector
             GUIStyle num = NeonTheme.GUILabelStyle(ink, tileH < 52f ? 17 : 20, true, TextAnchor.UpperCenter, display: true);
             GUI.Label(new Rect(tile.x, tile.y + 4f, tile.width, tile.height), $"{index + 1}", num);
             sub.normal.textColor = ink;
-            string state = here ? "Playing" : done ? $"Best {QueenBlitz.BestMoves(index, selectorPack)}/{p.par}" : !chapterOpen ? "Locked" : $"Par {p.par}";
+            string state = here ? "Playing" : done ? "Cleared" : !chapterOpen ? "Locked" : $"{p.pawns.Length} pawns";
             GUI.Label(new Rect(tile.x, tile.y, tile.width, tile.height - 5f), state, sub);
         }
         if (!chapterOpen)

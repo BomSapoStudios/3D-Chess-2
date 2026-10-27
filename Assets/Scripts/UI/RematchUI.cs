@@ -251,7 +251,7 @@ public class RematchUI : MonoBehaviour
             if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
             if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Puzzles", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18)) ToPuzzles();
             if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
-            GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), "Clear every pawn within par to keep its pawns.", NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
+            GUI.Label(new Rect(panel.x + 18, panel.y + h - 32, w - 36, 22), "Clear every pawn before your moves run out to keep its pawns.", NeonTheme.GUILabelStyle(NeonTheme.Yellow, 14, true));
             TouchGUI.End();
             return;
         }
