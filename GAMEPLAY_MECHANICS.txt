@@ -504,6 +504,16 @@ ACCOUNT
     once more so the server can cut that link. Things on the phone (settings,
     puzzles, pawns, purchases) stay; playing online again starts a new account.
 
+PLEASE UPDATE
+  • Every request says which build sent it (OnlineClient.ClientVersion, now 1).
+    The server's MIN_CLIENT_VERSION (wrangler.toml, now 0 = everyone) turns
+    older builds away; they show "TIME TO UPDATE!" with Later / Update
+    (TestFlight until the app has an App Store id) and Online Game shows it
+    again. Everything that plays on the phone keeps working, and Delete
+    account works on any build.
+  • To retire old builds: raise ClientVersion, ship that build, then raise
+    MIN_CLIENT_VERSION to match once it's out.
+
 PLAY ANYONE — Find Match
   • Choose board size and player count; you're matched with others who
     asked for the same. Nobody waits in the queue more than 5 minutes.

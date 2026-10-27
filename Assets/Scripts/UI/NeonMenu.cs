@@ -87,6 +87,7 @@ public partial class NeonMenu : MonoBehaviour
 
         // Game Center: Apple's sign-in banner, then link the player and copy ratings across
         GameCenter.Restored += OnGameCenterRestored;
+        OnlineClient.UpdateNeeded += ShowUpdatePicker; // this build is too old to play online
         GameCenter.SignIn();
 
         // Coming back to the menu from an online game ends the session
@@ -1020,6 +1021,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private void ShowOnline()
     {
+        if (OnlineClient.UpdateRequired) { ShowUpdatePicker(); return; }
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
@@ -1711,6 +1713,7 @@ public partial class NeonMenu : MonoBehaviour
     private void OnDestroy()
     {
         GameCenter.Restored -= OnGameCenterRestored;
+        OnlineClient.UpdateNeeded -= ShowUpdatePicker;
         AccessibilityPrefs.Changed -= RefreshAccess;
         Purchases.PricesLoaded -= RefreshCustomize;
         Purchases.Owned -= OnPurchased;
