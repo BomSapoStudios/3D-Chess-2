@@ -1,6 +1,7 @@
 import { issueToken, verifyToken } from './auth.js';
 import { verifyIdToken, type Provider } from './oidc.js';
 import { verifyGameCenter } from './gamecenter.js';
+import { revokeApple } from './appleRevoke.js';
 import type { GameConfig, PlayerColor } from './types/game.js';
 
 export { Room } from './room.js';
@@ -23,6 +24,8 @@ export { Accounts } from './accounts.js';
 //   GET  /me                            → { userId, name, providers }  (Bearer)
 //   POST /link/code                     → { code } to type on another device (Bearer)
 //   POST /link/redeem  { code }         → become that account on this device
+//   POST /account/delete { appleAuthorizationCode? } → delete your account and everything
+//                                         about you; resigns your games (Bearer)
 //   GET  /friends                       → { friends, challenges }; marks you online (Bearer)
 //   GET  /friends/search?q=neon         → { results: [{ userId, name, status }] } names containing q
 //   POST /friends/request { name }      POST /friends/respond { friendId, accept }
@@ -62,6 +65,9 @@ export interface Env {
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
   APNS_TOPIC?: string;
+  /** Sign in with Apple key (secret, the .p8 file's contents) and its key id: revokes Apple sign-in on account deletion */
+  SIWA_KEY?: string;
+  SIWA_KEY_ID?: string;
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */
@@ -168,6 +174,19 @@ export default {
       const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
       return json({ ...data, token });
     }
+    // Delete your account: Accounts forgets you, then your games are resigned and Apple sign-in revoked
+    if (request.method === 'POST' && path === '/account/delete') {
+      if (!user) return needUser();
+      const { status, data } = await accounts(env, 'delete-account', { userId: user.userId });
+      if (status !== 200) return json(data, status);
+      for (const code of ((data.codes as string[]) ?? []).slice(0, 40)) { // well under the Worker's subrequest limit
+        await env.ROOM.get(env.ROOM.idFromName(code)).fetch('https://room/remove-user', { method: 'POST', body: JSON.stringify({ userId: user.userId }) }).catch(() => undefined);
+      }
+      const code = typeof body.appleAuthorizationCode === 'string' ? body.appleAuthorizationCode : '';
+      const appleRevoked = code ? await revokeApple(env, code, (data.appleSubjects as string[]) ?? []).catch(() => false) : false;
+      return json({ ok: true, appleRevoked });
+    }
+
     // Push notifications: register this device, and read or change the notification switches
     if (path === '/push/register' && request.method === 'POST') return user ? account('push-register', { token: body.token, sandbox: body.sandbox === true }) : needUser();
     if (path === '/push/unregister' && request.method === 'POST') return user ? account('push-unregister', { token: body.token }) : needUser();

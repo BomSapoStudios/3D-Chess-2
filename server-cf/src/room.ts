@@ -165,6 +165,25 @@ export class Room extends DurableObject<Env> {
       });
     }
 
+    // A player deleted their account: they resign a game in progress, and a game that hasn't
+    // started can't go on without them
+    if (url.pathname === '/remove-user' && request.method === 'POST') {
+      const { userId } = await request.json() as { userId: string };
+      const color = this.seats[userId];
+      if (!this.meta || !this.engine || color === undefined || this.gameOver) return Response.json({ ok: true });
+      for (const ws of this.ctx.getWebSockets(userId)) {
+        try { ws.close(4002, 'Account deleted'); } catch { /* already closed */ }
+      }
+      const state = this.engine.getState();
+      if (state.phase === 'waiting') await this.closeRoom('host_left');
+      else if (state.phase === 'placement') await this.endAbandoned();
+      else if (state.phase === 'playing' && !state.players.find(p => p.color === color)?.isEliminated) {
+        const result = this.engine.resign(color);
+        await this.afterResult(result, { type: 'game:resigned', color });
+      }
+      return Response.json({ ok: true });
+    }
+
     if (url.pathname === '/connect') {
       if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected WebSocket', { status: 426 });
       if (!this.meta || !this.engine) return new Response('Room not found', { status: 404 });

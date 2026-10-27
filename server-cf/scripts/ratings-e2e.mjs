@@ -185,5 +185,22 @@ for (const [label, extra, matched] of [
   for (const x of c) x.close();
 }
 
+// 6. Deleting your account mid-game resigns it: the opponent still wins and is rated, and
+//    nothing about the deleted player is kept, even though the result arrives after the deletion
+{
+  const quitter = await guest('Quinn'), stayer = await guest('Sam');
+  const { b } = await playing(quitter, stayer);
+  const del = await fetch(BASE + '/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${quitter.token}` }, body: '{}' });
+  check(del.status === 200, 'a player deletes their account during a ranked game');
+  const over = await b.wait(m => m.type === 'game:over', 8000);
+  check(over.winner === 'Black' && over.reason === 'resignation', 'the game ends as their resignation');
+  const rated = await b.wait(m => m.type === 'game:rated', 8000);
+  check(rated.ratings.Black?.after > 1000 && !rated.ratings.White, 'the opponent is rated; the deleted player is not');
+  const ss = (await get('/stats', stayer)).body;
+  check(ss.games === 1 && ss.wins === 1 && ss.recent[0]?.opponents[0] === 'A player', `the opponent's record keeps the win against "A player" (${ss.recent[0]?.opponents[0]})`);
+  check((await get(`/stats?of=${quitter.userId}`, stayer)).status === 401, "the deleted player's stats are gone");
+  b.close();
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nAll ratings checks passed');
 process.exit(failures ? 1 : 0);
