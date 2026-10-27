@@ -489,6 +489,13 @@ promotion, draws and clocks.
 ACCOUNT
   Sign in with Apple. You get a random online name (e.g. shinyrook359),
   which you can change, and a friend code.
+  • Delete account (Settings): removes the account, name, sign-in links,
+    friends, blocks, notifications, ratings and stats from the server.
+    Games still in progress count as a resignation (a lobby closes; a game
+    still in setup is abandoned). Opponents keep their results against
+    "A player". If the account uses Sign in with Apple, the app asks Apple
+    once more so the server can cut that link. Things on the phone (settings,
+    puzzles, pawns, purchases) stay; playing online again starts a new account.
 
 PLAY ANYONE — Find Match
   • Choose board size and player count; you're matched with others who
@@ -589,7 +596,7 @@ Pushes go only to players who aren't currently in the game.
 15b. ACCESSIBILITY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-The Accessibility button on the home screen (next to Notifications) opens a
+Settings › Accessibility (Settings is on the home screen) opens a
 screen of switches. Every visual option starts OFF, and none of them follows
 the iPhone's own settings: the game looks exactly as usual until a player turns
 one on here. Choices are kept on the phone (PlayerPrefs, keys A11y.*).
@@ -641,6 +648,21 @@ one on here. Choices are kept on the phone (PlayerPrefs, keys A11y.*).
                          (error), your turn coming back to you, and a light tick
                          per pawn a Queen Blitz sweep knocks out (bunched up so a
                          long sweep doesn't buzz nonstop).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15c. SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The home screen's Settings button (beside Customize) opens:
+  Your account   — your online name, Sign in with Apple, Restore purchases,
+                   Delete account (asks first: "Keep it" / "Delete forever")
+  Settings       — Notifications and Accessibility (their Back and Done
+                   buttons return to Settings)
+  Help           — Support (apps.bomsapostudios.com/3dchess/support.html),
+                   Email us (support@bomsapostudios.com), Privacy Policy
+                   (apps.bomsapostudios.com/3dchess/privacy.html), and the
+                   app version
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -28,7 +28,7 @@ public partial class NeonMenu
         header.offsetMin = new Vector2(16, -64);
         header.offsetMax = new Vector2(-24, -12);
 
-        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowMenu);
+        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowSettings);
         Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
 
         TextMeshProUGUI title = NewText("Title", header, "ACCESSIBILITY", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
@@ -42,7 +42,7 @@ public partial class NeonMenu
         title.rectTransform.offsetMax = new Vector2(-180, 0);
         title.rectTransform.localEulerAngles = new Vector3(0, 0, -1);
 
-        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowMenu);
+        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowSettings);
         Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
 
         accessLeft = Card(root, "Seeing Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
@@ -134,6 +134,7 @@ public partial class NeonMenu
     {
         if (statsScreen != null) statsScreen.SetActive(false);
         if (notifyScreen != null) notifyScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -210,10 +211,11 @@ public partial class NeonMenu
         if (column != null) column.offsetMin = new Vector2(24, column.offsetMin.y);
         LargerTextLayout.Pan(menuScreen, new Vector2(480, 360));
 
-        foreach (GameObject screen in new[] { setupScreen, notifyScreen, accessScreen }) CompactHeader(screen);
+        foreach (GameObject screen in new[] { setupScreen, notifyScreen, accessScreen, settingsScreen }) CompactHeader(screen);
         LargerTextLayout.Stack(setupScreen, 74f, (RectTransform)setupScreen.transform.Find("Left Card"), (RectTransform)setupScreen.transform.Find("Right Card"));
         LargerTextLayout.Stack(notifyScreen, 74f, (RectTransform)notifyScreen.transform.Find("Permission Card"), (RectTransform)notifyScreen.transform.Find("Kinds Card"));
         LargerTextLayout.Stack(accessScreen, 74f, accessLeft, accessRight);
+        LargerTextLayout.Stack(settingsScreen, 74f, settingsLeft, settingsRight);
         LargerTextLayout.Pan(customizeScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(onlineScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(friendsScreen, new Vector2(844, 390));

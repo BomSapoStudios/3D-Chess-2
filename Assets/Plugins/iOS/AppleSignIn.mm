@@ -1,7 +1,8 @@
 // Sign in with Apple for the iPhone build. Asks for no name or email: we only need
 // Apple's stable user id, which the game server reads from the identity token.
 // Results go to the Unity GameObject named by the caller via UnitySendMessage:
-//   OnAppleSignIn(identityToken)  or  OnAppleSignInError(message)
+//   OnAppleSignIn(identityToken + "\n" + authorizationCode)  or  OnAppleSignInError(message)
+// The authorization code lets the server revoke the sign-in when the player deletes their account.
 
 #import <AuthenticationServices/AuthenticationServices.h>
 #import <UIKit/UIKit.h>
@@ -40,7 +41,8 @@ static AppleSignInHelper* current;
 {
     ASAuthorizationAppleIDCredential* credential = (ASAuthorizationAppleIDCredential*)authorization.credential;
     NSString* token = credential.identityToken ? [[NSString alloc] initWithData:credential.identityToken encoding:NSUTF8StringEncoding] : nil;
-    if (token.length > 0) [self finish:"OnAppleSignIn" message:token];
+    NSString* code = credential.authorizationCode ? [[NSString alloc] initWithData:credential.authorizationCode encoding:NSUTF8StringEncoding] : @"";
+    if (token.length > 0) [self finish:"OnAppleSignIn" message:[NSString stringWithFormat:@"%@\n%@", token, code ?: @""]];
     else [self finish:"OnAppleSignInError" message:@"Apple didn't return a sign-in token"];
 }
 
