@@ -97,6 +97,29 @@ public class OnlineClient : MonoBehaviour
     /// </summary>
     public IEnumerator EnsureSignedIn(Action<bool, string> done)
     {
+        // Screens that ask at the same moment (Online and its friends poll) share one sign-in,
+        // so a new player gets one guest account, not two with one left behind on the server
+        if (!signingIn)
+        {
+            signingIn = true;
+            StartCoroutine(SharedSignIn()); // runs here, so a caller's screen closing can't leave it stuck
+        }
+        while (signingIn) yield return null;
+        done(lastSignInOk, lastSignInError);
+    }
+
+    private IEnumerator SharedSignIn()
+    {
+        yield return SignIn((ok, error) => { lastSignInOk = ok; lastSignInError = error; });
+        signingIn = false;
+    }
+
+    private bool signingIn;
+    private bool lastSignInOk;
+    private string lastSignInError;
+
+    private IEnumerator SignIn(Action<bool, string> done)
+    {
         string token = Token;
         bool sameServer = PlayerPrefs.GetString("OnlineTokenServer", "") == ServerUrl; // local test server vs live
         if (!string.IsNullOrEmpty(token) && sameServer)
