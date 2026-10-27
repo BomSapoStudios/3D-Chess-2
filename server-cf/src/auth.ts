@@ -24,6 +24,8 @@ function fromB64url(text: string): Uint8Array {
 }
 
 async function key(secret: string): Promise<CryptoKey> {
+  // A missing or weak secret would make tokens forgeable: refuse to sign or accept any
+  if (typeof secret !== 'string' || !secret) throw new Error('TOKEN_SECRET is not set');
   return crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'],
   );
