@@ -74,6 +74,7 @@ public partial class NeonMenu : MonoBehaviour
         BuildFriendsScreen();
         BuildNotifyScreen();
         BuildAccessScreen();
+        BuildSettingsScreen();
         BuildStatsScreen();
         FitScreensForTextSize();
         ShowMenu();
@@ -122,6 +123,7 @@ public partial class NeonMenu : MonoBehaviour
         else if (debugStats == 2) ShowLeaderboard();
         else if (debugStats == 3) ShowCustomize();
         else if (debugStats == 14) ShowAccess(); // Accessibility
+        else if (debugStats == 15) ShowSettings(); // Settings
         else if (debugStats == 4) { ShowCustomize(); SelectTab(CustomizeTab.Effects); }
         else if (debugStats == 5) { ShowCustomize(); SelectTab(CustomizeTab.Pieces); }
         else if (debugStats == 7) { ShowCustomize(); SelectTab(CustomizeTab.Backdrop); }
@@ -348,31 +350,15 @@ public partial class NeonMenu : MonoBehaviour
         NeonButton(row, "Local Game", new Vector2(178, 52), NeonTheme.Lime, NeonTheme.Pink, 1f, 18, OrResume(SavedGames.Local, ShowSetup));
         onlineMenuLabel = NeonButton(row, "Online Game", new Vector2(178, 52), NeonTheme.Yellow, NeonTheme.Cyan, -1f, 18, ShowOnline).GetComponentInChildren<TextMeshProUGUI>();
 
-        if (PushNotifications.Supported)
-        {
-            RectTransform lower = NewRect("Row", column);
-            lower.sizeDelta = new Vector2(370, 44);
-            var lowerLayout = lower.gameObject.AddComponent<HorizontalLayoutGroup>();
-            lowerLayout.spacing = 14;
-            lowerLayout.childControlWidth = false;
-            lowerLayout.childControlHeight = false;
-            lowerLayout.childForceExpandWidth = false;
-            NeonButton(lower, "Customize", new Vector2(112, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 15, ShowCustomize);
-            NeonButton(lower, "Notifications", new Vector2(124, 44), NeonTheme.Lavender, NeonTheme.Pink, -0.5f, 15, ShowNotify);
-            NeonButton(lower, "Accessibility", new Vector2(124, 44), NeonTheme.PinkSoft, NeonTheme.Cyan, 0.8f, 15, ShowAccess);
-        }
-        else
-        {
-            RectTransform lower = NewRect("Row", column);
-            lower.sizeDelta = new Vector2(370, 44);
-            var lowerLayout = lower.gameObject.AddComponent<HorizontalLayoutGroup>();
-            lowerLayout.spacing = 14;
-            lowerLayout.childControlWidth = false;
-            lowerLayout.childControlHeight = false;
-            lowerLayout.childForceExpandWidth = false;
-            NeonButton(lower, "Customize", new Vector2(178, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
-            NeonButton(lower, "Accessibility", new Vector2(178, 44), NeonTheme.PinkSoft, NeonTheme.Cyan, -0.5f, 16, ShowAccess);
-        }
+        RectTransform lower = NewRect("Row", column);
+        lower.sizeDelta = new Vector2(370, 44);
+        var lowerLayout = lower.gameObject.AddComponent<HorizontalLayoutGroup>();
+        lowerLayout.spacing = 14;
+        lowerLayout.childControlWidth = false;
+        lowerLayout.childControlHeight = false;
+        lowerLayout.childForceExpandWidth = false;
+        NeonButton(lower, "Customize", new Vector2(178, 44), NeonTheme.Cyan, NeonTheme.Pink, 0.5f, 16, ShowCustomize);
+        NeonButton(lower, "Settings", new Vector2(178, 44), NeonTheme.Lavender, NeonTheme.Pink, -0.5f, 16, ShowSettings);
 
         // Every home screen button rocks gently, each on its own beat
         var swivels = new List<Button>(menuScreen.GetComponentsInChildren<Button>(true));
@@ -1036,6 +1022,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
@@ -1762,7 +1749,7 @@ public partial class NeonMenu : MonoBehaviour
         header.offsetMin = new Vector2(16, -64);
         header.offsetMax = new Vector2(-24, -12);
 
-        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowMenu);
+        Button back = NeonButton(header, "<", new Vector2(48, 48), NeonTheme.Cyan, NeonTheme.Pink, 0f, 24, ShowSettings);
         Place((RectTransform)back.transform, new Vector2(0, 0.5f), new Vector2(48, 48), new Vector2(28, 0));
 
         TextMeshProUGUI title = NewText("Title", header, "NOTIFICATIONS", 30, NeonTheme.Lime, TextAlignmentOptions.Left);
@@ -1773,7 +1760,7 @@ public partial class NeonMenu : MonoBehaviour
         title.rectTransform.offsetMax = new Vector2(-180, 0);
         title.rectTransform.localEulerAngles = new Vector3(0, 0, -1);
 
-        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowMenu);
+        Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowSettings);
         Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
 
         RectTransform left = Card(root, "Permission Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.42f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
@@ -1863,6 +1850,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (statsScreen != null) statsScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         menuScreen.SetActive(false);
         notifyScreen.SetActive(true);
         shownPushStatus = null;
@@ -1931,6 +1919,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(true);
         setupScreen.SetActive(false);
@@ -1943,6 +1932,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
@@ -1970,6 +1960,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
         customizeScreen.SetActive(false);

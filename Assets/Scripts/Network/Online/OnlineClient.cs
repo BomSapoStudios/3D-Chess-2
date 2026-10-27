@@ -202,6 +202,30 @@ public class OnlineClient : MonoBehaviour
         done(error);
     }
 
+    /// <summary>
+    /// Delete this player's account on the server (their games are resigned there), then forget it
+    /// on this device. appleCode: a fresh Sign in with Apple authorization code, so the server can
+    /// cut the game's link to the Apple ID; null if the account isn't linked or the player cancelled.
+    /// </summary>
+    public IEnumerator DeleteAccount(string appleCode, Action<string> done)
+    {
+        string error = null;
+        string body = string.IsNullOrEmpty(appleCode) ? "{}" : JsonUtility.ToJson(new DeleteBody { appleAuthorizationCode = appleCode });
+        yield return Call("POST", "/account/delete", body, Token, (status, text) =>
+        {
+            if (status != 200) error = ErrorText(status, text);
+        });
+        if (error == null)
+        {
+            LeaveOnline();
+            foreach (string key in new[] { "OnlineToken", "OnlineName", "OnlineUserId", "OnlineTokenServer", "OnlineAppleLinked", "GameCenterLinked" })
+                PlayerPrefs.DeleteKey(key);
+            PlayerPrefs.Save();
+            refreshedThisSession = false;
+        }
+        done(error);
+    }
+
     // ───────────────────────── Friends ─────────────────────────
 
     public IEnumerator GetFriends(Action<FriendsResponse, string> done)
@@ -570,6 +594,7 @@ public class OnlineClient : MonoBehaviour
 
     [Serializable] private class NameBody { public string name; }
     [Serializable] private class IdTokenBody { public string idToken; }
+    [Serializable] private class DeleteBody { public string appleAuthorizationCode; }
     [Serializable] private class AuthResponse { public string token; public string userId; public string name; public bool restored; }
     [Serializable] private class CreateRoomResponse { public string code; }
     [Serializable] private class LinkCodeResponse { public string code; }
