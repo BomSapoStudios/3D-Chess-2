@@ -8,6 +8,8 @@ export interface TokenPayload {
   userId: string;
   name: string;
   iat: number; // issued at, ms
+  /** The account's token version when issued; signing out everywhere bumps it (old tokens: 0) */
+  v?: number;
 }
 
 const TOKEN_LIFETIME_MS = 1000 * 60 * 60 * 24 * 90; // 90 days
@@ -31,8 +33,8 @@ async function key(secret: string): Promise<CryptoKey> {
   );
 }
 
-export async function issueToken(secret: string, userId: string, name: string): Promise<{ token: string; payload: TokenPayload }> {
-  const payload: TokenPayload = { userId, name, iat: Date.now() };
+export async function issueToken(secret: string, userId: string, name: string, v = 0): Promise<{ token: string; payload: TokenPayload }> {
+  const payload: TokenPayload = { userId, name, iat: Date.now(), ...(v ? { v } : {}) };
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', await key(secret), new TextEncoder().encode(body)));
   return { token: `${body}.${b64url(sig)}`, payload };

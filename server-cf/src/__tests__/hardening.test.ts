@@ -73,3 +73,26 @@ describe('Draw offers', () => {
     expect(engine.respondDraw(other, true)).toBeNull();
   });
 });
+
+describe('Message flood limit', () => {
+  test('a socket may send 1200 messages a minute, then is cut off until the next minute', async () => {
+    const { floodedBy } = await import('../validate');
+    const ws = {};
+    for (let i = 0; i < 1200; i++) expect(floodedBy(ws, 1000)).toBe(false);
+    expect(floodedBy(ws, 1000)).toBe(true);
+    expect(floodedBy(ws, 61_000)).toBe(false);
+    expect(floodedBy({}, 1000)).toBe(false); // each socket counts on its own
+  });
+});
+
+describe('Token versions', () => {
+  test('tokens carry the version they were issued at; old tokens read as 0', async () => {
+    const { issueToken, verifyToken } = await import('../auth');
+    const secret = 'test-secret-test-secret-test-secret';
+    const old = await issueToken(secret, 'u1', 'NeonRook1');
+    expect((await verifyToken(secret, old.token))?.v ?? 0).toBe(0);
+    const bumped = await issueToken(secret, 'u1', 'NeonRook1', 3);
+    expect((await verifyToken(secret, bumped.token))?.v).toBe(3);
+    expect(await verifyToken('', bumped.token)).toBeNull();
+  });
+});

@@ -38,11 +38,11 @@ async function keysFor(provider: Provider, forceRefresh: boolean): Promise<Jwk[]
  * Returns the provider's stable user id ("sub") if the token is genuine, unexpired and
  * issued for one of `audiences`; otherwise null.
  */
-export async function verifyIdToken(provider: Provider, token: string, audiences: string[]): Promise<string | null> {
+export async function verifyIdToken(provider: Provider, token: string, audiences: string[], nonce?: unknown): Promise<string | null> {
   const parts = token.split('.');
   if (parts.length !== 3 || audiences.length === 0) return null;
   let header: { kid?: string; alg?: string };
-  let claims: { iss?: string; aud?: string | string[]; exp?: number; sub?: string };
+  let claims: { iss?: string; aud?: string | string[]; exp?: number; sub?: string; nonce?: string };
   try {
     header = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[0])));
     claims = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
@@ -66,5 +66,13 @@ export async function verifyIdToken(provider: Provider, token: string, audiences
   if (!claims.iss || !ISSUERS[provider].includes(claims.iss)) return null;
   if (!aud.some(a => a && audiences.includes(a))) return null;
   if (!claims.exp || claims.exp * 1000 < Date.now()) return null;
+  // A token asked for with a nonce (the app sends SHA-256 of a random value, then the value itself here)
+  // only works for the device that asked for it, so a copied token can't be replayed
+  if (claims.nonce !== undefined && (typeof nonce !== 'string' || await sha256Hex(nonce) !== claims.nonce)) return null;
   return claims.sub ?? null;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
 }

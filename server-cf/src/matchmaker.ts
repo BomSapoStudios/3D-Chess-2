@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { sanitizeConfig } from './room.js';
+import { floodedBy } from './validate.js';
 import { createRoom, type Env } from './index.js';
 import type { GameConfig } from './types/game.js';
 
@@ -15,7 +16,7 @@ import type { GameConfig } from './types/game.js';
 interface Waiting {
   userId: string;
   name: string;
-  key: string | null;      // "4x4x4|2" once they've joined the queue
+  key: string | null;      // "5x5x5|2" once they've joined the queue
   config: Partial<GameConfig> | null;
   since: number;
 }
@@ -64,6 +65,10 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    if (floodedBy(ws)) {
+      try { ws.close(4008, 'Too many messages'); } catch { /* already closed */ }
+      return;
+    }
     let msg: Record<string, unknown>;
     try {
       msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw));
