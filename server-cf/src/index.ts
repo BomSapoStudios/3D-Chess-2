@@ -20,11 +20,12 @@ export { Accounts } from './accounts.js';
 //   POST /auth/google  { idToken }        account (Bearer optional) or restores yours
 //   POST /auth/gamecenter { teamPlayerId, publicKeyUrl, signature, salt, timestamp }
 //                                       → the same, with Apple's Game Center identity
+//   POST /auth/signout                  → every older token stops working; a fresh one back (Bearer)
 //   POST /names/reroll                  → a new unique name            (Bearer)
 //   GET  /me                            → { userId, name, providers }  (Bearer)
 //   POST /link/code                     → { code } to type on another device (Bearer)
 //   POST /link/redeem  { code }         → become that account on this device
-//   POST /account/delete { appleAuthorizationCode? } → delete your account and everything
+//   POST /account/delete { appleAuthorizationCode?, appleNonce? } → delete your account and everything
 //                                         about you; resigns your games (Bearer)
 //   GET  /friends                       → { friends, challenges }; marks you online (Bearer)
 //   GET  /friends/search?q=neon         → { results: [{ userId, name, status }] } names containing q
@@ -131,31 +132,41 @@ export default {
     if (path === '/health' || path === '') return json({ ok: true, service: '3d-chess' });
 
     const bearer = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? null;
-    const user = await verifyToken(env.TOKEN_SECRET, bearer ?? url.searchParams.get('token'));
+    // Only the WebSocket routes take the token in the URL (sockets can't send headers); URLs end up in logs
+    const socketRoute = path === '/matchmaking/connect' || /^\/rooms\/[A-Za-z0-9]{6}\/connect$/.test(path);
+    const user = await verifyToken(env.TOKEN_SECRET, bearer ?? (socketRoute ? url.searchParams.get('token') : null));
     const body = request.method === 'POST' ? await request.json().catch(() => ({})) as Record<string, unknown> : {};
+    const network = networkOf(request.headers.get('CF-Connecting-IP'));
+    // Every Accounts call made for the caller carries their token's version, so a signed-out token stops working
+    const caller = () => ({ userId: user?.userId, tokenV: user?.v ?? 0 });
+
+    // A sign-in answer: the account plus a fresh token at its current version
+    const signedIn = async (data: Record<string, unknown>): Promise<Response> => {
+      const { v, ...rest } = data;
+      const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string, Number(v) || 0);
+      return json({ ...rest, token });
+    };
 
     // Run an Accounts call; when it identifies an account, hand back a fresh token for it
     const account = async (op: string, extra: Record<string, unknown> = {}, signsIn = false): Promise<Response> => {
-      const { status, data } = await accounts(env, op, { ...extra, userId: user?.userId });
+      const { status, data } = await accounts(env, op, { ...extra, ...caller() });
       if (status !== 200 || !signsIn) return json(data, status);
-      const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
-      return json({ ...data, token });
+      return signedIn(data);
     };
     const needUser = () => json({ error: 'Sign in first' }, 401);
 
     if (request.method === 'POST' && path === '/auth/guest') {
       // New accounts per network address per day are capped (the address is only kept as a hash)
-      const { status, data } = await accounts(env, 'guest', { ip: networkOf(request.headers.get('CF-Connecting-IP')) });
+      const { status, data } = await accounts(env, 'guest', { ip: network });
       if (status !== 200) return json(data, status);
-      const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
-      return json({ ...data, token });
+      return signedIn(data);
     }
     if (request.method === 'POST' && path === '/auth/refresh') return user ? account('refresh', { name: user.name }, true) : needUser();
     if (request.method === 'POST' && (path === '/auth/apple' || path === '/auth/google')) {
       const provider: Provider = path.endsWith('apple') ? 'apple' : 'google';
       const audiences = (provider === 'apple' ? env.APPLE_AUDIENCES : env.GOOGLE_CLIENT_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
       if (audiences.length === 0) return json({ error: `Sign in with ${provider} isn't set up yet` }, 501);
-      const subject = typeof body.idToken === 'string' ? await verifyIdToken(provider, body.idToken, audiences) : null;
+      const subject = typeof body.idToken === 'string' ? await verifyIdToken(provider, body.idToken, audiences, body.nonce) : null;
       if (!subject) return json({ error: 'Sign-in failed, please try again' }, 401);
       return account('login', { provider, subject }, true);
     }
@@ -165,14 +176,17 @@ export default {
       if (!subject) return json({ error: 'Game Center sign-in failed' }, 401);
       return account('login', { provider: 'gamecenter', subject }, true);
     }
+    // Sign out everywhere: every token issued so far stops working; the answer holds a new one for
+    // this device (an app signing out here too just drops it)
+    if (request.method === 'POST' && path === '/auth/signout') return user ? account('signout', {}, true) : needUser();
     if (request.method === 'POST' && path === '/names/reroll') return user ? account('reroll', {}, true) : needUser();
     if (request.method === 'GET' && path === '/me') return user ? account('me') : needUser();
     if (request.method === 'POST' && path === '/link/code') return user ? account('link-code') : needUser();
     if (request.method === 'POST' && path === '/link/redeem') {
-      const { status, data } = await accounts(env, 'link-redeem', { code: body.code });
+      // Wrong codes are counted per network, so codes can't be guessed by trying them all
+      const { status, data } = await accounts(env, 'link-redeem', { code: body.code, ip: network });
       if (status !== 200) return json(data, status);
-      const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
-      return json({ ...data, token });
+      return signedIn(data);
     }
     // Delete your account: Accounts forgets you, then your games are resigned and Apple sign-in revoked
     if (request.method === 'POST' && path === '/account/delete') {
@@ -183,7 +197,7 @@ export default {
         await env.ROOM.get(env.ROOM.idFromName(code)).fetch('https://room/remove-user', { method: 'POST', body: JSON.stringify({ userId: user.userId }) }).catch(() => undefined);
       }
       const code = typeof body.appleAuthorizationCode === 'string' ? body.appleAuthorizationCode : '';
-      const appleRevoked = code ? await revokeApple(env, code, (data.appleSubjects as string[]) ?? []).catch(() => false) : false;
+      const appleRevoked = code ? await revokeApple(env, code, (data.appleSubjects as string[]) ?? [], typeof body.appleNonce === 'string' ? body.appleNonce : undefined).catch(() => false) : false;
       return json({ ok: true, appleRevoked });
     }
 
@@ -214,7 +228,7 @@ export default {
         if (path === '/friends/block') return account('block', { friendId: body.friendId });
         if (path === '/friends/dismiss') return account('challenge-dismiss', { roomCode: body.roomCode });
         if (path === '/friends/challenge') {
-          const allowed = await accounts(env, 'can-challenge', { userId: user.userId, friendId: body.friendId });
+          const allowed = await accounts(env, 'can-challenge', { ...caller(), friendId: body.friendId });
           if (allowed.status !== 200) return json(allowed.data, allowed.status);
           const room = await createRoom(env, user.userId, (body.config as Partial<GameConfig>) ?? {}, false);
           await accounts(env, 'challenge', { userId: user.userId, friendId: body.friendId, roomCode: room.code });
@@ -226,7 +240,8 @@ export default {
     // Your games in progress (or waiting for players), newest first, with whose turn it is
     if (path === '/games' && request.method === 'GET') {
       if (!user) return needUser();
-      const { data } = await accounts(env, 'games', { userId: user.userId });
+      const { status, data } = await accounts(env, 'games', caller());
+      if (status !== 200) return json(data, status);
       const games = [];
       for (const code of (data.codes as string[]) ?? []) {
         const res = await env.ROOM.get(env.ROOM.idFromName(code)).fetch(`https://room/info?userId=${encodeURIComponent(user.userId)}`);
@@ -242,6 +257,9 @@ export default {
 
     if (path === '/rooms' && request.method === 'POST') {
       if (!user) return json({ error: 'Sign in first' }, 401);
+      // Rooms per account per day are capped (and this checks the token is still good)
+      const allowed = await accounts(env, 'room-create', caller());
+      if (allowed.status !== 200) return json(allowed.data, allowed.status);
       const matched = env.TEST_MATCHED === '1' && body.matched === true; // never in production
       const room = await createRoom(env, user.userId, (body.config as Partial<GameConfig>) ?? {}, body.isPublic === true, undefined, matched);
       return json(room);
@@ -256,6 +274,8 @@ export default {
         return json(await res.json(), res.status);
       }
       if (!user) return new Response('Sign in first', { status: 401 });
+      const valid = await accounts(env, 'check', caller());
+      if (valid.status !== 200) return new Response('Sign in again', { status: 401 });
       return stub.fetch('https://room/connect', {
         // reveal=1: the app shows other players' setup when play starts (private setup)
         headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name, 'X-Reveal': url.searchParams.get('reveal') === '1' ? '1' : '0' },
@@ -265,7 +285,8 @@ export default {
     if (path === '/matchmaking/connect') {
       if (!user) return new Response('Sign in first', { status: 401 });
       // Walked out of too many games lately: no Find Match until the cooldown ends
-      const { data } = await accounts(env, 'cooldown', { userId: user.userId });
+      const { status, data } = await accounts(env, 'cooldown', caller());
+      if (status !== 200) return new Response('Sign in again', { status: 401 });
       if ((data.until as number) > 0) return new Response('Find Match is paused for you', { status: 403 });
       const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName('global'));
       return stub.fetch('https://matchmaker/connect', {

@@ -167,7 +167,7 @@ public class OnlineClient : MonoBehaviour
     {
         bool restored = false;
         string error = null;
-        string body = JsonUtility.ToJson(new IdTokenBody { idToken = identityToken });
+        string body = JsonUtility.ToJson(new IdTokenBody { idToken = identityToken, nonce = AppleSignIn.Nonce });
         yield return Call("POST", "/auth/apple", body, Token, (status, text) =>
         {
             if (status != 200) { error = ErrorText(status, text); return; }
@@ -233,7 +233,7 @@ public class OnlineClient : MonoBehaviour
     public IEnumerator DeleteAccount(string appleCode, Action<string> done)
     {
         string error = null;
-        string body = string.IsNullOrEmpty(appleCode) ? "{}" : JsonUtility.ToJson(new DeleteBody { appleAuthorizationCode = appleCode });
+        string body = string.IsNullOrEmpty(appleCode) ? "{}" : JsonUtility.ToJson(new DeleteBody { appleAuthorizationCode = appleCode, appleNonce = AppleSignIn.Nonce });
         yield return Call("POST", "/account/delete", body, Token, (status, text) =>
         {
             if (status != 200) error = ErrorText(status, text);
@@ -616,8 +616,8 @@ public class OnlineClient : MonoBehaviour
     private static string Pos(BoardPosition p) => "{\"x\":" + p.x + ",\"y\":" + p.y + ",\"z\":" + p.z + "}";
 
     [Serializable] private class NameBody { public string name; }
-    [Serializable] private class IdTokenBody { public string idToken; }
-    [Serializable] private class DeleteBody { public string appleAuthorizationCode; }
+    [Serializable] private class IdTokenBody { public string idToken; public string nonce; }
+    [Serializable] private class DeleteBody { public string appleAuthorizationCode; public string appleNonce; }
     [Serializable] private class AuthResponse { public string token; public string userId; public string name; public bool restored; }
     [Serializable] private class CreateRoomResponse { public string code; }
     [Serializable] private class LinkCodeResponse { public string code; }

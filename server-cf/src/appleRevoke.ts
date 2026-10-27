@@ -39,9 +39,10 @@ async function clientSecret(env: Env, clientId: string): Promise<string> {
 
 /**
  * Revoke the Apple sign-in behind this authorization code, if it belongs to one of
- * `subjects` (the Apple ids linked to the account being deleted). Returns whether it was revoked.
+ * `subjects` (the Apple ids linked to the account being deleted). `nonce`: the value the app signed in
+ * with, which Apple's token carries a hash of. Returns whether it was revoked.
  */
-export async function revokeApple(env: Env, authorizationCode: string, subjects: string[]): Promise<boolean> {
+export async function revokeApple(env: Env, authorizationCode: string, subjects: string[], nonce?: string): Promise<boolean> {
   if (!revokeConfigured(env) || !authorizationCode || subjects.length === 0) return false;
   const clientId = env.APPLE_AUDIENCES.split(',').map(s => s.trim()).filter(Boolean)[0];
   const secret = await clientSecret(env, clientId);
@@ -55,7 +56,7 @@ export async function revokeApple(env: Env, authorizationCode: string, subjects:
   if (!res.ok) { console.log(`[apple revoke] code exchange failed: ${res.status}`); return false; }
   const tokens = await res.json() as { refresh_token?: string; id_token?: string };
   // Only cut a link that belongs to this account
-  const subject = tokens.id_token ? await verifyIdToken('apple', tokens.id_token, [clientId]) : null;
+  const subject = tokens.id_token ? await verifyIdToken('apple', tokens.id_token, [clientId], nonce) : null;
   if (!subject || !subjects.includes(subject) || !tokens.refresh_token) return false;
 
   const revoked = await fetch(`${APPLE}/auth/revoke`, form({ client_id: clientId, client_secret: secret, token: tokens.refresh_token, token_type_hint: 'refresh_token' }));

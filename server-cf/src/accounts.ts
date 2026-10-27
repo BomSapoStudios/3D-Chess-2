@@ -26,8 +26,11 @@ const ONLINE_WINDOW_MS = 45_000;           // "online" = checked in within this 
 const CHALLENGE_LIFETIME_MS = 10 * 60_000; // an unanswered challenge disappears after 10 minutes
 const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60_000; // an unanswered friend request expires after 30 days (and can be sent again)
 const LINK_CODE_LIFETIME_MS = 10 * 60_000;
-const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60 } as const; // per account per day
-const GUESTS_PER_ADDRESS = 50;             // new accounts per network per day (homes, schools and phone carriers share addresses)
+const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60, room: 100, block: 100 } as const; // per account per day
+const NETWORK_LIMITS = {                   // per network per day (homes, schools and phone carriers share addresses)
+  guest: 50,                               // new accounts
+  linkMiss: 20,                            // wrong device link codes
+} as const;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 type Limit = keyof typeof LIMITS;
@@ -59,10 +62,13 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
-      CREATE TABLE IF NOT EXISTS guest_addresses (address TEXT, day INTEGER, count INTEGER, PRIMARY KEY (address, day));
       CREATE TABLE IF NOT EXISTS deleted_accounts (id TEXT PRIMARY KEY, deleted_at INTEGER);
+      CREATE TABLE IF NOT EXISTS network_limits (address TEXT, kind TEXT, day INTEGER, count INTEGER, PRIMARY KEY (address, kind, day));
+      DROP TABLE IF EXISTS guest_addresses;
     `);
     setupTables(this.sql);
+    // Signing out everywhere bumps this; tokens carry the version they were issued at
+    try { this.sql.exec('ALTER TABLE accounts ADD COLUMN token_version INTEGER DEFAULT 0'); } catch { /* already there */ }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -78,7 +84,12 @@ export class Accounts extends DurableObject<Env> {
   }
 
   private handle(op: string, b: Record<string, unknown>): unknown {
-    const userId = typeof b.userId === 'string' ? b.userId : '';
+    let userId = typeof b.userId === 'string' ? b.userId : '';
+    // Calls made for a signed-in player carry their token's version: an older one has been signed out
+    if (userId && typeof b.tokenV === 'number' && b.tokenV < this.tokenVersion(userId)) {
+      if (op === 'login') userId = ''; // signing in again from a signed-out device: as if signed out
+      else throw new HttpError(401, 'You were signed out, please sign in again');
+    }
     switch (op) {
       case 'guest': return this.guest(String(b.ip ?? ''));
       case 'refresh': return this.refresh(userId, String(b.name ?? ''));
@@ -86,7 +97,10 @@ export class Accounts extends DurableObject<Env> {
       case 'login': return this.login(String(b.provider), String(b.subject), userId || null);
       case 'me': return this.me(userId);
       case 'link-code': return this.linkCode(userId);
-      case 'link-redeem': return this.redeem(String(b.code ?? ''));
+      case 'link-redeem': return this.redeem(String(b.code ?? ''), String(b.ip ?? ''));
+      case 'signout': return this.signOut(userId);
+      case 'check': return { ok: true }; // the token version check above is the whole job
+      case 'room-create': this.spend(userId, 'room'); return { ok: true };
       case 'friends': return this.friends(userId);
       case 'friend-request': return this.friendRequest(userId, String(b.name ?? ''));
       case 'search': return this.search(userId, String(b.query ?? ''));
@@ -141,18 +155,38 @@ export class Accounts extends DurableObject<Env> {
     throw new HttpError(503, 'No free names right now, try again');
   }
 
-  /** A new guest account, unless this address has made too many today */
+  /** A new guest account, unless this network has made too many today */
   private async guest(ip: string) {
-    if (ip) {
-      const day = Math.floor(Date.now() / DAY);
-      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${day}|${ip}`)));
-      const address = Array.from(digest.slice(0, 12), x => x.toString(16).padStart(2, '0')).join('');
-      this.sql.exec('DELETE FROM guest_addresses WHERE day < ?', day);
-      const count = (this.sql.exec('SELECT count FROM guest_addresses WHERE address = ? AND day = ?', address, day).toArray()[0]?.count as number | undefined) ?? 0;
-      if (count >= GUESTS_PER_ADDRESS) throw new HttpError(429, 'Too many new players from this network today, try again tomorrow');
-      this.sql.exec('INSERT OR REPLACE INTO guest_addresses (address, day, count) VALUES (?, ?, ?)', address, day, count + 1);
-    }
+    if (await this.networkCount(ip, 'guest', false) >= NETWORK_LIMITS.guest) throw new HttpError(429, 'Too many new players from this network today, try again tomorrow');
+    await this.networkCount(ip, 'guest', true);
     return this.createAccount(crypto.randomUUID(), null);
+  }
+
+  /**
+   * Today's count of something for a network (empty = local tests: never limited), optionally adding one.
+   * The address is kept only as a hash that changes every day.
+   */
+  private async networkCount(ip: string, kind: keyof typeof NETWORK_LIMITS, add: boolean): Promise<number> {
+    if (!ip) return 0;
+    const day = Math.floor(Date.now() / DAY);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${day}|${ip}`)));
+    const address = Array.from(digest.slice(0, 12), x => x.toString(16).padStart(2, '0')).join('');
+    this.sql.exec('DELETE FROM network_limits WHERE day < ?', day);
+    const count = (this.sql.exec('SELECT count FROM network_limits WHERE address = ? AND kind = ? AND day = ?', address, kind, day).toArray()[0]?.count as number | undefined) ?? 0;
+    if (!add) return count;
+    this.sql.exec('INSERT OR REPLACE INTO network_limits (address, kind, day, count) VALUES (?, ?, ?, ?)', address, kind, day, count + 1);
+    return count + 1;
+  }
+
+  private tokenVersion(userId: string): number {
+    return (this.sql.exec('SELECT token_version FROM accounts WHERE id = ?', userId).toArray()[0]?.token_version as number | null | undefined) ?? 0;
+  }
+
+  /** Every token issued so far stops working; this device gets a new one at the new version */
+  private signOut(userId: string) {
+    this.account(userId);
+    this.sql.exec('UPDATE accounts SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ?', userId);
+    return this.refresh(userId, '');
   }
 
   private createAccount(id: string, preferredName: string | null) {
@@ -174,7 +208,7 @@ export class Accounts extends DurableObject<Env> {
       this.sql.exec('UPDATE accounts SET name = ? WHERE id = ?', name, userId);
     }
     this.sql.exec('UPDATE accounts SET last_seen = ? WHERE id = ?', Date.now(), userId);
-    return { userId, name };
+    return { userId, name, v: this.tokenVersion(userId) };
   }
 
   private reroll(userId: string) {
@@ -182,7 +216,7 @@ export class Accounts extends DurableObject<Env> {
     this.spend(userId, 'reroll');
     const name = this.freeName(null);
     this.sql.exec('UPDATE accounts SET name = ?, last_seen = ? WHERE id = ?', name, Date.now(), userId);
-    return { userId, name };
+    return { userId, name, v: this.tokenVersion(userId) };
   }
 
   private me(userId: string) {
@@ -223,9 +257,13 @@ export class Accounts extends DurableObject<Env> {
     return { code, expiresInSeconds: LINK_CODE_LIFETIME_MS / 1000 };
   }
 
-  private redeem(code: string) {
+  private async redeem(code: string, ip: string) {
+    if (await this.networkCount(ip, 'linkMiss', false) >= NETWORK_LIMITS.linkMiss) throw new HttpError(429, 'Too many wrong codes, try again tomorrow');
     const row = this.sql.exec('SELECT account_id FROM link_codes WHERE code = ? AND expires >= ?', code.toUpperCase(), Date.now()).toArray()[0];
-    if (!row) throw new HttpError(404, 'That code is wrong or has expired');
+    if (!row) {
+      await this.networkCount(ip, 'linkMiss', true);
+      throw new HttpError(404, 'That code is wrong or has expired');
+    }
     this.sql.exec('DELETE FROM link_codes WHERE code = ?', code.toUpperCase());
     return this.refresh(row.account_id as string, '');
   }
@@ -486,6 +524,8 @@ export class Accounts extends DurableObject<Env> {
 
   private block(userId: string, friendId: string) {
     this.account(userId);
+    if (!friendId || friendId === userId || !this.sql.exec('SELECT 1 FROM accounts WHERE id = ?', friendId).toArray().length) throw new HttpError(404, 'Player not found');
+    if (!this.sql.exec('SELECT 1 FROM blocks WHERE account_id = ? AND blocked_id = ?', userId, friendId).toArray().length) this.spend(userId, 'block');
     this.removeFriend(userId, friendId);
     this.sql.exec('INSERT OR IGNORE INTO blocks (account_id, blocked_id) VALUES (?, ?)', userId, friendId);
     return { ok: true };
