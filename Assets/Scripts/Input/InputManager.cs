@@ -584,8 +584,10 @@ public class InputManager : MonoBehaviour
         if (GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
         TouchGUI.Begin();
         if (TouchGUI.NeonButton(new Rect(16, 130, 150, 44), "Deselect", NeonTheme.Cyan, NeonTheme.Pink, fontSize: 16)) DeselectPiece();
+        // Move! goes under Deselect, or under Queen Blitz's pawn tracker, which has that spot in a puzzle
+        float moveY = QueenBlitzDirector.Instance != null ? Mathf.Max(182f, QueenBlitzDirector.Instance.TrackerBottom + 10f) : 182f;
         if (armedTarget.HasValue
-            && TouchGUI.NeonButton(new Rect(16, 182, 150, 44), "Move!", NeonTheme.Lime, NeonTheme.Pink, fontSize: 16))
+            && TouchGUI.NeonButton(new Rect(16, moveY, 150, 44), "Move!", NeonTheme.Lime, NeonTheme.Pink, fontSize: 16))
             TryMovePiece(armedTarget.Value, confirmed: true);
         TouchGUI.End();
     }
