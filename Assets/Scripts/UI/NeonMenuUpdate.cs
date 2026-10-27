@@ -18,6 +18,8 @@ public partial class NeonMenu
     private void ShowUpdatePicker()
     {
         if (this == null) return; // the menu went away (a game is loading)
+        // Nothing online works on this build, so don't leave the player on an online screen behind the card
+        if (onlineScreen.activeSelf || friendsScreen.activeSelf || (statsScreen != null && statsScreen.activeSelf)) ShowMenu();
         if (updatePicker == null) BuildUpdatePicker();
         updatePicker.transform.SetAsLastSibling();
         updatePicker.SetActive(true);

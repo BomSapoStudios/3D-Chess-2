@@ -1985,6 +1985,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private void ShowToast(string message)
     {
+        if (updatePicker != null && updatePicker.activeSelf) return; // the update card already says it
         if (toastRoutine != null) StopCoroutine(toastRoutine);
         toastRoutine = StartCoroutine(ToastRoutine(message));
     }
