@@ -69,6 +69,8 @@ public partial class NeonMenu
             "Fades in place of spins; backdrops hold still");
         AccessSwitch(accessRight, "Haptics", () => AccessibilityPrefs.Haptics, v => { AccessibilityPrefs.Haptics = v; Haptics.Medium(); },
             "Taps and buzzes as you play");
+        AccessSwitch(accessRight, "Tap Twice to Move", () => AccessibilityPrefs.TapTwiceToMove, v => AccessibilityPrefs.TapTwiceToMove = v,
+            "First tap marks the square, second tap moves");
 
         // The six symbols, so players can learn them here
         SectionLabel(accessRight, "Player symbols", NeonTheme.PinkSoft);

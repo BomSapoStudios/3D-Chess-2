@@ -9,19 +9,9 @@ public class BoardCell : MonoBehaviour
         Position = position;
     }
     
-    private void OnMouseDown()
-    {
-        if (ChessBoard.Instance != null)
-        {
-            // Notify the input manager that this cell was clicked
-            InputManager inputManager = FindFirstObjectByType<InputManager>();
-            if (inputManager != null)
-            {
-                inputManager.OnCellClicked(Position);
-            }
-        }
-    }
-    
+    // Taps are handled by InputManager when the finger lifts. A board cell used to act on
+    // OnMouseDown, which fires as the finger touches, so starting to turn the board could move a piece.
+
     private void OnTriggerEnter(Collider other)
     {
         ChessPiece piece = other.GetComponent<ChessPiece>();
