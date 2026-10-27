@@ -65,6 +65,14 @@ CHAPTERS = [
 ]
 
 
+def longer(n, c, i, s):
+    """On 5x5x5, one-trick puzzles with 3 moves are over too fast (Brandon, Oct 27: High Five 6-10
+    felt too easy). There, chapter 1 goes to 4 moves halfway through and chapter 2 is a move longer."""
+    if n != 5 or c > 1 or (c == 0 and i < 5):
+        return s
+    return dict(s, pars=tuple(p + 1 for p in s["pars"]))
+
+
 def fits(p, s, c, relax):
     if p["mech"] != s["mech"]:
         return False
@@ -98,6 +106,7 @@ def assemble(cands, n):
     for c, slots in enumerate(CHAPTERS):
         picks = []
         for i, s in enumerate(slots):
+            s = longer(n, c, i, s)
             for relax in range(4):
                 flat = sum(q["tricks"] == ["diagonal"] for q in picks)
                 # 3D diagonals are in nearly every route, so at most 3 diagonal-only puzzles a chapter
