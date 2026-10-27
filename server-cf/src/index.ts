@@ -191,7 +191,7 @@ export default {
     // Delete your account: Accounts forgets you, then your games are resigned and Apple sign-in revoked
     if (request.method === 'POST' && path === '/account/delete') {
       if (!user) return needUser();
-      const { status, data } = await accounts(env, 'delete-account', { userId: user.userId });
+      const { status, data } = await accounts(env, 'delete-account', caller());
       if (status !== 200) return json(data, status);
       for (const code of ((data.codes as string[]) ?? []).slice(0, 40)) { // well under the Worker's subrequest limit
         await env.ROOM.get(env.ROOM.idFromName(code)).fetch('https://room/remove-user', { method: 'POST', body: JSON.stringify({ userId: user.userId }) }).catch(() => undefined);

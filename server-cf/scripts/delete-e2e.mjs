@@ -51,6 +51,12 @@ const ga = await join(game.code, a.token);
 await until(() => gb.inbox.some(m => m.type === 'game:phaseChanged' || m.state?.phase === 'placement'));
 check((await get('/games', a.token)).body.games?.length === 2, 'before: A is in two games');
 
+// A token signed out everywhere can't delete the account
+const d = (await post('/auth/guest')).body;
+const fresh_d = (await post('/auth/signout', {}, d.token)).body;
+check((await post('/account/delete', {}, d.token)).status === 401, 'a signed-out token cannot delete the account');
+check((await post('/account/delete', {}, fresh_d.token)).status === 200, 'the new token can');
+
 // Delete
 check((await post('/account/delete', {})).status === 401, 'deleting needs sign-in');
 const del = await post('/account/delete', {}, a.token);
