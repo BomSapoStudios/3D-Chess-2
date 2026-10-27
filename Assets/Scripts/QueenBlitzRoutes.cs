@@ -7,8 +7,8 @@ using UnityEngine;
 /// - Portals come in pairs, an in end and an out end (the out end is a block from every side)
 ///   unless the pair is two-way. Each is an upright disc on its own square facing a level axis.
 ///   She goes in only through the front (moving against its facing, straight or diagonally),
-///   comes out of the paired portal turned the way the entry facing turns into the exit facing,
-///   keeping her climb or fall, and carries on: one continuous move that sweeps pawns on both
+///   comes out of the paired portal heading straight out of its face, level, whatever angle she
+///   went in at, and carries on: one continuous move that sweeps pawns on both
 ///   sides. She can't stop on a portal, and can't go in if the square after the exit is a block
 ///   or off the board. Portals may chain.
 /// - Ramps rise toward one or more level directions. Moving straight along a rising direction she
@@ -105,17 +105,6 @@ public static partial class QueenBlitz
 
     private static Vector3 Floor(BoardPosition c) => ChessBoard.Instance.BoardToLocalPosition(c);
 
-    /// <summary>d turned about the up axis by the turn that takes -faceIn onto faceOut (solver._turn)</summary>
-    private static Vector3Int Turn(Vector3Int d, Vector3Int faceIn, Vector3Int faceOut)
-    {
-        int fi0 = -faceIn.x, fi1 = -faceIn.z, fo0 = faceOut.x, fo1 = faceOut.z;
-        int[][] rots = { new[] { 1, 0, 0, 1 }, new[] { 0, -1, 1, 0 }, new[] { -1, 0, 0, -1 }, new[] { 0, 1, -1, 0 } };
-        foreach (int[] r in rots)
-            if (r[0] * fi0 + r[1] * fi1 == fo0 && r[2] * fi0 + r[3] * fi1 == fo1)
-                return new Vector3Int(r[0] * d.x + r[1] * d.z, d.y, r[2] * d.x + r[3] * d.z);
-        return d; // facings are always level axes; never reached
-    }
-
     /// <summary>
     /// One step from c heading d, through portals and up ramps (solver._step). Adds what it passes to
     /// the route and returns the landing square and her new heading; false when it's a wall.
@@ -143,7 +132,7 @@ public static partial class QueenBlitz
                 swept.Add(next); sweptDir.Add(d);
                 entered.Add(next);
                 pts.Add((Floor(next), false));          // into the disc
-                d = Turn(d, link.face, link.outFace);
+                d = link.outFace; // always straight out of the exit disc, level
                 swept.Add(link.other); sweptDir.Add(d);
                 pts.Add((Floor(link.other), true));     // out of its partner
                 c = link.other;
