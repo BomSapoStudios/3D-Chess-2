@@ -17,6 +17,7 @@ from multiprocessing import Pool
 from solver import Board, DIRS, UP
 import engine, packs, players, tricky
 
+TRICKS = {"greed": "greedy", "bait": "liner", "stop": "stopper", "quiet": "eager", "diagonal": "flat"}
 LEVEL = [d for d in DIRS if d[UP] == 0 and sum(map(abs, d)) == 1]
 
 
@@ -187,7 +188,9 @@ def _attempt(job):
     braked = brakes(b, line) if ice else 0
     if want == "brake" and not (braked and tempting_portal(b, line, par)):
         return None
-    e.update(want="brake" if braked else want, lured=None)
+    r = players.assess(e)
+    e.update(want="brake" if braked else want, lured=players.lured(e, r), trick_score=players.score(e, r),
+             tricks=sorted(t for t, who in TRICKS.items() if who in r and r[who] > par))
     return e
 
 
@@ -215,7 +218,8 @@ def gen(seconds, seed, out, sizes, pars):
                 seen.add(key)
                 found.append(e)
                 json.dump(found, open(out, "w"))
-                print(f"[{tried}] {e['size']}³ par {e['par']} {e['want']} {'ice' if e['ice'] else ''}", flush=True)
+                print(f"[{tried}] {e['size']}³ par {e['par']} {e['want']} {'ice' if e['ice'] else ''} lured {e['lured']} "
+                      f"tricks {','.join(e['tricks']) or '-'}", flush=True)
     print(f"done: {len(found)} kept of {tried} tried", flush=True)
 
 

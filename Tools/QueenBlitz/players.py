@@ -87,11 +87,14 @@ HABITS = {
 def ray_rest(b, at, left, d):
     """Pawns still on the board along direction d from `at` (up to a block or the edge)"""
     mask, c = 0, at
-    while True:
-        c = (c[0] + d[0], c[1] + d[1], c[2] + d[2])
-        if not b.inside(c) or c in b.blockers:
+    for _ in range(4 * b.n * b.n):
+        step = b._step(c, d)  # through portals and up ramps, like the move itself
+        if step is None:
             return mask
-        mask |= b.bit.get(c, 0) & left
+        passed, c, d = step
+        for x in passed + [c]:
+            mask |= b.bit.get(x, 0) & left
+    return mask
 
 
 def greedy_pick(b, at, left):
@@ -177,9 +180,8 @@ def play_lure(b, pick, start, par, cap=6):
 # ---------- the report ----------
 
 def board_of(p):
-    n = p["size"]
-    trip = lambda xs: [tuple(xs[i:i + 3]) for i in range(0, len(xs), 3)]
-    return Board(n, trip(p["pawns"]), trip(p.get("blocks", [])), p.get("ice", False))
+    import packs
+    return packs.board(p)
 
 
 def edge_starts(b):
@@ -188,7 +190,7 @@ def edge_starts(b):
     for p in b.pawns:
         for d in [(x, y, z) for x in (-1, 0, 1) for y in (-1, 0, 1) for z in (-1, 0, 1)]:
             c = (p[0] + d[0], p[1] + d[1], p[2] + d[2])
-            if b.inside(c) and c not in b.bit and c not in b.blockers:
+            if b.inside(c) and c not in b.bit and c not in b.blockers and c not in b.portal and c not in b.ramp:
                 near.add(c)
     return sorted(near)
 

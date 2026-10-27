@@ -31,6 +31,7 @@ TIPS = {
     "walls": "The blocks are there for a reason.",
 }
 MAKERS = ["fork", "wander", "bait", "walls", "blocks", "plain"]
+ICE_SHARE = float(__import__("os").environ.get("ICE_SHARE", "0"))  # share of ice-board candidates
 WANT = "any"
 
 
@@ -55,6 +56,7 @@ def attempt(job):
 def _attempt(job):
     n, par, kind, seed = job
     rng = random.Random(seed)
+    ice = kind == "ice"
     lo = 4 if par <= 2 else par + 2
     for _ in range(40):
         made = plain(n, par, rng) if kind == "plain" else engine.MAKERS[kind](n, par, rng)
@@ -63,7 +65,7 @@ def _attempt(job):
     else:
         return None
     start, pawns, blocks = made
-    b = Board(n, pawns, blocks)
+    b = Board(n, pawns, blocks, ice)
     if engine.fewest(b, [start], par) != par:
         return None
     free_par = engine.fewest(b, b.starts(), par)
@@ -80,10 +82,12 @@ def _attempt(job):
                 starts.append(s)
                 if len(starts) > 4:
                     return None
-    walls = engine.working_blocks(n, queen, pawns, blocks, False, par, starts)
-    entry = packs.solved("", n, queen, pawns, walls, "", False)
+    walls = engine.working_blocks(n, queen, pawns, blocks, ice, par, starts)
+    if ice and not walls:
+        return None
+    entry = packs.solved("", n, queen, pawns, walls, "", ice)
     r = players.assess(entry)
-    found = tricks_of(entry, r, bool(walls))
+    found = tricks_of(entry, r, bool(walls) and not ice)
     if not found and par > 2:
         return None
     if WANT == "single":
@@ -92,7 +96,7 @@ def _attempt(job):
         eff = [t for t in found if t != "diagonal"]
         if len(eff) != 1 and players.lured(entry, r) < 3:
             return None
-    m = pipeline.measure(n, False, queen, pawns, walls)
+    m = pipeline.measure(n, ice, queen, pawns, walls)
     entry.update(kind=kind, tricks=found, lured=players.lured(entry, r), trick_score=players.score(entry, r),
                  grade=pipeline.grade(m),
                  players={k: (v - par if not k.endswith("_kept") else v) for k, v in r.items()})
@@ -105,7 +109,8 @@ def gen(seconds, seed, out, sizes, pars):
     end = time.time() + seconds
     with Pool(4) as pool:
         while time.time() < end:
-            batch = [(rng.choice(sizes), rng.choice(pars), rng.choice(MAKERS), rng.randrange(1 << 30)) for _ in range(16)]
+            batch = [(rng.choice(sizes), rng.choice(pars), "ice" if rng.random() < ICE_SHARE else rng.choice(MAKERS),
+                      rng.randrange(1 << 30)) for _ in range(16)]
             for e in pool.imap_unordered(attempt, batch):
                 tried += 1
                 if not e:
@@ -116,7 +121,7 @@ def gen(seconds, seed, out, sizes, pars):
                 seen.add(key)
                 found.append(e)
                 json.dump(found, open(out, "w"))
-                print(f"[{tried}] {e['size']}³ par {e['par']} {'given' if e['queen'] else 'place'} "
+                print(f"[{tried}] {e['size']}³ par {e['par']} {'ice ' if e['ice'] else ''}{'given' if e['queen'] else 'place'} "
                       f"tricks {','.join(e['tricks']) or '-'} lured {e['lured']} grade {e['grade']}", flush=True)
     print(f"done: {len(found)} kept of {tried} tried", flush=True)
 
