@@ -1799,10 +1799,7 @@ public partial class NeonMenu : MonoBehaviour
             // The server only changes what's sent, so send everything as it now stands
             change.all = pushPrefs.all; change.turn = pushPrefs.turn; change.joined = pushPrefs.joined;
             change.started = pushPrefs.started; change.challenge = pushPrefs.challenge; change.friend = pushPrefs.friend;
-            StartCoroutine(OnlineClient.GetOrCreate().PushSettings(change, (prefs, error) =>
-            {
-                if (error != null) ShowToast("Couldn't save that: " + error);
-            }));
+            StartCoroutine(SavePushPrefs(change));
         });
         track.transform.parent.GetComponent<LayoutElement>().preferredHeight = parent.name == "Kinds Card" ? 46 : 54;
         pushSwitches.Add((key, track, knob, note, offText == null ? onText : onText + "|" + offText));
@@ -1859,9 +1856,20 @@ public partial class NeonMenu : MonoBehaviour
         StartCoroutine(LoadPushPrefs());
     }
 
+    private IEnumerator SavePushPrefs(PushPrefs change)
+    {
+        // Choosing a notification is the first thing that needs an account (the choices live on the server)
+        var client = OnlineClient.GetOrCreate();
+        string error = null;
+        yield return client.EnsureSignedIn((ok, signInError) => error = ok ? null : signInError);
+        if (error == null) yield return client.PushSettings(change, (prefs, saveError) => error = saveError);
+        if (error != null) ShowToast("Couldn't save that: " + error);
+    }
+
     private IEnumerator LoadPushPrefs()
     {
         var client = OnlineClient.GetOrCreate();
+        if (!client.HasToken) yield break; // no account yet: just looking doesn't make one, so show the defaults
         bool signedIn = false;
         yield return client.EnsureSignedIn((ok, error) => signedIn = ok);
         if (!signedIn) yield break;
