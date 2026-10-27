@@ -51,12 +51,6 @@ public class GameManager : MonoBehaviour
         
         Debug.Log("GameManager: ChessBoard.Instance confirmed ready, continuing initialization...");
         
-        // DIAGNOSTIC: Create test input script first to verify Unity compilation
-        Debug.Log("GameManager: Creating InputManagerTest for diagnostics...");
-        GameObject testObject = new GameObject("InputManagerTest");
-        testObject.AddComponent<InputManagerTest>();
-        Debug.Log("GameManager: InputManagerTest created");
-        
         // Ensure InputManager exists
         if (InputManager.Instance == null)
         {
@@ -145,17 +139,7 @@ public class GameManager : MonoBehaviour
                 Debug.LogError("🚨 This explains why AI placement timing is broken!");
             }
         }
-        
-        // Add the automated test system
-        GameObject movementTestObject = new GameObject("Movement Test System");
-        movementTestObject.AddComponent<TestMovementSystem>();
-        Debug.Log("GameManager: Added TestMovementSystem for verification");
-        
-        // CheckUITester removed from automatic creation to prevent debug text in UI
-        // The CheckUITester component can still be manually added for debugging if needed
-        // GameObject checkUITesterObject = new GameObject("Check UI Tester");
-        // checkUITesterObject.AddComponent<CheckUITester>();
-        // Debug.Log("GameManager: Added CheckUITester for manual UI testing (T/Y/U keys)");
+
         
         // Create confirmation dialog system
         SetupConfirmationDialog();
