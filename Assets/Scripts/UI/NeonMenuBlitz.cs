@@ -104,6 +104,11 @@ public partial class NeonMenu
     private void ReturnToBlitzPicker(string packId, int index)
     {
         ShowBlitzPicker();
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+        // Screenshots (BlitzDemo 95 with DebugBlitzPack "packs" or "playtest"): the pack pages themselves
+        if (packId == "packs") return;
+        if (packId == "playtest") { ShowBlitzPlaytest(); return; }
+#endif
         if (QueenBlitz.IsDaily(packId)) ShowBlitzDaily(0);
         else if (QueenBlitz.Owns(QueenBlitz.Info(packId))) ShowBlitzPuzzles(packId, index / QueenBlitz.ChapterSize);
     }
@@ -114,36 +119,115 @@ public partial class NeonMenu
         blitzTitle.text = "QUEEN BLITZ";
         BlitzText("One queen. Clear every pawn before your moves run out. Your first clear of a puzzle keeps its pawns.",
             15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
-
         blitzView = BlitzView.Packs;
-        var packs = QueenBlitz.Available();
-        int count = packs.Count + 1;
-        float width = Mathf.Min(170f, 560f / count - 10f);
 
+        var tiles = new System.Collections.Generic.List<PackTile>();
         // The Daily puzzle comes first
-        float dx = -(count - 1) / 2f * (width + 10f);
         bool todayDone = QueenBlitz.DailyCleared(QueenBlitz.Today);
-        Button daily = NeonButton(blitzContent, "Daily", new Vector2(width, 64), todayDone ? NeonTheme.Lavender : NeonTheme.Yellow, NeonTheme.Pink, -1f, 18,
-            () => { Haptics.Selection(); ShowBlitzDaily(0); });
-        Place((RectTransform)daily.transform, new Vector2(0.5f, 0.5f), new Vector2(width, 64), new Vector2(dx, 10));
         int streak = QueenBlitz.DailyStreak();
         string dailyUnder = QueenBlitz.Today < QueenBlitz.DailyEpoch ? $"Starts {QueenBlitz.DailyEpoch:MMM d}"
             : todayDone ? (streak > 1 ? $"Done! {streak} days in a row" : "Done for today!")
             : streak > 0 ? $"{streak}-day streak" : $"#{QueenBlitz.DailyNumber(QueenBlitz.Today)} is ready";
-        BlitzText(dailyUnder, 13, NeonTheme.Yellow, new Vector2(0.5f, 0.5f), new Vector2(width + 8, 20), new Vector2(dx, -36));
-
-        for (int i = 0; i < packs.Count; i++)
+        tiles.Add(new PackTile("Daily", todayDone ? NeonTheme.Lavender : NeonTheme.Yellow, dailyUnder, NeonTheme.Yellow, () => ShowBlitzDaily(0)));
+        var review = new System.Collections.Generic.List<QueenBlitz.PackInfo>();
+        foreach (QueenBlitz.PackInfo pack in QueenBlitz.Available())
         {
-            QueenBlitz.PackInfo pack = packs[i];
-            float x = (i + 1 - (count - 1) / 2f) * (width + 10f);
-            int total = QueenBlitz.PuzzlesOf(pack.id).Length;
-            bool owned = QueenBlitz.Owns(pack);
-            Color color = pack.review ? NeonTheme.Pink : owned ? NeonTheme.Lime : NeonTheme.Muted;
-            Button b = NeonButton(blitzContent, pack.name, new Vector2(width, 64), color, NeonTheme.Ground, (i - count / 2) * 0.6f, 18,
-                () => { Haptics.Selection(); if (QueenBlitz.Owns(pack)) ShowBlitzPuzzles(pack.id, FirstOpenChapter(pack.id)); else ShowBlitzBuy(pack); });
-            Place((RectTransform)b.transform, new Vector2(0.5f, 0.5f), new Vector2(width, 64), new Vector2(x, 10));
-            string under = owned ? $"{QueenBlitz.ClearedCount(pack.id)} / {total} cleared" : $"{total} puzzles · locked";
-            BlitzText(under, 13, owned ? NeonTheme.Yellow : NeonTheme.Lavender, new Vector2(0.5f, 0.5f), new Vector2(width + 8, 20), new Vector2(x, -36));
+            if (pack.review) review.Add(pack);
+            else tiles.Add(Tile(pack));
+        }
+        // Brandon's playtest packs (after the five taps) wait on a page of their own
+        if (review.Count > 0)
+            tiles.Add(new PackTile("Playtest", NeonTheme.Pink, $"{review.Count} test packs", NeonTheme.PinkSoft, ShowBlitzPlaytest));
+        PackGrid(tiles);
+    }
+
+    /// <summary>The review and test packs, on their own page so the main one stays readable</summary>
+    private void ShowBlitzPlaytest()
+    {
+        ClearBlitzContent();
+        blitzView = BlitzView.Packs;
+        blitzTitle.text = "PLAYTEST";
+        BlitzBack(ShowBlitzPacks);
+        BlitzText("Puzzles waiting for your playtest notes; names show tier and score.",
+            15, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 44), new Vector2(0, -84));
+        var tiles = new System.Collections.Generic.List<PackTile>();
+        foreach (QueenBlitz.PackInfo pack in QueenBlitz.Available())
+            if (pack.review) tiles.Add(Tile(pack));
+        PackGrid(tiles);
+    }
+
+    private PackTile Tile(QueenBlitz.PackInfo pack)
+    {
+        int total = QueenBlitz.PuzzlesOf(pack.id).Length;
+        bool owned = QueenBlitz.Owns(pack);
+        Color color = pack.review ? NeonTheme.Pink : owned ? NeonTheme.Lime : NeonTheme.Muted;
+        string under = owned ? $"{QueenBlitz.ClearedCount(pack.id)} / {total} cleared" : $"{total} puzzles · locked";
+        return new PackTile(pack.name, color, under, owned ? NeonTheme.Yellow : NeonTheme.Lavender,
+            () => { if (QueenBlitz.Owns(pack)) ShowBlitzPuzzles(pack.id, FirstOpenChapter(pack.id)); else ShowBlitzBuy(pack); });
+    }
+
+    private readonly struct PackTile
+    {
+        public readonly string name, under;
+        public readonly Color color, underColor;
+        public readonly System.Action open;
+        public PackTile(string name, Color color, string under, Color underColor, System.Action open)
+        { this.name = name; this.color = color; this.under = under; this.underColor = underColor; this.open = open; }
+    }
+
+    /// <summary>
+    /// Packs as same-size pills, four to a row (fewer when there are fewer), the name fitted to the
+    /// pill and the progress under it; more rows than fit scroll up and down
+    /// </summary>
+    private void PackGrid(System.Collections.Generic.List<PackTile> tiles)
+    {
+        const float areaW = 580f, areaH = 196f, pillH = 52f, rowH = 84f, gap = 12f;
+        int cols = Mathf.Clamp(tiles.Count, 1, 4);
+        int rows = (tiles.Count + cols - 1) / cols;
+        float pillW = Mathf.Min(150f, (areaW - gap * (cols - 1)) / cols);
+        float contentH = rows * rowH;
+
+        RectTransform view = NewRect("Pack List", blitzContent);
+        Place(view, new Vector2(0.5f, 1f), new Vector2(areaW, areaH), new Vector2(0f, -116f - areaH / 2f));
+        view.gameObject.AddComponent<RectMask2D>();
+        Image catcher = view.gameObject.AddComponent<Image>();
+        catcher.color = new Color(0f, 0f, 0f, 0f); // takes the drags
+        RectTransform content = NewRect("Packs", view);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.sizeDelta = new Vector2(0f, Mathf.Max(contentH, areaH));
+        content.anchoredPosition = Vector2.zero;
+        ScrollRect scroll = view.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = view;
+        scroll.content = content;
+        scroll.horizontal = false;
+        scroll.vertical = contentH > areaH;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+
+        float top = contentH < areaH ? (areaH - contentH) / 2f : 0f; // a short list sits in the middle
+        for (int k = 0; k < tiles.Count; k++)
+        {
+            PackTile t = tiles[k];
+            int row = k / cols, col = k % cols;
+            int inRow = Mathf.Min(cols, tiles.Count - row * cols); // a last, shorter row is centred
+            float x = (col - (inRow - 1) / 2f) * (pillW + gap);
+            float y = -top - row * rowH - pillH / 2f - 4f;
+            System.Action open = t.open;
+            Button b = NeonButton(content, t.name, new Vector2(pillW, pillH), t.color, NeonTheme.Pink, (col - 1.5f) * 0.5f, 17, () => open());
+            Place((RectTransform)b.transform, new Vector2(0.5f, 1f), new Vector2(pillW, pillH), new Vector2(x, y));
+            TextMeshProUGUI label = b.GetComponentInChildren<TextMeshProUGUI>();
+            label.enableAutoSizing = true;   // the whole name always fits its pill
+            label.fontSizeMin = 11;
+            label.fontSizeMax = 17;
+            label.enableWordWrapping = true;
+            label.margin = new Vector4(8f, 2f, 8f, 2f);
+            TextMeshProUGUI under = NewText("Under", content, t.under, 12, t.underColor, TextAlignmentOptions.Center);
+            under.fontStyle = FontStyles.Normal;
+            under.enableAutoSizing = true;
+            under.fontSizeMin = 9;
+            under.fontSizeMax = 12;
+            Place(under.rectTransform, new Vector2(0.5f, 1f), new Vector2(pillW + 10f, 18f), new Vector2(x, y - pillH / 2f - 12f));
         }
     }
 
