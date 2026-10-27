@@ -390,9 +390,6 @@ public class SceneController : MonoBehaviour
             Debug.LogWarning("SceneController: ChaosRotationManager.Instance not found but chaos mode is enabled in configuration");
         }
         
-        // Apply other settings as needed
-        // TODO: Apply showMoveHints, enableSoundEffects when these systems are implemented
-        
         // Initialize the game state to start the actual game
         if (GameStateManager.Instance != null)
         {
@@ -432,9 +429,7 @@ public class SceneController : MonoBehaviour
             blackPlayerType = PlayerType.Computer,
             aiDifficulty = AIDifficulty.Medium,
             boardSize = BoardSize.Small5x5x5,
-            enableTurnValidation = true,
-            showMoveHints = true,
-            enableSoundEffects = true
+            enableTurnValidation = true
         };
         
         if (currentSceneType == SceneType.Game)

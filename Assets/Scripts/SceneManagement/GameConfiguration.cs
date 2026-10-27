@@ -38,8 +38,6 @@ public class GameConfiguration
     
     [Header("Game Preferences")]
     public bool enableTurnValidation = true;
-    public bool showMoveHints = true;
-    public bool enableSoundEffects = true;
     
     [Header("Chaos Mode Settings")]
     public bool enableChaosMode = false;      // Enable simplified chaos mode 
@@ -74,8 +72,6 @@ public class GameConfiguration
         blackPlayerType = PlayerType.Human;
         aiDifficulty = AIDifficulty.Medium;
         enableTurnValidation = true;
-        showMoveHints = true;
-        enableSoundEffects = true;
         enableChaosMode = false;
         chaosTurnInterval = 9;
         enableTimedPlay = false;
@@ -94,8 +90,6 @@ public class GameConfiguration
         blackPlayerType = blackType;
         aiDifficulty = difficulty;
         enableTurnValidation = true;
-        showMoveHints = true;
-        enableSoundEffects = true;
         enableChaosMode = false;
         chaosTurnInterval = 9;
         enableTimedPlay = false;
@@ -133,8 +127,6 @@ public class GameConfiguration
         }
         
         enableTurnValidation = true;
-        showMoveHints = true;
-        enableSoundEffects = true;
         enableChaosMode = false;
         chaosTurnInterval = 9;
         enableTimedPlay = false;
@@ -226,8 +218,6 @@ public class GameConfiguration
             blackPlayerType = this.blackPlayerType,
             aiDifficulty = this.aiDifficulty,
             enableTurnValidation = this.enableTurnValidation,
-            showMoveHints = this.showMoveHints,
-            enableSoundEffects = this.enableSoundEffects,
             
             // Chaos Mode Settings
             enableChaosMode = this.enableChaosMode,
@@ -332,7 +322,7 @@ public class GameConfiguration
     /// </summary>
     public override string ToString()
     {
-        return $"GameConfig: {GetFullDescription()}, AI: {aiDifficulty}, Validation: {enableTurnValidation}, Hints: {showMoveHints}, Sound: {enableSoundEffects}";
+        return $"GameConfig: {GetFullDescription()}, AI: {aiDifficulty}, Validation: {enableTurnValidation}";
     }
     
     // === SCALABLE SIDE SELECTION HELPER METHODS ===
