@@ -53,11 +53,12 @@ export function spkiFromCertificate(der: Uint8Array): Uint8Array {
   return der.slice(pos, field.end);
 }
 
-/** Only Apple's own certificate hosts, over https */
-function trustedKeyUrl(raw: string): boolean {
+/** Only Apple's Game Center certificate host (https://static.gc.apple.com/public-key/gc-prod-N.cer) */
+export function trustedKeyUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
-    return url.protocol === 'https:' && (url.hostname === 'apple.com' || url.hostname.endsWith('.apple.com'));
+    return url.protocol === 'https:' && url.hostname === 'static.gc.apple.com' && url.pathname.startsWith('/public-key/')
+      && url.pathname.endsWith('.cer') && !url.search && !url.username && !url.port;
   } catch {
     return false;
   }

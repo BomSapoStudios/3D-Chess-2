@@ -6,6 +6,7 @@ import {
 } from './types/game.js';
 import { accounts, createRoom, type Env } from './index.js';
 import type { PushMessage } from './push.js';
+import { asPosition } from './validate.js';
 import type { GameResult, RatingChange } from './ratings.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,7 +160,8 @@ export class Room extends DurableObject<Env> {
         currentTurn: state.currentTurn,
         turnNumber: state.turnNumber,
         lastMove: state.moveHistory[state.moveHistory.length - 1] ?? null,
-        pieces: state.board.flat(2).filter(Boolean).map(p => `${p!.color[0]}${p!.type}@${p!.position.x},${p!.position.y},${p!.position.z}`),
+        // During setup only the asker's own pieces (none without an asker), like the room itself
+        pieces: state.board.flat(2).filter(p => p && (state.phase !== 'placement' || p.color === yourColor)).map(p => `${p!.color[0]}${p!.type}@${p!.position.x},${p!.position.y},${p!.position.z}`),
       });
     }
 
@@ -290,23 +292,27 @@ export class Room extends DurableObject<Env> {
       }
 
       case 'game:placePiece': {
-        const result = engine.placePiece(me.color, msg.pieceType as PieceType, msg.position as BoardPosition);
+        const position = asPosition(msg.position);
+        if (!position || typeof msg.pieceType !== 'string') return reply(false, 'Bad placement');
+        const result = engine.placePiece(me.color, msg.pieceType as PieceType, position);
         if (!result.success) return reply(false, result.error);
         this.meta!.lastPlayAt = Date.now();
         await this.persist();
         reply(true);
-        await this.logEvent({ type: 'game:piecePlaced', color: me.color, pieceType: msg.pieceType, position: msg.position });
+        await this.logEvent({ type: 'game:piecePlaced', color: me.color, pieceType: msg.pieceType, position });
         return this.broadcast({ type: 'game:stateUpdate', reason: 'placement', state: this.stateForClients() });
       }
 
       case 'game:unplacePiece': {
         // Setup: a piece taken back off the board onto its owner's bench
-        const result = engine.unplacePiece(me.color, msg.position as BoardPosition);
+        const position = asPosition(msg.position);
+        if (!position) return reply(false, 'Bad position');
+        const result = engine.unplacePiece(me.color, position);
         if (!result.success) return reply(false, result.error);
         this.meta!.lastPlayAt = Date.now();
         await this.persist();
         reply(true);
-        await this.logEvent({ type: 'game:pieceUnplaced', color: me.color, pieceType: result.pieceType, position: msg.position });
+        await this.logEvent({ type: 'game:pieceUnplaced', color: me.color, pieceType: result.pieceType, position });
         return this.broadcast({ type: 'game:stateUpdate', reason: 'placement', state: this.stateForClients() });
       }
 
@@ -329,21 +335,25 @@ export class Room extends DurableObject<Env> {
       }
 
       case 'game:move': {
+        const from = asPosition(msg.from), to = asPosition(msg.to);
+        if (!from || !to) return reply(false, 'Bad move');
         if (this.chargeClock() || this.slowDeadlinePassed()) return reply(false, 'Out of time');
-        const result = engine.executeMove(me.color, msg.from as BoardPosition, msg.to as BoardPosition);
+        const result = engine.executeMove(me.color, from, to);
         if (!result.success) {
           reply(false, result.error);
-          return this.send(ws, { type: 'game:moveRejected', from: msg.from, to: msg.to, error: result.error });
+          return this.send(ws, { type: 'game:moveRejected', from, to, error: result.error });
         }
         reply(true);
-        return this.afterResult(result, { type: 'game:moveValidated', color: me.color, from: msg.from, to: msg.to });
+        return this.afterResult(result, { type: 'game:moveValidated', color: me.color, from, to });
       }
 
       case 'game:promotePawn': {
-        const result = engine.promotePawn(me.color, msg.position as BoardPosition, msg.pieceType as PieceType);
+        const position = asPosition(msg.position);
+        if (!position) return reply(false, 'Bad position');
+        const result = engine.promotePawn(me.color, position, msg.pieceType as PieceType);
         if (!result.success) return reply(false, result.error);
         reply(true);
-        return this.afterResult(result, { type: 'game:pawnPromoted', color: me.color, position: msg.position, pieceType: msg.pieceType });
+        return this.afterResult(result, { type: 'game:pawnPromoted', color: me.color, position, pieceType: msg.pieceType });
       }
 
       case 'game:resign': {
@@ -354,6 +364,7 @@ export class Room extends DurableObject<Env> {
 
       case 'game:offerDraw': {
         if (engine.getState().phase !== 'playing') return reply(false, 'Game not in progress');
+        if (engine.getState().currentTurn !== me.color) return reply(false, 'You can offer a draw on your turn');
         engine.offerDraw(me.color);
         await this.persist();
         reply(true);
@@ -361,6 +372,7 @@ export class Room extends DurableObject<Env> {
       }
 
       case 'game:respondDraw': {
+        if (engine.getState().phase !== 'playing') return reply(false, 'Game not in progress');
         const result = engine.respondDraw(me.color, msg.accept === true);
         if (!result) return reply(false, 'No draw offer to answer');
         reply(true);
@@ -871,7 +883,9 @@ export class Room extends DurableObject<Env> {
   /** The colours whose setup this player may see: their own, and the robots' if they host */
   private ownColors(viewer: Attachment | null): PlayerColor[] {
     if (!viewer) return [];
-    if (!viewer.reveal) return [...PLAYER_COLORS_BY_COUNT[6]]; // an older app: it sees everything as before
+    // An older app sees everything as before, but never in a ranked game, where a client could leave
+    // reveal off just to look at the opponent's setup
+    if (!viewer.reveal && !this.meta?.matched) return [...PLAYER_COLORS_BY_COUNT[6]];
     const robots = viewer.userId === this.meta?.hostUserId ? (this.engine?.config.aiColors ?? []) : [];
     return [viewer.color, ...robots];
   }

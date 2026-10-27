@@ -25,6 +25,7 @@ const CHALLENGE_LIFETIME_MS = 10 * 60_000; // an unanswered challenge disappears
 const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60_000; // an unanswered friend request expires after 30 days (and can be sent again)
 const LINK_CODE_LIFETIME_MS = 10 * 60_000;
 const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60 } as const; // per account per day
+const GUESTS_PER_ADDRESS = 50;             // new accounts per network per day (homes, schools and phone carriers share addresses)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 type Limit = keyof typeof LIMITS;
@@ -56,6 +57,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS declines (decliner_id TEXT, sender_id TEXT, created_at INTEGER, PRIMARY KEY (decliner_id, sender_id));
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
+      CREATE TABLE IF NOT EXISTS guest_addresses (address TEXT, day INTEGER, count INTEGER, PRIMARY KEY (address, day));
     `);
     setupTables(this.sql);
   }
@@ -64,7 +66,7 @@ export class Accounts extends DurableObject<Env> {
     const op = new URL(request.url).pathname.slice(1);
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     try {
-      const result = this.handle(op, body);
+      const result = await this.handle(op, body);
       return Response.json(result);
     } catch (e) {
       if (e instanceof HttpError) return Response.json({ error: e.message }, { status: e.status });
@@ -75,7 +77,7 @@ export class Accounts extends DurableObject<Env> {
   private handle(op: string, b: Record<string, unknown>): unknown {
     const userId = typeof b.userId === 'string' ? b.userId : '';
     switch (op) {
-      case 'guest': return this.createAccount(crypto.randomUUID(), null);
+      case 'guest': return this.guest(String(b.ip ?? ''));
       case 'refresh': return this.refresh(userId, String(b.name ?? ''));
       case 'reroll': return this.reroll(userId);
       case 'login': return this.login(String(b.provider), String(b.subject), userId || null);
@@ -95,7 +97,7 @@ export class Accounts extends DurableObject<Env> {
       case 'game-remove': return this.gameRemove(String(b.roomCode ?? ''), typeof b.userId === 'string' ? b.userId : null);
       case 'games': return this.games(userId);
       case 'push-register': return this.pushRegister(userId, String(b.token ?? ''), b.sandbox === true);
-      case 'push-unregister': return this.pushUnregister(String(b.token ?? ''));
+      case 'push-unregister': return this.pushUnregister(String(b.token ?? ''), userId);
       case 'push-settings': return this.pushSettings(userId, b.prefs as Record<string, boolean> | undefined);
       case 'game-result': return { changes: recordGame(this.sql, b.result as GameResult, Date.now()) };
       case 'walkout': recordWalkout(this.sql, String(b.walkoutUserId ?? ''), Date.now()); return { ok: true };
@@ -133,6 +135,20 @@ export class Accounts extends DurableObject<Env> {
       if (tryName(name)) return name;
     }
     throw new HttpError(503, 'No free names right now, try again');
+  }
+
+  /** A new guest account, unless this address has made too many today */
+  private async guest(ip: string) {
+    if (ip) {
+      const day = Math.floor(Date.now() / DAY);
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${day}|${ip}`)));
+      const address = Array.from(digest.slice(0, 12), x => x.toString(16).padStart(2, '0')).join('');
+      this.sql.exec('DELETE FROM guest_addresses WHERE day < ?', day);
+      const count = (this.sql.exec('SELECT count FROM guest_addresses WHERE address = ? AND day = ?', address, day).toArray()[0]?.count as number | undefined) ?? 0;
+      if (count >= GUESTS_PER_ADDRESS) throw new HttpError(429, 'Too many new players from this network today, try again tomorrow');
+      this.sql.exec('INSERT OR REPLACE INTO guest_addresses (address, day, count) VALUES (?, ?, ?)', address, day, count + 1);
+    }
+    return this.createAccount(crypto.randomUUID(), null);
   }
 
   private createAccount(id: string, preferredName: string | null) {
@@ -245,8 +261,10 @@ export class Accounts extends DurableObject<Env> {
     return { ok: true };
   }
 
-  private pushUnregister(token: string) {
-    this.sql.exec('DELETE FROM push_tokens WHERE token = ?', token.toLowerCase());
+  /** A device signing out of notifications; with an account, only that account's own device */
+  private pushUnregister(token: string, userId?: string) {
+    if (userId) this.sql.exec('DELETE FROM push_tokens WHERE token = ? AND account_id = ?', token.toLowerCase(), userId);
+    else this.sql.exec('DELETE FROM push_tokens WHERE token = ?', token.toLowerCase());
     return { ok: true };
   }
 

@@ -92,6 +92,19 @@ export async function createRoom(env: Env, hostUserId: string, config: Partial<G
   throw new Error('Could not allocate a room code');
 }
 
+/**
+ * The network a request came from, for per-network limits: the IPv4 address, or an IPv6
+ * address's /64 (one home or phone gets a whole /64). Empty for this computer (local tests).
+ */
+function networkOf(ip: string | null): string {
+  if (!ip || ip === '127.0.0.1' || ip === '::1') return '';
+  if (!ip.includes(':')) return ip;
+  const [head, tail = ''] = ip.split('::');
+  const groups = head.split(':').filter(Boolean);
+  if (groups.length < 4) groups.push(...Array(8 - groups.length - tail.split(':').filter(Boolean).length).fill('0'));
+  return groups.slice(0, 4).join(':') + '::/64';
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -125,7 +138,8 @@ export default {
     const needUser = () => json({ error: 'Sign in first' }, 401);
 
     if (request.method === 'POST' && path === '/auth/guest') {
-      const { status, data } = await accounts(env, 'guest', {});
+      // New accounts per network address per day are capped (the address is only kept as a hash)
+      const { status, data } = await accounts(env, 'guest', { ip: networkOf(request.headers.get('CF-Connecting-IP')) });
       if (status !== 200) return json(data, status);
       const { token } = await issueToken(env.TOKEN_SECRET, data.userId as string, data.name as string);
       return json({ ...data, token });
@@ -156,7 +170,7 @@ export default {
     }
     // Push notifications: register this device, and read or change the notification switches
     if (path === '/push/register' && request.method === 'POST') return user ? account('push-register', { token: body.token, sandbox: body.sandbox === true }) : needUser();
-    if (path === '/push/unregister' && request.method === 'POST') return account('push-unregister', { token: body.token });
+    if (path === '/push/unregister' && request.method === 'POST') return user ? account('push-unregister', { token: body.token }) : needUser();
     if (path === '/push/settings') {
       if (!user) return needUser();
       return account('push-settings', request.method === 'POST' ? { prefs: body.prefs } : {});
