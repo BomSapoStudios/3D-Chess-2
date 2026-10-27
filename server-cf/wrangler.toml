@@ -49,4 +49,4 @@ APNS_TOPIC = "BomSapo.Chess3D"
 # Sign in with Apple revocation when a player deletes their account (Apple requires it).
 # SIWA_KEY is a secret: `npx wrangler secret put SIWA_KEY` (paste the whole AuthKey_XXXXXXXXXX.p8 of a key
 # with Sign in with Apple enabled). Without it, deletion still works but the Apple link isn't cut.
-SIWA_KEY_ID = ""
+SIWA_KEY_ID = "P7VN9J993P"
