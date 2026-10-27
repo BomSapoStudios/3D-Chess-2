@@ -126,6 +126,23 @@ def brakes(b, line):
     return out
 
 
+def tempting_portal(b, line, par):
+    """Brandon (Oct 27): a brake portal must look like the way to go. True when, at the start or
+    a stop of the solution, going through a portal sweeps at least 2 pawns and at least as many
+    as the right move, yet can no longer make par"""
+    left = b.full
+    for k, (a, c) in enumerate(line):
+        right = next(m for m in b.moves(a) if m[0] == c)
+        r = bin(right[1] & left).count("1")
+        for to, sw, d, _ in b.moves(a):
+            n = bin(sw & left).count("1")
+            if n >= max(2, r) and special(b, a, d, to) and \
+                    (left & ~sw) and b.solve_from(to, left & ~sw, par - k - 1) is None:
+                return True
+        left &= ~right[1]
+    return False
+
+
 def flat(cells):
     return [v for c in cells for v in c]
 
@@ -168,13 +185,13 @@ def _attempt(job):
     if e["par"] != par or not taps_ok(b, line, b.full):
         return None
     braked = brakes(b, line) if ice else 0
-    if want == "brake" and not braked:
+    if want == "brake" and not (braked and tempting_portal(b, line, par)):
         return None
     e.update(want="brake" if braked else want, lured=None)
     return e
 
 
-WANTS = ("portal", "portal", "ramp", "both", "brake")
+WANTS = tuple(__import__("os").environ.get("WANTS", "portal,portal,ramp,both,brake").split(","))
 
 
 def gen(seconds, seed, out, sizes, pars):
