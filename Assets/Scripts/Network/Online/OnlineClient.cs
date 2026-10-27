@@ -263,6 +263,10 @@ public class OnlineClient : MonoBehaviour
     public IEnumerator BlockPlayer(string friendId, Action<string> done) =>
         Simple("/friends/block", "{\"friendId\":\"" + friendId + "\"}", done);
 
+    /// <summary>Report a player to us (reason: cheating, stalling or other)</summary>
+    public IEnumerator ReportPlayer(string userId, string reason, Action<string> done) =>
+        Simple("/players/report", "{\"userId\":\"" + userId + "\",\"reason\":\"" + reason + "\"}", done);
+
     public IEnumerator DismissChallenge(string roomCode, Action<string> done) =>
         Simple("/friends/dismiss", "{\"roomCode\":\"" + roomCode + "\"}", done);
 

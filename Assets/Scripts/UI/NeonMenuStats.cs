@@ -154,6 +154,7 @@ public partial class NeonMenu
         statsStatus.text = "";
         statsTitle.text = userId == null ? "YOUR STATS" : stats.name.ToUpperInvariant();
         FillProfile(stats, userId == null);
+        if (userId != null) ReportButton(userId);
     }
 
     private void FillProfile(PlayerStats s, bool mine)
@@ -206,6 +207,33 @@ public partial class NeonMenu
                 Line(statsList, $"{result}{vs} · {(g.mode == "melee" ? "Melee" : "Duel")} {change}", c, 14);
             }
         }
+    }
+
+    /// <summary>Report another player: tap Report, then pick what happened</summary>
+    private void ReportButton(string userId)
+    {
+        Button report = NeonButton(statsLeft, "Report", new Vector2(150, 40), NeonTheme.Pink, NeonTheme.Cyan, 0f, 16, () => { });
+        report.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
+        report.onClick.AddListener(() =>
+        {
+            Destroy(report.gameObject);
+            TextMeshProUGUI note = Line(statsLeft, "What happened?", NeonTheme.Lavender, 15);
+            var reasons = new List<GameObject>();
+            foreach (var (label, reason) in new[] { ("Cheating", "cheating"), ("Stalling", "stalling"), ("Something else", "other") })
+            {
+                Button pick = NeonButton(statsLeft, label, new Vector2(170, 36), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, () =>
+                {
+                    foreach (GameObject r in reasons) Destroy(r);
+                    note.text = "Sending...";
+                    StartCoroutine(OnlineClient.Instance.ReportPlayer(userId, reason, error =>
+                    {
+                        if (note != null) note.text = error ?? "Thanks, we'll take a look. You can also block them from your friends list.";
+                    }));
+                });
+                pick.gameObject.AddComponent<LayoutElement>().preferredHeight = 36;
+                reasons.Add(pick.gameObject);
+            }
+        });
     }
 
     private static string RatingLine(string mode, ModeRating r) =>
