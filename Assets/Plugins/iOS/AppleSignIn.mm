@@ -10,6 +10,7 @@ extern "C" void UnitySendMessage(const char* obj, const char* method, const char
 
 @interface AppleSignInHelper : NSObject <ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 @property (nonatomic, copy) NSString* receiver;
+@property (nonatomic, copy) NSString* nonce;
 @end
 
 static AppleSignInHelper* current;
@@ -20,6 +21,9 @@ static AppleSignInHelper* current;
 {
     ASAuthorizationAppleIDRequest* request = [[ASAuthorizationAppleIDProvider new] createRequest];
     request.requestedScopes = @[];
+    // SHA-256 of a one-time value the app keeps; Apple puts it in the token, so the server can
+    // tell this token was asked for by this device and not copied from somewhere else
+    if (self.nonce.length > 0) request.nonce = self.nonce;
     ASAuthorizationController* controller = [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
     controller.delegate = self;
     controller.presentationContextProvider = self;
@@ -61,9 +65,10 @@ static AppleSignInHelper* current;
 
 @end
 
-extern "C" void AppleSignIn_Start(const char* receiver)
+extern "C" void AppleSignIn_Start(const char* receiver, const char* nonce)
 {
     current = [AppleSignInHelper new];
     current.receiver = [NSString stringWithUTF8String:receiver];
+    current.nonce = nonce ? [NSString stringWithUTF8String:nonce] : nil;
     [current start];
 }

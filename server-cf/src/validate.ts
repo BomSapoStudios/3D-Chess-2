@@ -9,3 +9,17 @@ export function asPosition(value: unknown): BoardPosition | null {
   if (![x, y, z].every(n => Number.isInteger(n) && (n as number) >= 0 && (n as number) < 16)) return null;
   return { x: x as number, y: y as number, z: z as number };
 }
+
+/**
+ * Messages per socket per minute. A normal game sends a few; the most is a host auto-placing every
+ * robot seat's pieces at once (about 100). This is a backstop for a client stuck in a loop (the kind
+ * of bug behind the October 2026 outage): past it the socket is closed and the app reconnects.
+ */
+const MESSAGES_PER_MINUTE = 1200;
+const messageCounts = new WeakMap<object, { start: number; count: number }>();
+
+export function floodedBy(ws: object, now = Date.now()): boolean {
+  let c = messageCounts.get(ws);
+  if (!c || now - c.start >= 60_000) messageCounts.set(ws, c = { start: now, count: 0 });
+  return ++c.count > MESSAGES_PER_MINUTE;
+}
