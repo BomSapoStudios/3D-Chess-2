@@ -41,8 +41,41 @@ public static class Sfx
         Play(name, volume, Step(plane) - 5, vary: false);
     }
 
-    /// <summary>The sound for a menu button: the blob bloop</summary>
-    public static void Tap() => Play("ui_tap", 0.7f);
+    /// <summary>
+    /// The sound for a menu button: the blob bloop. Buttons with a PressSound already played it the
+    /// moment they were touched, so the tap when the finger lifts is skipped for them.
+    /// </summary>
+    public static void Tap()
+    {
+        if (Time.unscaledTime - pressedAt < 0.8f) { pressedAt = -10f; return; }
+        Play("ui_tap", 0.7f);
+    }
+
+    /// <summary>A button's sound, played as the finger touches it (see PressSound)</summary>
+    public static void Press(bool back)
+    {
+        Play(back ? "ui_back" : "ui_tap", back ? 1f : 0.7f);
+        pressedAt = Time.unscaledTime;
+    }
+
+    private static float pressedAt = -10f;
+
+    // Every clip is loaded and the voices made at launch, so the first tap of each sound isn't late
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Preload()
+    {
+        var all = new Dictionary<string, List<AudioClip>>();
+        foreach (AudioClip clip in Resources.LoadAll<AudioClip>("Audio/Sfx"))
+        {
+            string name = clip.name;
+            int us = name.LastIndexOf('_');
+            if (us > 0 && int.TryParse(name.Substring(us + 1), out _)) name = name.Substring(0, us); // move_2 -> move
+            if (!all.TryGetValue(name, out var list)) all[name] = list = new List<AudioClip>();
+            list.Add(clip);
+        }
+        foreach (var pair in all) clips[pair.Key] = pair.Value.ToArray();
+        _ = Host;
+    }
 
     private static readonly Dictionary<string, AudioClip[]> clips = new Dictionary<string, AudioClip[]>();
     private static readonly Dictionary<string, float> lastPlayed = new Dictionary<string, float>();

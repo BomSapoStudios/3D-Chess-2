@@ -78,6 +78,7 @@ public partial class NeonMenu : MonoBehaviour
         BuildSettingsScreen();
         BuildStatsScreen();
         FitScreensForTextSize();
+        PressSound.AddAll(transform); // button sounds play on touch, not on release
         ShowMenu();
         if (reopenAccessibility)
         {
@@ -2207,7 +2208,8 @@ public partial class NeonMenu : MonoBehaviour
         NeonTheme.StyleFilled(image, fill, shadow, tilt);
         Button button = image.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => { Haptics.Selection(); if (text.StartsWith("<")) Sfx.Play("ui_back"); else Sfx.Tap(); onClick(); });
+        button.onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); onClick(); });
+        button.gameObject.AddComponent<PressSound>().back = text.StartsWith("<");
         TextMeshProUGUI label = NewText("Text", image.transform, text, fontSize, NeonTheme.Ground, TextAlignmentOptions.Center);
         Stretch(label.rectTransform);
         return button;
