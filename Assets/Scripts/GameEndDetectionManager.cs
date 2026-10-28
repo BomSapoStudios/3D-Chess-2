@@ -35,6 +35,11 @@ public class GameEndDetectionManager : MonoBehaviour
     private bool drawOfferPending = false;
     private PieceColor drawOfferingPlayer;
     private float drawOfferTimestamp;
+    private readonly HashSet<PieceColor> drawAccepted = new HashSet<PieceColor>(); // 3+ players: who has said yes so far
+
+    // 50-move rule: moves in a row with no capture and no pawn move (DrawRules)
+    private int quietMoves;
+    private string progressSignature;
     
     private void Awake()
     {
@@ -107,6 +112,8 @@ public class GameEndDetectionManager : MonoBehaviour
             Debug.Log("GameEndDetectionManager: Game started - enabling game end detection");
             enableGameEndDetection = !ZombieMode.Active && !QueenBlitz.Active; // zombie runs end when the player has nothing left (ZombieDirector)
             if (SavedGames.Resuming) enableGameEndDetection = false; // the stand-in setup isn't the real game: SavedGames turns this back on
+            quietMoves = 0;
+            progressSignature = null;
         }
         else if (newState == GameState.GameOver)
         {
@@ -177,6 +184,35 @@ public class GameEndDetectionManager : MonoBehaviour
                 HandleStalemate(newCurrentPlayer);
             }
         }
+
+        // Online, moving instead of answering a draw offer turns it down (as the server does)
+        if (OnlineSession.IsActive && drawOfferPending && DrawResponders().Contains(previousPlayer)) DeclineDrawOffer(previousPlayer);
+
+        if (PlayerManager.Instance == null || !PlayerManager.Instance.IsPlayerEliminated(previousPlayer)) CountQuietMove();
+        CheckAutomaticDraw();
+    }
+
+    /// <summary>One more move for the 50-move rule: a capture or pawn move starts the count again</summary>
+    private void CountQuietMove()
+    {
+        string now = DrawRules.ProgressSignature();
+        quietMoves = now == progressSignature ? quietMoves + 1 : 0;
+        progressSignature = now;
+    }
+
+    /// <summary>
+    /// Draws the game calls by itself (DrawRules): nobody can checkmate anybody, or 50 moves each
+    /// without progress. Online the server decides and its game:over ends the game here.
+    /// </summary>
+    private void CheckAutomaticDraw()
+    {
+        if (!enableGameEndDetection || OnlineSession.IsActive || PlayerManager.Instance == null) return;
+        if (GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing) return;
+        List<PieceColor> active = PlayerManager.Instance.GetActivePlayers().Where(p => !PlayerManager.Instance.IsPlayerEliminated(p)).ToList();
+        if (DrawRules.IsInsufficientMaterial(active))
+            EndGame(null, "Draw! Nobody has enough pieces left to checkmate");
+        else if (quietMoves >= DrawRules.QuietMovesPerPlayer * active.Count)
+            EndGame(null, $"Draw! {DrawRules.QuietMovesPerPlayer} moves each with no capture or pawn move");
     }
     
     /// <summary>
@@ -197,7 +233,22 @@ public class GameEndDetectionManager : MonoBehaviour
             return;
         }
         
-        PieceColor winner = (playerWhoRanOutOfTime == PieceColor.White) ? PieceColor.Black : PieceColor.White;
+        // 4 or 6 players: out of time counts like a forfeit and the game goes on
+        if (IsMultiplayerInProgress())
+        {
+            if (OnlineSession.IsActive) return; // the server decides; its game:playerEliminated applies it here
+            HandleMultiplayerForfeit(playerWhoRanOutOfTime);
+            CheckAutomaticDraw();
+            return;
+        }
+
+        PieceColor winner = ForfeitWinner(playerWhoRanOutOfTime);
+        // Running out the clock can't beat a player who could never checkmate: a draw
+        if (DrawRules.CannotMate(winner))
+        {
+            EndGame(null, $"Draw! {playerWhoRanOutOfTime} ran out of time, but {winner} has too little left to checkmate");
+            return;
+        }
         string reason = $"Time Out! {winner} wins - {playerWhoRanOutOfTime} ran out of time";
         
         Debug.Log($"⏰ GameEndDetectionManager: TIMER EXPIRED - {reason}");
@@ -840,7 +891,9 @@ public class GameEndDetectionManager : MonoBehaviour
             Winner = winner;
             OnGameEnd?.Invoke($"{winner} wins - everyone else is out");
             if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
+            return;
         }
+        CheckAutomaticDraw(); // those left may have nothing to checkmate with
     }
 
     public void HandleForfeit(PieceColor forfeitingPlayer)
@@ -961,6 +1014,7 @@ public class GameEndDetectionManager : MonoBehaviour
         drawOfferPending = true;
         drawOfferingPlayer = offeringPlayer;
         drawOfferTimestamp = Time.time;
+        drawAccepted.Clear();
         if (OnlineSession.ShouldSend(offeringPlayer)) OnlineClient.Instance.SendOfferDraw(offeringPlayer);
         
         Debug.Log($"🤝 GameEndDetectionManager: Draw offered by {offeringPlayer}");
@@ -968,21 +1022,39 @@ public class GameEndDetectionManager : MonoBehaviour
         // Fire event
         OnDrawOffered?.Invoke(offeringPlayer);
         
-        // If the responding player is AI, immediately trigger their response evaluation
-        PieceColor respondingPlayer = (offeringPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
-        if (TurnManager.Instance != null && TurnManager.Instance.IsPlayerAI(respondingPlayer))
+        // Computer players answer for themselves (online, only the device that plays them)
+        foreach (PieceColor respondingPlayer in DrawResponders())
         {
-            Debug.Log($"🤖 GameEndDetectionManager: Draw offer made to AI player {respondingPlayer}, triggering response evaluation");
-            
-            if (AIPlayer.Instance != null)
-            {
-                AIPlayer.Instance.HandleDrawOfferResponse(respondingPlayer);
-            }
-            else
-            {
-                Debug.LogError("GameEndDetectionManager: AIPlayer.Instance is null - cannot handle AI draw response");
-            }
+            if (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(respondingPlayer) || !OnlineSession.CanControl(respondingPlayer)) continue;
+            if (AIPlayer.Instance != null) AIPlayer.Instance.HandleDrawOfferResponse(respondingPlayer);
+            else Debug.LogError("GameEndDetectionManager: AIPlayer.Instance is null - cannot handle AI draw response");
         }
+    }
+
+    /// <summary>
+    /// Who still has to answer the draw offer: every other player still in the game who hasn't
+    /// said yes. With 3 or more players everyone must agree.
+    /// </summary>
+    public List<PieceColor> DrawResponders()
+    {
+        var result = new List<PieceColor>();
+        if (!drawOfferPending) return result;
+        IEnumerable<PieceColor> players = PlayerManager.Instance != null
+            ? PlayerManager.Instance.GetActivePlayers().Where(p => !PlayerManager.Instance.IsPlayerEliminated(p))
+            : new[] { PieceColor.White, PieceColor.Black };
+        foreach (PieceColor p in players)
+            if (p != drawOfferingPlayer && !drawAccepted.Contains(p)) result.Add(p);
+        return result;
+    }
+
+    /// <summary>How many players have said yes to the pending draw offer, and how many must</summary>
+    public (int yes, int needed) DrawAgreement() => (drawAccepted.Count, drawAccepted.Count + DrawResponders().Count);
+
+    private void DeclineDrawOffer(PieceColor decliningPlayer)
+    {
+        Debug.Log($"🤝 GameEndDetectionManager: Draw declined by {decliningPlayer}");
+        OnDrawDeclined?.Invoke(decliningPlayer);
+        ClearDrawOffer();
     }
     
     /// <summary>
@@ -1005,9 +1077,8 @@ public class GameEndDetectionManager : MonoBehaviour
             return;
         }
         
-        // Validate this is the correct player responding (the one who didn't offer)
-        PieceColor expectedResponder = (drawOfferingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
-        if (respondingPlayer != expectedResponder)
+        // Only players who still have to answer (not the one who offered, nor anyone who said yes)
+        if (!DrawResponders().Contains(respondingPlayer))
         {
             Debug.LogWarning($"GameEndDetectionManager: {respondingPlayer} cannot respond to draw offer made by {drawOfferingPlayer}");
             return;
@@ -1024,8 +1095,16 @@ public class GameEndDetectionManager : MonoBehaviour
 
         if (accepted)
         {
+            // 3+ players: wait until everyone else has said yes
+            drawAccepted.Add(respondingPlayer);
+            if (DrawResponders().Count > 0)
+            {
+                Debug.Log($"🤝 GameEndDetectionManager: {respondingPlayer} agrees to the draw; waiting for {string.Join(", ", DrawResponders())}");
+                return;
+            }
+
             // Draw accepted - end game in draw
-            string reason = $"Draw by agreement! Both players agreed to a draw";
+            string reason = DrawAgreement().needed > 1 ? "Draw by agreement! Everyone agreed to a draw" : "Draw by agreement! Both players agreed to a draw";
             
             Debug.Log($"🤝 GameEndDetectionManager: DRAW ACCEPTED - {reason}");
             
@@ -1075,6 +1154,7 @@ public class GameEndDetectionManager : MonoBehaviour
         drawOfferPending = false;
         drawOfferingPlayer = PieceColor.White; // Reset to default
         drawOfferTimestamp = 0f;
+        drawAccepted.Clear();
     }
     
     /// <summary>
@@ -1110,7 +1190,8 @@ public class GameEndDetectionManager : MonoBehaviour
         {
             Debug.Log($"GameEndDetectionManager: Auto-declining draw offer from {drawOfferingPlayer} (timeout after {timeoutSeconds}s)");
             
-            PieceColor autoDeclinedBy = (drawOfferingPlayer == PieceColor.White) ? PieceColor.Black : PieceColor.White;
+            List<PieceColor> waiting = DrawResponders();
+            PieceColor autoDeclinedBy = waiting.Count > 0 ? waiting[0] : (drawOfferingPlayer == PieceColor.White ? PieceColor.Black : PieceColor.White);
             OnDrawDeclined?.Invoke(autoDeclinedBy);
             
             ClearDrawOffer();

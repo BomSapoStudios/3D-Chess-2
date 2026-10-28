@@ -428,8 +428,15 @@ public class GameMenuUI : MonoBehaviour
             bool canRespondToDraw = TurnManager.Instance.CanCurrentPlayerRespondToDraw();
             bool isDrawPending = GameEndDetectionManager.Instance.IsDrawOfferPending();
 
+            var (drawYes, drawNeeded) = GameEndDetectionManager.Instance.DrawAgreement();
             if (canRespondToDraw && isDrawPending)
             {
+                // 3+ players: everyone must agree, so say who's answering and how many have said yes
+                if (drawNeeded > 1)
+                {
+                    PieceColor? answering = TurnManager.Instance.DrawResponder();
+                    GUILayout.Label($"{GameEndDetectionManager.Instance.GetDrawOfferingPlayer()} offers a draw ({drawYes} of {drawNeeded} agreed). {answering}, do you agree?", infoStyle);
+                }
                 // Show accept/decline buttons side by side when responding to draw offer
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Accept Draw (Y)", buttonStyle, GUILayout.Height(40)))
@@ -446,7 +453,7 @@ public class GameMenuUI : MonoBehaviour
             {
                 // Draw pending but can't respond - show disabled button
                 GUI.enabled = false;
-                GUILayout.Button("⏳ Draw Pending...", buttonStyle, GUILayout.Height(40));
+                GUILayout.Button(drawNeeded > 1 ? $"⏳ Draw Pending ({drawYes} of {drawNeeded} agreed)" : "⏳ Draw Pending...", buttonStyle, GUILayout.Height(40));
                 GUI.enabled = true;
             }
             else if (canOfferDraw)

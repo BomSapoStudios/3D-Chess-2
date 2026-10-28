@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -1481,8 +1482,8 @@ public class TurnManager : MonoBehaviour
         
         PieceColor drawOfferingPlayer = GameEndDetectionManager.Instance.GetDrawOfferingPlayer();
         
-        // Only respond if the AI is the correct responder (not the one who offered)
-        if (drawOfferingPlayer != currentPlayer)
+        // Only respond if the AI still has to answer (not the one who offered, and hasn't said yes)
+        if (GameEndDetectionManager.Instance.DrawResponders().Contains(currentPlayer))
         {
             Debug.Log($"🤝 TurnManager: AI player {currentPlayer} needs to respond to draw offer from {drawOfferingPlayer}");
             
@@ -1596,8 +1597,13 @@ public class TurnManager : MonoBehaviour
             return;
         }
         
-        PieceColor drawOfferingPlayer = GameEndDetectionManager.Instance.GetDrawOfferingPlayer();
-        PieceColor respondingPlayer = DrawResponder(drawOfferingPlayer);
+        PieceColor? responder = DrawResponder();
+        if (!responder.HasValue)
+        {
+            Debug.LogWarning("TurnManager: Cannot respond to draw - nobody here has to answer it");
+            return;
+        }
+        PieceColor respondingPlayer = responder.Value;
 
         // Allow both human and AI players to respond to draws
         // For AI players, the response decision should come from AIPlayer class
@@ -1665,20 +1671,23 @@ public class TurnManager : MonoBehaviour
             return false;
         }
         
-        PieceColor drawOfferingPlayer = GameEndDetectionManager.Instance.GetDrawOfferingPlayer();
-        PieceColor respondingPlayer = DrawResponder(drawOfferingPlayer);
-
-        // Must be human player and the correct responder (not the one who offered)
-        return !IsPlayerAI(respondingPlayer) && respondingPlayer != drawOfferingPlayer && OnlineSession.CanControl(respondingPlayer);
+        PieceColor? respondingPlayer = DrawResponder();
+        return respondingPlayer.HasValue && OnlineSession.CanControl(respondingPlayer.Value);
     }
 
     /// <summary>
-    /// Who answers a draw offer: online, the player on this device; otherwise the offerer's
-    /// opponent (draws are a two-player option, like the check in GameEndDetectionManager)
+    /// Who answers the draw offer on this device: online, the player here if they still have to;
+    /// otherwise the first person (not a computer player) who hasn't answered yet. With 3 or
+    /// more players everyone else must say yes, one after another.
     /// </summary>
-    private static PieceColor DrawResponder(PieceColor offeringPlayer)
+    public PieceColor? DrawResponder()
     {
-        if (OnlineSession.IsActive) return OnlineSession.LocalColor;
-        return offeringPlayer == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        if (GameEndDetectionManager.Instance == null) return null;
+        List<PieceColor> waiting = GameEndDetectionManager.Instance.DrawResponders();
+        if (OnlineSession.IsActive)
+            return waiting.Contains(OnlineSession.LocalColor) ? OnlineSession.LocalColor : (PieceColor?)null;
+        foreach (PieceColor p in waiting)
+            if (!IsPlayerAI(p)) return p;
+        return null;
     }
 }

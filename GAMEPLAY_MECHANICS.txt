@@ -181,9 +181,18 @@ STALEMATE
     4/6 players: that player just sits out the turn. If nobody can move at
     all, the game is a draw.
 
-OTHER DRAWS
-  • Insufficient material — nobody has enough left to checkmate.
+OTHER DRAWS (the game calls these by itself)
+  • Nobody can checkmate — called as soon as it happens, so nobody can drag
+    out a dead game hoping the other player gives up or walks out.
+      2 players: kings alone, a King and one Bishop or Knight against a lone
+      King, or a King and Bishop each.
+      4/6 players: no Rook, Queen or Pawn left anywhere and at most one Bishop
+      or Knight on the whole board.
+    (A Pawn always counts as enough: it can still become a Queen.)
+  • 50 moves each with no capture and no pawn move.
   • Threefold repetition — the same position occurs three times.
+  • Out of time against a player who could never checkmate (no Rook, Queen
+    or Pawn and at most one minor piece): a draw, not a win.
   • Draw by agreement — see Offer Draw below.
 
 OTHER WAYS TO LOSE
@@ -193,6 +202,8 @@ OTHER WAYS TO LOSE
 
 OFFER DRAW
   • Only on your own turn. Your opponent can accept or decline.
+  • 4/6 players: everyone still in the game has to accept; one decline ends
+    the offer. Online, moving instead of answering declines it.
   • Works online and on the phone (the computer decides for itself).
   • Not available in Zombie Survival.
 
@@ -264,8 +275,9 @@ CHESS CLOCK (any game; "No clock" by default)
   • Only the player on turn's clock runs; it pauses for animations,
     Chaos spins and promotion.
   • A warning shows under 1 minute.
-  • Running out loses the game. With more than two players left, the game
-    ends with no winner.
+  • Running out loses the game, unless the other player could never
+    checkmate (see Other Draws): then it's a draw. With more than two players
+    left, running out counts like a forfeit and the game goes on.
 
 ONLINE PACE
   Speed round (live)

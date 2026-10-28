@@ -229,6 +229,15 @@ public class OnlineGameBridge : MonoBehaviour
                 }
                 break;
 
+            case "game:drawAgreed":
+                // 3+ players: one more yes, still waiting on others
+                if (fromOpponent && GameEndDetectionManager.Instance != null)
+                {
+                    Remote(() => GameEndDetectionManager.Instance.HandleDrawResponse(color.Value, true));
+                    Show($"{color.Value} agrees to a draw. Everyone has to agree.", 4f);
+                }
+                break;
+
             case "game:drawAccepted":
             case "game:drawDeclined":
                 if (fromOpponent && GameEndDetectionManager.Instance != null)
@@ -326,6 +335,26 @@ public class OnlineGameBridge : MonoBehaviour
             PieceColor loser = OnlineSession.LocalColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
             if (GameEndDetectionManager.Instance != null && GameStateManager.Instance.currentState != GameState.GameOver)
                 Remote(() => GameEndDetectionManager.Instance.HandleForfeit(loser));
+        }
+        // Draws the server called (nobody can checkmate, 50 quiet moves, out of time against a
+        // player who can't mate, everyone agreeing): end the game here too if it hasn't ended yet
+        string draw = DrawText(msg.reason);
+        if (string.IsNullOrEmpty(msg.winner) && draw != null && GameEndDetectionManager.Instance != null
+            && GameStateManager.Instance != null && GameStateManager.Instance.currentState != GameState.GameOver)
+            Remote(() => GameEndDetectionManager.Instance.EndGame(null, draw));
+    }
+
+    private static string DrawText(string reason)
+    {
+        switch (reason)
+        {
+            case "insufficient_material": return "Draw! Nobody has enough pieces left to checkmate";
+            case "fifty_moves": return "Draw! 50 moves each with no capture or pawn move";
+            case "timeout_draw": return "Draw! Out of time, but the other player had too little left to checkmate";
+            case "threefold_repetition": return "Draw by repetition! The same position has occurred three times";
+            case "draw_agreement": return "Draw by agreement! Everyone agreed to a draw";
+            case "stalemate": return "Stalemate! Game ends in a draw";
+            default: return null;
         }
     }
 
