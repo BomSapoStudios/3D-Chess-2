@@ -833,6 +833,15 @@ public partial class QueenBlitzDirector : MonoBehaviour
             NeonTheme.GUILabelStyle(NeonTheme.Yellow, size, true, TextAnchor.MiddleLeft));
     }
 
+    /// <summary>The solve clock in the bottom-left corner, just right of the left column (Move! can
+    /// reach down that column); it stops when the last pawn falls</summary>
+    private static void DrawClock(Vector2 ui)
+    {
+        Rect r = new Rect(16f + 150f + 12f, ui.y - 52f, 96f, 38f);
+        NeonTheme.GUIPanel(r, NeonTheme.Cyan, 0.85f);
+        GUI.Label(r, QueenBlitz.Clock(QueenBlitz.Elapsed), NeonTheme.GUILabelStyle(NeonTheme.Cyan, 18, true, TextAnchor.MiddleCenter));
+    }
+
     private void DrawTracker()
     {
         if (filledAt == null) return;
@@ -917,15 +926,6 @@ public partial class QueenBlitzDirector : MonoBehaviour
             string text = state == GameState.PiecePlacement
                 ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  {puzzle.par} moves"
                 : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}";
-            // The solve clock (playtest): sized as if every digit were wide, so the text doesn't
-            // shrink and grow as the seconds tick by
-            string fit = text;
-            if (QueenBlitz.ShowTimer)
-            {
-                string clock = QueenBlitz.Clock(QueenBlitz.Elapsed);
-                text += $"  ·  <color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Cyan)}>{clock}</color>";
-                fit += "  ·  " + System.Text.RegularExpressions.Regex.Replace(clock, "[0-9]", "8");
-            }
             // At the very top (the turn line is hidden in puzzles), between the pawn total on the
             // left and the "?" on the right with a clear gap to each; smaller text, then two lines,
             // on narrow screens
@@ -935,8 +935,8 @@ public partial class QueenBlitzDirector : MonoBehaviour
             const float icon = 26f;
             GUIStyle style = NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter);
             style.richText = true;
-            while (style.fontSize > 12 && style.CalcSize(new GUIContent(fit)).x > w - 16f - icon) style.fontSize--;
-            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(fit), w - 16f - icon) + 8f);
+            while (style.fontSize > 12 && style.CalcSize(new GUIContent(text)).x > w - 16f - icon) style.fontSize--;
+            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(text), w - 16f - icon) + 8f);
             Rect rect = new Rect(from + (to - from - w) / 2f, 6f, w, h);
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
             GUI.Label(new Rect(rect.x + 8f, rect.y, rect.width - 16f - icon, rect.height), text, style);
@@ -962,6 +962,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         }
         DrawTally();
         if (!over) DrawTracker();
+        if (!over && QueenBlitz.ShowTimer) DrawClock(ui);
         GUI.enabled = true;
         TouchGUI.End();
         if (selectorOpen) DrawSelector();

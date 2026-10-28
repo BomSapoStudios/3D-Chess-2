@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// Queen Blitz solve times, for gauging how hard each puzzle really is. A clock counts up from
-/// the moment a puzzle starts until it is cleared (the top bar and the CLEARED panel show it when
+/// the moment a puzzle starts until it is cleared (the bottom-left corner and the CLEARED panel show it when
 /// ShowTimer is on). Every clear goes into a log on the device: pack and puzzle, the time of the
 /// clearing attempt, the time across every attempt since the last clear, moves and attempts.
 /// The Playtest page in the Queen Blitz picker lists it.
@@ -15,8 +15,8 @@ public static partial class QueenBlitz
     /// <summary>Seconds on this attempt's clock (the director counts it while the puzzle is in play)</summary>
     public static float Elapsed { get; set; }
 
-    /// <summary>The clock is shown to players: only with playtest on for now</summary>
-    public static bool ShowTimer => Reviewer;
+    /// <summary>The clock is shown to players: on every puzzle while the packs are being timed</summary>
+    public static bool ShowTimer => true;
 
     /// <summary>The clear just logged (null until one is)</summary>
     public static Solve LastSolve { get; private set; }
