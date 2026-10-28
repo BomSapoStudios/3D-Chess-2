@@ -210,19 +210,25 @@ def setup():
 # ---------------- Chess ----------------
 def zap(f, take):
     """Move C3: electric zap landing on the note, with a low thud for weight"""
-    det = [0, 6, -6][take]
-    x = tone(f * 2, 0.14, 0.25, "saw", f1=f, glide=0.04, cutoff=3000 + take * 300, detune=det)
-    x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=1500, detune=det))
-    x = at(x, 0.0, thud(150 + take * 8, 60, 0.18, 0.6))
+    # Same note every take (the plane sets the pitch); the takes differ in sweep speed,
+    # brightness and thud so repeats don't sound copied
+    glide, bright, body, low = [(0.04, 3000, 1500, 150), (0.025, 4200, 2000, 175), (0.065, 2200, 1100, 130)][take]
+    x = tone(f * 2, 0.14, 0.25, "saw", f1=f, glide=glide, cutoff=bright)
+    x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=body, detune=[0, 7, -7][take]))
+    x = at(x, 0.0, thud(low, 60, 0.18, 0.6))
+    if take == 1: x = at(x, 0.0, hiss(0.03, 6000, 0.08, kind="high", att=0.001))  # a crisper spark
+    if take == 2: x = at(x, 0.05, tone(f * 1.5, 0.12, 0.06, "triangle"))  # a soft fifth on top
     return x
 
 def chess():
     for k in range(3):
         write(f"move_{k + 1}", zap(hz(12), k), loud=-3)
     for k in range(3):
-        x = thud(140 - k * 6, 55, 0.25, 0.7)
-        x = at(x, 0, tone(hz(19), 0.4, 0.25, "triangle", detune=[0, 8, -8][k]))
-        x = at(x, 0, tone(hz(26), 0.25, 0.12))
+        # each take rings a different note of D minor (A, F, C) over a different thud
+        note = [19, 15, 22][k]
+        x = thud([140, 165, 120][k], 55, 0.25, 0.7)
+        x = at(x, 0, tone(hz(note), 0.4, 0.25, "triangle"))
+        x = at(x, 0, tone(hz(note + 7), 0.25, 0.12))
         x = at(x, 0.01, hiss(0.25, 5000, 0.12, kind="high"))
         # little glass shards
         for j in range(4):
@@ -234,11 +240,10 @@ def chess():
     x = at(x, 0.35, tone(hz(22), 0.5, 0.06))
     write("check", x, loud=-1, wet=0.2)
     # your turn: friendly two-note bell
-    x = tone(hz(15), 0.5, 0.3)
-    x = at(x, 0, tone(hz(15) * 2.76, 0.15, 0.06))
-    x = at(x, 0.13, tone(hz(19), 0.7, 0.3))
-    x = at(x, 0.13, tone(hz(19) * 2.76, 0.18, 0.06))
-    write("your_turn", x, loud=-3, wet=0.2)
+    # small and polite (the first version was too big): two quick high pings
+    x = tone(hz(27), 0.12, 0.3, att=0.002)
+    x = at(x, 0.08, tone(hz(31), 0.18, 0.3, att=0.002))
+    write("your_turn", hp(x, 400), loud=-10, wet=0.06)
     # Checkmate B: arcade level up, D major
     x = buf(0)
     for k, s in enumerate([0, 4, 7, 12, 16, 19, 24]):
