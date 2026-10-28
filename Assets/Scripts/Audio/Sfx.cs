@@ -39,7 +39,7 @@ public static class Sfx
     }
 
     /// <summary>The sound for a menu button: the blob bloop</summary>
-    public static void Tap() => Play("ui_tap", 0.8f);
+    public static void Tap() => Play("ui_tap", 0.7f);
 
     private static readonly Dictionary<string, AudioClip[]> clips = new Dictionary<string, AudioClip[]>();
     private static readonly Dictionary<string, float> lastPlayed = new Dictionary<string, float>();

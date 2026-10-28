@@ -163,11 +163,13 @@ def write(name, x, **kw):
 
 # ---------------- Menus ----------------
 def ui():
-    for i, end in enumerate([520, 560, 490]):
-        x = tone(180, 0.18, 0.6, f1=end, glide=0.06)
-        x = at(x, 0.02, tone(360, 0.1, 0.15, "triangle", f1=end * 1.73, glide=0.05))
-        write(f"ui_tap_{i + 1}", x, loud=-4, wet=0.08)
-    write("ui_back", at(tone(520, 0.18, 0.6, f1=170, glide=0.08), 0.0, tone(900, 0.08, 0.1, "triangle", f1=340)), loud=-5, wet=0.08)
+    # Small and light (Brandon: the first version felt too big): a short high bloop, no low end
+    for i, end in enumerate([880, 940, 830]):
+        x = tone(440, 0.07, 0.6, f1=end, glide=0.03, att=0.002, shape=0.8)
+        x = at(x, 0.01, tone(end * 1.5, 0.04, 0.12, "triangle"))
+        write(f"ui_tap_{i + 1}", hp(x, 300), loud=-11, wet=0.02)
+    x = tone(880, 0.08, 0.6, f1=420, glide=0.04, att=0.002, shape=0.8)
+    write("ui_back", hp(x, 300), loud=-12, wet=0.02)
     write("ui_toggle_on", at(tone(hz(12), 0.07, 0.4, "triangle"), 0.06, tone(hz(19), 0.12, 0.4, "triangle")), loud=-6, wet=0.08)
     write("ui_toggle_off", at(tone(hz(19), 0.07, 0.4, "triangle"), 0.06, tone(hz(12), 0.12, 0.4, "triangle")), loud=-6, wet=0.08)
     x = tone(150, 0.12, 0.6, "square", f1=110, cutoff=700)
