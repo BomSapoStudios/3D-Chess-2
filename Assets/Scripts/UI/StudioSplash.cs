@@ -113,7 +113,27 @@ public class StudioSplash : MonoBehaviour
     {
         // NeonMenu turns off every other root canvas when it builds (HideOldMenu); keep this one showing
         if (!canvas.enabled) canvas.enabled = true;
+        ReturnOldMenu();
         if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)) skipped = true;
+    }
+
+    // MainMenuController builds the old menu under FindFirstObjectByType<Canvas>(), which can be this one.
+    // Move it to the scene's own "Canvas" (which NeonMenu hides), or it would show through the splash
+    private void ReturnOldMenu()
+    {
+        if (transform.childCount <= 2) return;
+        GameObject sceneCanvas = GameObject.Find("Canvas");
+        if (sceneCanvas == null || sceneCanvas.GetComponent<Canvas>() == null)
+        {
+            sceneCanvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            sceneCanvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            sceneCanvas.GetComponent<Canvas>().enabled = false;
+        }
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (child.name != "Background" && child.name != "Content") child.SetParent(sceneCanvas.transform, false);
+        }
     }
 
     private static RectTransform NewRect(string name, Transform parent)
