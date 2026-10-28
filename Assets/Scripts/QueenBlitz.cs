@@ -385,6 +385,7 @@ public static partial class QueenBlitz
         Cleared = false;
         OutOfMoves = false;
         AutoPlaced = false;
+        StartAttempt();
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
         SetUpFeatures(Current);
@@ -403,6 +404,7 @@ public static partial class QueenBlitz
     /// Returns the pawns paid, and whether the moves are a new best.</summary>
     public static (int paid, bool best) RecordClear()
     {
+        LogSolve();
         int paid = 0;
         if (!EverCleared(Index) || !PawnBank.BlitzPaysFirstClearOnly)
         {
@@ -565,11 +567,14 @@ public partial class QueenBlitzDirector : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        QueenBlitz.EndAttempt(); // left or restarted without a clear: the time still counts towards it
     }
 
     private void Update()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        // The solve clock runs from the puzzle appearing until the last pawn falls (a long frame, such as coming back from the background, adds at most half a second)
+        if (laidOut && !ended && (state == GameState.PiecePlacement || state == GameState.Playing)) QueenBlitz.Elapsed += Mathf.Min(Time.unscaledDeltaTime, 0.5f);
         if (laidOut && ChessBoard.Instance != null) TrackTaken();
         if (state != GameState.PiecePlacement && state != GameState.Playing) return;
         if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
@@ -912,6 +917,15 @@ public partial class QueenBlitzDirector : MonoBehaviour
             string text = state == GameState.PiecePlacement
                 ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  {puzzle.par} moves"
                 : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}";
+            // The solve clock (playtest): sized as if every digit were wide, so the text doesn't
+            // shrink and grow as the seconds tick by
+            string fit = text;
+            if (QueenBlitz.ShowTimer)
+            {
+                string clock = QueenBlitz.Clock(QueenBlitz.Elapsed);
+                text += $"  ·  <color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Cyan)}>{clock}</color>";
+                fit += "  ·  " + System.Text.RegularExpressions.Regex.Replace(clock, "[0-9]", "8");
+            }
             // At the very top (the turn line is hidden in puzzles), between the pawn total on the
             // left and the "?" on the right with a clear gap to each; smaller text, then two lines,
             // on narrow screens
@@ -921,8 +935,8 @@ public partial class QueenBlitzDirector : MonoBehaviour
             const float icon = 26f;
             GUIStyle style = NeonTheme.GUILabelStyle(NeonTheme.Yellow, 16, true, TextAnchor.MiddleCenter);
             style.richText = true;
-            while (style.fontSize > 12 && style.CalcSize(new GUIContent(text)).x > w - 16f - icon) style.fontSize--;
-            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(text), w - 16f - icon) + 8f);
+            while (style.fontSize > 12 && style.CalcSize(new GUIContent(fit)).x > w - 16f - icon) style.fontSize--;
+            float h = Mathf.Max(32f, style.CalcHeight(new GUIContent(fit), w - 16f - icon) + 8f);
             Rect rect = new Rect(from + (to - from - w) / 2f, 6f, w, h);
             NeonTheme.GUIPanel(rect, NeonTheme.Yellow, 0.85f);
             GUI.Label(new Rect(rect.x + 8f, rect.y, rect.width - 16f - icon, rect.height), text, style);

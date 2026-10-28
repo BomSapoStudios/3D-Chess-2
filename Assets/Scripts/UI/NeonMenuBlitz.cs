@@ -153,7 +153,74 @@ public partial class NeonMenu
         var tiles = new System.Collections.Generic.List<PackTile>();
         foreach (QueenBlitz.PackInfo pack in QueenBlitz.Available())
             if (pack.review) tiles.Add(Tile(pack));
+        int solves = QueenBlitz.Solves().Count;
+        tiles.Add(new PackTile("Solve times", NeonTheme.Cyan, $"{solves} clear{(solves == 1 ? "" : "s")} logged", NeonTheme.Yellow, ShowBlitzSolves));
         PackGrid(tiles);
+    }
+
+    private float blitzClearTapTime = -10f;
+
+    /// <summary>Every logged clear, newest first: how long it took, in how many tries, for gauging difficulty</summary>
+    private void ShowBlitzSolves()
+    {
+        ClearBlitzContent();
+        blitzView = BlitzView.Packs;
+        blitzTitle.text = "SOLVE TIMES";
+        BlitzBack(ShowBlitzPlaytest);
+        var list = QueenBlitz.Solves();
+        BlitzText(list.Count == 0 ? "No clears logged yet. Every clear from now on is timed from the puzzle appearing."
+                : "Newest first. Tries and the total count every start since the last clear.",
+            14, NeonTheme.Lavender, new Vector2(0.5f, 1f), new Vector2(560, 40), new Vector2(0, -82));
+
+        const float areaW = 580f, areaH = 168f, rowH = 22f;
+        RectTransform view = NewRect("Solve List", blitzContent);
+        Place(view, new Vector2(0.5f, 1f), new Vector2(areaW, areaH), new Vector2(0f, -104f - areaH / 2f));
+        view.gameObject.AddComponent<RectMask2D>();
+        Image catcher = view.gameObject.AddComponent<Image>();
+        catcher.color = new Color(0f, 0f, 0f, 0f); // takes the drags
+        RectTransform content = NewRect("Solves", view);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.sizeDelta = new Vector2(0f, Mathf.Max(list.Count * rowH, areaH));
+        content.anchoredPosition = Vector2.zero;
+        ScrollRect scroll = view.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport = view;
+        scroll.content = content;
+        scroll.horizontal = false;
+        scroll.vertical = list.Count * rowH > areaH;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        for (int i = list.Count - 1, row = 0; i >= 0; i--, row++)
+        {
+            QueenBlitz.Solve solve = list[i];
+            string pack = QueenBlitz.IsDaily(solve.pack) ? solve.name : $"{QueenBlitz.Info(solve.pack).name} {solve.puzzle}";
+            string tries = solve.attempts > 1 ? $"{solve.attempts} tries, {QueenBlitz.Clock(solve.totalSeconds)} in all" : "first try";
+            string line = $"<color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Yellow)}>{QueenBlitz.Clock(solve.seconds)}</color>  {pack}  ·  {tries}  ·  {solve.moves}/{solve.par} moves"
+                + (solve.first ? "" : "  ·  replay") + $"  <color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Muted)}>{solve.date}</color>";
+            TextMeshProUGUI t = NewText("Solve", content, line, 13, NeonTheme.Lavender, TextAlignmentOptions.Left);
+            t.fontStyle = FontStyles.Normal;
+            t.enableWordWrapping = false;
+            t.overflowMode = TextOverflowModes.Ellipsis;
+            Place(t.rectTransform, new Vector2(0.5f, 1f), new Vector2(areaW - 16f, rowH), new Vector2(0f, -row * rowH - rowH / 2f));
+        }
+        if (list.Count == 0) return;
+
+        // Copy the log for a spreadsheet; Clear asks for a second tap
+        Button copy = NeonButton(blitzContent, "Copy all", new Vector2(130, 38), NeonTheme.Lime, NeonTheme.Pink, -0.4f, 15, () =>
+        {
+            GUIUtility.systemCopyBuffer = QueenBlitz.SolvesAsText();
+            Haptics.Selection(); Sfx.Tap();
+            ShowToast($"Copied {QueenBlitz.Solves().Count} solve times, ready to paste into a spreadsheet");
+        });
+        Place((RectTransform)copy.transform, new Vector2(0.5f, 0f), new Vector2(130, 38), new Vector2(-80, 34));
+        Button clear = NeonButton(blitzContent, "Clear", new Vector2(110, 38), NeonTheme.Pink, NeonTheme.Ground, 0.4f, 15, () =>
+        {
+            if (Time.unscaledTime - blitzClearTapTime > 3f) { blitzClearTapTime = Time.unscaledTime; ShowToast("Tap Clear again to delete every solve time"); return; }
+            blitzClearTapTime = -10f;
+            QueenBlitz.ClearSolves();
+            ShowBlitzSolves();
+        });
+        Place((RectTransform)clear.transform, new Vector2(0.5f, 0f), new Vector2(110, 38), new Vector2(80, 34));
     }
 
     private PackTile Tile(QueenBlitz.PackInfo pack)
