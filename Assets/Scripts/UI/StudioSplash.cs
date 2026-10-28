@@ -81,19 +81,21 @@ public class StudioSplash : MonoBehaviour
         // Scripts start while Unity's "Made with Unity" splash is still drawing over everything, so the
         // card would otherwise play out unseen underneath it
         while (!UnityEngine.Rendering.SplashScreen.isFinished) yield return null;
+        yield return null;
+        yield return null;
 
         // Fade the logo and text in, then hold (a tap only shortens the hold once MinHold has passed)
-        for (float t = 0; t < FadeIn; t += Time.unscaledDeltaTime)
+        for (float t = 0; t < FadeIn; t += Step)
         {
             contentGroup.alpha = t / FadeIn;
             yield return null;
         }
         contentGroup.alpha = 1f;
         skipped = false;
-        for (float t = 0; t < Hold && !(skipped && t >= MinHold); t += Time.unscaledDeltaTime) yield return null;
+        for (float t = 0; t < Hold && !(skipped && t >= MinHold); t += Step) yield return null;
 
         // The whole card fades away to the menu; taps stay blocked until it's gone
-        for (float t = 0; t < FadeOut; t += Time.unscaledDeltaTime)
+        for (float t = 0; t < FadeOut; t += Step)
         {
             group.alpha = 1f - t / FadeOut;
             yield return null;
@@ -101,6 +103,10 @@ public class StudioSplash : MonoBehaviour
         Destroy(gameObject);
         Resources.UnloadUnusedAssets();
     }
+
+    // The menu builds itself over the first frames after launch, and a single one of those can take
+    // longer than the whole card; capping the step means every fade is actually drawn, frame by frame
+    private static float Step => Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
 
     private void Update()
     {
