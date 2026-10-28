@@ -99,7 +99,7 @@ public class UndoManager : MonoBehaviour
         activeCount = active;
 
         // Save once at the start of each turn a person plays, after the last move has settled
-        if (savedAtTurn != TurnKey && PersonToMove() && GameStateManager.Instance.CanMovePieces() && HasOwnPieces())
+        if (savedAtTurn != TurnKey && PersonToMove() && GameStateManager.Instance.CanMovePieces() && HasOwnPieces() && ZombiesRisen())
         {
             savedAtTurn = TurnKey;
             history.Add(Capture());
@@ -115,6 +115,12 @@ public class UndoManager : MonoBehaviour
         foreach (ChessPiece p in BoardPieces()) if (p.pieceColor == me) return true;
         return false;
     }
+
+    /// <summary>
+    /// A zombie run's first zombie is on the board. It rises in the director's Update on the frame
+    /// play starts; saving before it kept a board without it, and Undo after the first move removed it
+    /// </summary>
+    private static bool ZombiesRisen() => !ZombieMode.Active || (ZombieDirector.Instance != null && ZombieDirector.Instance.Started);
 
     private static Snapshot Capture()
     {
