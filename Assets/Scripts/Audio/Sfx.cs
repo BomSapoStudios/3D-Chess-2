@@ -19,8 +19,11 @@ public static class Sfx
         return 12 * (n / Scale.Length) + Scale[n % Scale.Length];
     }
 
-    /// <summary>Plays a sound. semitones moves it up or down in pitch; vary adds the small random shift</summary>
-    public static void Play(string name, float volume = 1f, float semitones = 0f, bool vary = true)
+    /// <summary>
+    /// Plays a sound. semitones moves it up or down in pitch; vary adds the small random shift;
+    /// pan places it between the speakers (-1 left, 1 right)
+    /// </summary>
+    public static void Play(string name, float volume = 1f, float semitones = 0f, bool vary = true, float pan = 0f)
     {
         if (!SoundPrefs.Effects) return;
         AudioClip clip = Pick(name);
@@ -29,7 +32,7 @@ public static class Sfx
         if (lastPlayed.TryGetValue(name, out float last) && now - last < 0.03f) return; // same sound twice in one beat
         lastPlayed[name] = now;
         float pitch = Mathf.Pow(2f, semitones / 12f) * (vary ? Random.Range(0.97f, 1.03f) : 1f);
-        Host.Play(clip, volume * SoundPrefs.EffectsVolume, pitch);
+        Host.Play(clip, volume * SoundPrefs.EffectsVolume, pitch, pan);
     }
 
     /// <summary>Plays a sound pitched by the board plane it happens on: higher plane, higher note</summary>
@@ -99,7 +102,7 @@ public class SfxHost : MonoBehaviour
         }
     }
 
-    public void Play(AudioClip clip, float volume, float pitch)
+    public void Play(AudioClip clip, float volume, float pitch, float pan)
     {
         if (volume <= 0f) return;
         // a free voice if there is one, otherwise the oldest
@@ -113,6 +116,7 @@ public class SfxHost : MonoBehaviour
         s.clip = clip;
         s.volume = volume;
         s.pitch = pitch;
+        s.panStereo = pan;
         s.Play();
     }
 }

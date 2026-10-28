@@ -488,8 +488,11 @@ SOUND
   Every sound is synthesized for the game (Tools/Sound/make_sounds.py, no
   samples) and tuned to D, the key of the menu music (Arcade Rush 1).
   • Menu buttons bloop; back buttons bloop downward; switches blip.
-  • A move lands with a zap and a low thud, pitched by the plane it lands
-    on (higher plane, higher note). Captures clink and shatter.
+  • A move lands with a soft zap whose tone belongs to its square: the plane
+    (height) sets the note, climbing D minor pentatonic; the row (depth) sets
+    a soft second note on top, so each square of a plane has its own two-note
+    chord; and the sound pans to where the square is on screen. Captures
+    clink and shatter.
   • Check: a low sonar pulse. Your turn (vs robots or online): a chime.
   • Game over: an arcade "level up" for a win (D major), a falling run for
     a loss (D minor), a suspended chord for a draw.

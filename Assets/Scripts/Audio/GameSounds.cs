@@ -8,11 +8,29 @@ public static class GameSounds
 {
     private static bool IsZombie(ChessPiece p) => ZombieMode.Active && p != null && p.pieceColor == ZombieMode.ZombieColor;
 
-    /// <summary>A move lands: the zap, higher on higher planes (a zombie shuffles instead)</summary>
+    /// <summary>
+    /// A move lands with a tone that belongs to its square (a zombie shuffles instead). On cubes up
+    /// to 8x8x8: the plane (height) sets the zap's note, climbing D minor pentatonic; the row
+    /// (depth) sets the soft note on top, so each square of a plane has its own two-note chord;
+    /// and the sound is panned to where the square is on screen, whichever way the cube is turned.
+    /// </summary>
     public static void MoveLanded(ChessPiece piece, BoardPosition to)
     {
-        if (IsZombie(piece)) Sfx.Play("zombie_step", 0.8f);
-        else Sfx.OnPlane("move", to.y);
+        if (IsZombie(piece)) { Sfx.Play("zombie_step", 0.8f); return; }
+        float pan = ScreenPan(piece.transform.position);
+        Sfx.Play("move", 1f, Sfx.Step(to.y) - 5, vary: false, pan: pan);
+        int top = to.y + 2 + to.z;
+        if (top > 11) top -= 5; // an octave down, so the top note stays close to the zap
+        Sfx.Play("move_chime", 0.3f, Sfx.Step(top) - 5, vary: false, pan: pan);
+    }
+
+    /// <summary>-0.7 (left of the screen) to 0.7 (right)</summary>
+    private static float ScreenPan(Vector3 world)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return 0f;
+        float x = cam.WorldToViewportPoint(world).x;
+        return Mathf.Clamp((x - 0.5f) * 1.4f, -0.7f, 0.7f);
     }
 
     /// <summary>The sound of a piece being taken</summary>
