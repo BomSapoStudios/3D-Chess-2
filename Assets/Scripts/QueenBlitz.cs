@@ -549,7 +549,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
     private static void TryCreate()
     {
         GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
-        bool inGame = Object.FindFirstObjectByType<MainMenuController>() == null;
+        bool inGame = !MenuScene.IsActive;
         QueenBlitz.Active = inGame && config != null && config.queenBlitz && !config.isOnlineGame;
         if (!QueenBlitz.Active || Instance != null) return;
         QueenBlitz.Begin(config.blitzPuzzle);

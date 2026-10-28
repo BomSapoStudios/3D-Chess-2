@@ -85,7 +85,7 @@ public class ZombieDirector : MonoBehaviour
     private static void TryCreate()
     {
         GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
-        bool inGame = Object.FindFirstObjectByType<MainMenuController>() == null;
+        bool inGame = !MenuScene.IsActive;
         ZombieMode.Active = inGame && config != null && config.zombieMode && !config.isOnlineGame;
         ZombieMode.HoldTurn = false;
         if (!ZombieMode.Active || Instance != null) return;
