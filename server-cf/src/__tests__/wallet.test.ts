@@ -4,7 +4,7 @@ import { describe, test, expect, beforeEach } from 'vitest';
 const { DatabaseSync } = await import('node:sqlite' as string);
 const fixtures = (await import('./fixtures/apple-jws.json' as string)).default;
 import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError } from '../wallet';
-import { ECONOMY, itemOfProduct, priceOf } from '../economy';
+import { ECONOMY, EVERYTHING, itemOfProduct, priceOf } from '../economy';
 import { verifyAppleTransaction } from '../appleJws';
 
 /** The Durable Object's SqlStorage, on Node's built-in SQLite */
@@ -165,6 +165,13 @@ describe('App Store purchases', () => {
     expect(walletOf(sql, 'a').items).toEqual(['backdrop.graveyard']);
   });
 
+  test('Unlock Everything is kept like any purchase, and can\'t be had for pawns', () => {
+    syncWallet(sql, 'a', { balance: 10_000, items: ['bundle.everything'] }, []);
+    expect(walletOf(sql, 'a').items).toEqual([EVERYTHING]); // moved over from a phone that bought it before
+    expect(() => spendPawns(sql, 'b', rid(), EVERYTHING)).toThrow(/can't be bought with pawns/);
+    expect(recordPurchases(sql, 'b', [p('1010', EVERYTHING)]).wallet.items).toEqual([EVERYTHING]);
+  });
+
   test('a refund takes the item away', () => {
     recordPurchases(sql, 'a', [p('1004', 'promotion.splat')]);
     recordPurchases(sql, 'a', [p('1004', 'promotion.splat', true)]);
@@ -190,6 +197,11 @@ describe('economy', () => {
     expect(itemOfProduct('BomSapo.Chess3D.backdrop.graveyard')).toBe('backdrop.graveyard');
     expect(itemOfProduct('com.other.coins')).toBeNull();
     expect(itemOfProduct('BomSapo.Chess3D.coins.1000')).toBeNull();
+  });
+
+  test('Unlock Everything is an App Store product pawns can\'t buy', () => {
+    expect(itemOfProduct('BomSapo.Chess3D.bundle.everything')).toBe(EVERYTHING);
+    expect(priceOf(EVERYTHING)).toBeNull();
   });
 });
 

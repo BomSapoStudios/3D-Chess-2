@@ -4,7 +4,8 @@ using UnityEngine;
 /// <summary>
 /// What's unlocked on this phone, and what things cost. Cyberpunk pieces, the Neon Glow backdrop
 /// and the Fade promotion are free; everything else unlocks for pawns (PawnBank) or for money
-/// (Purchases, the App Store). Ownership is saved on this phone.
+/// (Purchases, the App Store). Unlock Everything (money only) owns every paid item and Queen Blitz
+/// pack, including ones added later. Ownership is saved on this phone.
 /// </summary>
 public static class Store
 {
@@ -16,18 +17,23 @@ public static class Store
 
     public const int PromotionPawns = 1000;                       // placeholder until Brandon confirms
     public const string PromotionDollars = "$0.99";               // placeholder until Brandon confirms
+    public const string EverythingDollars = "$19.99";
+
+    /// <summary>Unlock Everything: every piece set, backdrop, promotion and Queen Blitz pack, now and later</summary>
+    public const string EverythingId = "bundle.everything";
+    public static bool OwnsEverything => OwnsId(EverythingId);
 
     public static string Id(PieceShapes.Kind set) => "set." + set;
     public static string Id(PromotionStyle.Kind promotion) => "promotion." + promotion;
     public static bool Free(PromotionStyle.Kind promotion) => promotion == PromotionStyle.Kind.Fade;
-    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || OwnsId(Id(promotion));
+    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || OwnsEverything || OwnsId(Id(promotion));
     public static string Id(Backdrops.Kind backdrop) => "backdrop." + backdrop;
 
     public static bool Free(PieceShapes.Kind set) => set == PieceShapes.Kind.Cyberpunk;
     public static bool Free(Backdrops.Kind backdrop) => backdrop == Backdrops.Kind.NeonGlow;
 
-    public static bool Owns(PieceShapes.Kind set) => Free(set) || OwnsId(Id(set));
-    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || OwnsId(Id(backdrop));
+    public static bool Owns(PieceShapes.Kind set) => Free(set) || OwnsEverything || OwnsId(Id(set));
+    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || OwnsEverything || OwnsId(Id(backdrop));
 
     /// <summary>Owned on the server (Wallet), or unlocked on this phone before the server kept it</summary>
     public static bool OwnsId(string id) => Wallet.Owns(id, "Owned." + id);
@@ -44,5 +50,12 @@ public static class Store
         foreach (PieceShapes.Kind k in PieceShapes.All) if (!Free(k)) yield return Id(k);
         foreach (Backdrops.Kind k in Backdrops.All) if (!Free(k)) yield return Id(k);
         foreach (PromotionStyle.Kind k in PromotionStyle.All) if (!Free(k)) yield return Id(k);
+    }
+
+    /// <summary>Everything sold on the App Store: each paid item and Unlock Everything</summary>
+    public static IEnumerable<string> ProductIds()
+    {
+        foreach (string id in PaidIds()) yield return id;
+        yield return EverythingId;
     }
 }

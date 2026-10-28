@@ -290,7 +290,7 @@ public class Wallet : MonoBehaviour
     private static Migration PhoneMigration()
     {
         var items = new List<string>();
-        foreach (string id in Store.PaidIds()) if (PlayerPrefs.GetInt("Owned." + id, 0) == 1) items.Add(id.ToLowerInvariant());
+        foreach (string id in Store.ProductIds()) if (PlayerPrefs.GetInt("Owned." + id, 0) == 1) items.Add(id.ToLowerInvariant());
         foreach (string pack in QueenBlitz.PawnPacks()) if (PlayerPrefs.GetInt("QueenBlitzOwned." + pack, 0) == 1) items.Add("blitz." + pack);
         return new Migration { balance = PawnBank.PhoneTotal, lifetime = PawnBank.PhoneLifetime, items = items.ToArray(), cleared = QueenBlitz.ClearedPuzzleIds().ToArray() };
     }

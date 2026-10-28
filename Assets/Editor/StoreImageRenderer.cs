@@ -169,6 +169,7 @@ public static class StoreImageRenderer
             yield return Step(ReviewShots(menu));
         }
         yield return Step(GamePromos());
+        if (!timingCandidates) yield return Step(EverythingImages(menu));
 
         PieceShapes.Showing = null;
         Debug.Log("STORE IMAGES: done" + (failures.Count > 0 ? " — failed: " + string.Join(", ", failures) : ""));
@@ -361,6 +362,64 @@ public static class StoreImageRenderer
                 else { Bounds e = b.Value; e.Encapsulate(r.bounds); b = e; }
             }
         return b ?? new Bounds(Vector3.zero, Vector3.one);
+    }
+
+    // ───────── Unlock Everything: a collage of what it opens, and the Customize card ─────────
+
+    private static IEnumerator EverythingImages(NeonMenu menu)
+    {
+        if (!Wanted(Store.EverythingId)) yield break;
+        // The review shot: Customize with the Unlock Everything card over the choices
+        if (menu == null) menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>();
+        if (menu == null)
+        {
+            // Back to the menu after the game shots
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+            float until = Time.realtimeSinceStartup + 30f;
+            while ((menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>()) == null && Time.realtimeSinceStartup < until) yield return null;
+            yield return new WaitForSecondsRealtime(3f);
+        }
+        if (menu != null)
+        {
+            Call(menu, "ShowCustomize");
+            yield return new WaitForSecondsRealtime(1f);
+            SelectTab(menu, "Pieces");
+            yield return new WaitForSecondsRealtime(2.5f);
+            yield return CaptureScreen(ProductId(Store.EverythingId) + "_review");
+        }
+
+        // The promo image: three piece sets, three backdrops and three promotions, from their own pictures
+        var tiles = new List<string>();
+        tiles.AddRange(PieceShapes.All.Where(k => !Store.Free(k)).Take(3).Select(k => ProductId(Store.Id(k))));
+        tiles.AddRange(Backdrops.All.Where(k => !Store.Free(k)).Take(3).Select(k => ProductId(Store.Id(k))));
+        tiles.AddRange(PromotionStyle.All.Where(k => !Store.Free(k)).Take(3).Select(k => ProductId(Store.Id(k))));
+        // Mixed so no row is all one kind
+        int[] order = { 0, 3, 6, 4, 7, 1, 8, 2, 5 };
+        var tex = new Texture2D(PromoSize, PromoSize, TextureFormat.RGB24, false);
+        var px = new Color[PromoSize * PromoSize];
+        for (int i = 0; i < px.Length; i++) px[i] = NeonTheme.Ground;
+        const int gap = 14, edge = 4;
+        int cell = (PromoSize - gap * 4) / 3;
+        Color[] edges = { NeonTheme.Pink, NeonTheme.Cyan, NeonTheme.Lime };
+        for (int t = 0; t < 9; t++)
+        {
+            string path = Path.Combine(OutputFolder, tiles[order[t]] + ".png");
+            if (!File.Exists(path)) { failures.Add("Unlock Everything needs " + tiles[order[t]]); continue; }
+            var src = new Texture2D(2, 2);
+            src.LoadImage(File.ReadAllBytes(path));
+            int x0 = gap + (t % 3) * (cell + gap), y0 = gap + (2 - t / 3) * (cell + gap);
+            Color border = edges[(t + t / 3) % 3];
+            for (int y = 0; y < cell; y++)
+                for (int x = 0; x < cell; x++)
+                {
+                    bool onEdge = x < edge || y < edge || x >= cell - edge || y >= cell - edge;
+                    px[(y0 + y) * PromoSize + x0 + x] = onEdge ? border : src.GetPixelBilinear((x + 0.5f) / cell, (y + 0.5f) / cell);
+                }
+            UnityEngine.Object.Destroy(src);
+        }
+        tex.SetPixels(px);
+        tex.Apply();
+        SavePng(tex, ProductId(Store.EverythingId));
     }
 
     // ───────── Review screenshots: the Customize screen previewing each locked item ─────────

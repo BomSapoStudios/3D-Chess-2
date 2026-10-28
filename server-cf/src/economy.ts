@@ -26,8 +26,12 @@ export const ECONOMY = {
   maxTransactionsPerCall: 40,
 } as const;
 
-/** Everything sold is "<kind>.<name>"; ids are lowercase (App Store product ids are "BomSapo.Chess3D." + id) */
-export const ITEM_ID = /^(set|backdrop|promotion|blitz)\.[a-z0-9-]{1,40}$/;
+/**
+ * Everything sold is "<kind>.<name>"; ids are lowercase (App Store product ids are "BomSapo.Chess3D." + id).
+ * "bundle.everything" (Unlock Everything, money only) owns every item and pack; the app honors it.
+ */
+export const ITEM_ID = /^(set|backdrop|promotion|blitz|bundle)\.[a-z0-9-]{1,40}$/;
+export const EVERYTHING = 'bundle.everything';
 /** A Queen Blitz puzzle: "<pack>.<index>" (dailies are "daily-YYYY-MM-DD.0") */
 export const PUZZLE_ID = /^[a-z0-9-]{1,40}\.[0-9]{1,4}$/;
 /** Request and run ids the app makes up (GUIDs) */
@@ -35,6 +39,7 @@ export const CLIENT_ID = /^[A-Za-z0-9-]{8,64}$/;
 
 export const PRODUCT_PREFIX = 'bomsapo.chess3d.';
 
+/** The pawn price, or null if pawns can't buy it (unknown items and Unlock Everything) */
 export function priceOf(item: string): number | null {
   if (!ITEM_ID.test(item)) return null;
   return ECONOMY.prices[item.split('.')[0]] ?? null;

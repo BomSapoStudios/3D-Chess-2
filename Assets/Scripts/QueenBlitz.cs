@@ -248,7 +248,7 @@ public static partial class QueenBlitz
 
     // ───────────────────────── Owning packs and opening chapters ─────────────────────────
 
-    public static bool Owns(PackInfo pack) => pack.free || Wallet.Owns("blitz." + pack.id, "QueenBlitzOwned." + pack.id);
+    public static bool Owns(PackInfo pack) => pack.free || Store.OwnsEverything || Wallet.Owns("blitz." + pack.id, "QueenBlitzOwned." + pack.id);
 
     /// <summary>Packs sold for pawns (their ids)</summary>
     public static IEnumerable<string> PawnPacks()

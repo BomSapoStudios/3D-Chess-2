@@ -65,6 +65,9 @@ check(pu.granted?.includes('set.mushroomgrove') && pu.rejected === 4 && pu.walle
 pu = (await post('/wallet/purchase', { transactions: [F.e2e[0]] }, b.token)).body;
 const wa = (await get('/wallet', a.token)).body;
 check(pu.wallet.items.includes('set.mushroomgrove') && !wa.items.includes('set.mushroomgrove'), 'restored on another account, the purchase moves there');
+pu = (await post('/wallet/purchase', { transactions: [F.everything] }, b.token)).body;
+check(pu.granted?.includes('bundle.everything') && pu.wallet.items.includes('bundle.everything'), 'Unlock Everything is recorded with the account');
+check((await post('/wallet/spend', { requestId: rid(), item: 'bundle.everything' }, b.token)).status === 400, "Unlock Everything can't be bought with pawns");
 pu = (await post('/wallet/purchase', { transactions: [F.e2eRefund] }, b.token)).body;
 check(!pu.wallet.items.includes('set.mushroomgrove'), 'a refund takes it away');
 

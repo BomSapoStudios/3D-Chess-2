@@ -52,6 +52,7 @@ const fixtures = {
   valid,
   backdrop: jws(good, tx(2000002, 'BomSapo.Chess3D.backdrop.graveyard')),
   promotion: jws(good, tx(2000003, 'BomSapo.Chess3D.promotion.splat')),
+  everything: jws(good, tx(2000008, 'BomSapo.Chess3D.bundle.everything')),
   e2e: Array.from({ length: 6 }, (_, i) => jws(good, tx(3000001 + i, 'BomSapo.Chess3D.set.mushroomgrove'))),
   e2eRefund: jws(good, tx(3000001, 'BomSapo.Chess3D.set.mushroomgrove', { revocationDate: now })),
   wrongBundle: jws(good, tx(2000004, 'BomSapo.Chess3D.set.abyssglow', { bundleId: 'com.someone.else' })),
