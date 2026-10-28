@@ -176,7 +176,7 @@ public class ZombieDirector : MonoBehaviour
 
         if (!PlayerPieces().Any())
         {
-            EndRun();
+            EndRun("Overrun");
             yield break;
         }
         if (Playing() && TurnManager.Instance != null && TurnManager.Instance.GetCurrentPlayer() == ZombieMode.ZombieColor)
@@ -325,13 +325,21 @@ public class ZombieDirector : MonoBehaviour
 
     // ───────────────────────── The end ─────────────────────────
 
-    private void EndRun()
+    /// <summary>The player forfeited: the run ends here, scored as it stands</summary>
+    public void GiveUp()
+    {
+        if (!Playing()) return;
+        ZombieMode.HoldTurn = false;
+        EndRun("Gave up");
+    }
+
+    private void EndRun(string how)
     {
         if (ended) return;
         ended = true;
         bool best = ZombieMode.SaveBest();
         GameCenter.ReportZombieRun(ZombieMode.Difficulty, ZombieMode.Rounds);
-        string reason = $"Overrun after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})")
+        string reason = $"{how} after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})")
             + $". +{pawnsThisRun} pawn{(pawnsThisRun == 1 ? "" : "s")}" + (PawnBank.ZombieLeftToday == 0 ? " (today's limit reached)" : "");
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.EndGame(ZombieMode.ZombieColor, reason);
         else if (GameStateManager.Instance != null) GameStateManager.Instance.ChangeState(GameState.GameOver);
