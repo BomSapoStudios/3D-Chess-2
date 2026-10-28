@@ -209,14 +209,12 @@ def setup():
 
 # ---------------- Chess ----------------
 def zap(f, take):
-    """Move C1: electric zap landing on the note (Brandon switched from C3, which added a thud)"""
-    # Same note every take (the plane sets the pitch); the takes differ in sweep speed,
-    # brightness and thud so repeats don't sound copied
-    glide, bright, body = [(0.04, 3000, 1500), (0.025, 4200, 2000), (0.065, 2200, 1100)][take]
+    """Move: Brandon's pick, the soft C1 zap with a fifth on top (take 3 of the earlier set).
+    Takes differ only very slightly so repeats don't sound copied."""
+    glide, bright, det = [(0.065, 2200, -7), (0.06, 2350, -4), (0.07, 2050, -10)][take]
     x = tone(f * 2, 0.14, 0.25, "saw", f1=f, glide=glide, cutoff=bright)
-    x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=body, detune=[0, 7, -7][take]))
-    if take == 1: x = at(x, 0.0, hiss(0.03, 6000, 0.08, kind="high", att=0.001))  # a crisper spark
-    if take == 2: x = at(x, 0.05, tone(f * 1.5, 0.12, 0.06, "triangle"))  # a soft fifth on top
+    x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=1100, detune=det))
+    x = at(x, 0.05, tone(f * 1.5, 0.12, 0.06, "triangle"))  # a soft fifth on top
     return x
 
 def chess():
