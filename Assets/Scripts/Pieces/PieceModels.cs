@@ -50,6 +50,15 @@ public static class PieceModels
         return tex;
     }
 
+    /// <summary>The chosen set's recolour maps for a piece (original colours, main-colour mask), if it has them</summary>
+    public static (Texture2D colours, Texture2D mask) Recolor(ChessPieceType type)
+    {
+        string path = "Pieces/" + Folder + "/" + type;
+        if (!details.TryGetValue(path + "_Color", out Texture2D colours)) details[path + "_Color"] = colours = Resources.Load<Texture2D>(path + "_Color");
+        if (!details.TryGetValue(path + "_Mask", out Texture2D mask)) details[path + "_Mask"] = mask = Resources.Load<Texture2D>(path + "_Mask");
+        return (colours, mask);
+    }
+
     /// <summary>The chosen set's detail map for a piece (grayscale; the material tints it), if it has one</summary>
     public static Texture2D Detail(ChessPieceType type)
     {

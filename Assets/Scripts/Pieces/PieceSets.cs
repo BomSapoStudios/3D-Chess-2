@@ -175,14 +175,45 @@ public static class PieceSets
     }
 
     /// <summary>
-    /// A textured set's piece in the chosen finish: the two-tone detail is the colour, and the
-    /// finish brings the surface (Neon Glow glows softer than on plain pieces, so the markings
-    /// aren't washed out).
+    /// A textured set's piece in the chosen finish. With recolour maps (Art/Pieces/export_recolor.py)
+    /// the piece keeps its original colours and only its main colour becomes the side's; otherwise
+    /// the detail map in two tones of the side's colour. The finish brings the surface (Neon Glow
+    /// glows softer than on plain pieces, so the markings aren't washed out).
     /// </summary>
     public static Material CreateTexturedMaterial(PieceColor player, ChessPieceType type)
     {
         Kind kind = Effective;
         Material material = CreateMaterial(kind, player);
+        var (colours, mask) = PieceModels.Recolor(type);
+        Shader recolor = colours != null && mask != null ? Resources.Load<Shader>("Shaders/RecolorPiece") : null;
+        if (recolor != null)
+        {
+            var piece = new Material(recolor);
+            piece.SetTexture("_MainTex", colours);
+            piece.SetTexture("_MaskTex", mask);
+            piece.SetColor("_Tint", Tint(kind, player));
+            piece.SetFloat("_Glossiness", material.GetFloat("_Glossiness"));
+            piece.SetFloat("_Metallic", material.GetFloat("_Metallic"));
+            switch (kind)
+            {
+                case Kind.NeonGlow:
+                    piece.color = new Color(0.8f, 0.8f, 0.8f);
+                    piece.SetColor("_EmissionColor", Color.white * 0.45f);
+                    break;
+                case Kind.Crystal:
+                    piece.color = new Color(1f, 1f, 1f, material.color.a);
+                    piece.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    piece.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    piece.SetFloat("_ZWrite", 0f);
+                    piece.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    break;
+                default:
+                    piece.color = Color.white;
+                    break;
+            }
+            return piece;
+        }
+
         var (dark, light) = DetailTones(kind, player);
         Texture2D tones = PieceModels.TwoTone(type, dark, light);
         if (tones == null) return material;
@@ -194,9 +225,6 @@ public static class PieceSets
                 material.color = new Color(0.75f, 0.75f, 0.75f, alpha);
                 material.SetTexture("_EmissionMap", tones);
                 material.SetColor("_EmissionColor", Color.white * 0.55f);
-                break;
-            case Kind.Chrome:
-                material.color = new Color(1f, 1f, 1f, alpha);
                 break;
             default:
                 material.color = new Color(1f, 1f, 1f, alpha);
