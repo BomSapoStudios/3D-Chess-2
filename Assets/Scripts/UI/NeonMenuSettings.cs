@@ -68,6 +68,7 @@ public partial class NeonMenu
         RectTransform screens = Row(settingsRight);
         if (PushNotifications.Supported) NeonButton(screens, "Notifications", new Vector2(0, 44), NeonTheme.Lavender, NeonTheme.Pink, 0f, 15, ShowNotify);
         NeonButton(screens, "Accessibility", new Vector2(0, 44), NeonTheme.PinkSoft, NeonTheme.Cyan, 0f, 15, ShowAccess);
+        NeonButton(screens, "Sound", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 15, ShowSound);
 
         SectionLabel(settingsRight, "Help", NeonTheme.PinkSoft);
         RectTransform help = Row(settingsRight);
@@ -88,6 +89,7 @@ public partial class NeonMenu
         if (statsScreen != null) statsScreen.SetActive(false);
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -150,7 +152,7 @@ public partial class NeonMenu
 
     private void ShowDeletePicker()
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         if (deletePicker == null) BuildDeletePicker();
         bool hasAccount = OnlineClient.GetOrCreate().HasToken;
         if (!hasAccount)
@@ -210,7 +212,7 @@ public partial class NeonMenu
     private void ConfirmDelete()
     {
         if (deleting) return;
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         var client = OnlineClient.GetOrCreate();
         if (client.SignedInWithApple && AppleSignIn.IsAvailable)
         {

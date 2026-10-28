@@ -247,7 +247,7 @@ public static class NeonTheme
         GUI.Label(rect, text, style);
 
         bool tapped = GUI.Button(rect, GUIContent.none, GUIStyle.none);
-        if (tapped) Haptics.Selection();
+        if (tapped) { Haptics.Selection(); Sfx.Tap(); }
         return tapped;
     }
 

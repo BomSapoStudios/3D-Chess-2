@@ -74,6 +74,7 @@ public partial class NeonMenu : MonoBehaviour
         BuildFriendsScreen();
         BuildNotifyScreen();
         BuildAccessScreen();
+        BuildSoundScreen();
         BuildSettingsScreen();
         BuildStatsScreen();
         FitScreensForTextSize();
@@ -582,7 +583,7 @@ public partial class NeonMenu : MonoBehaviour
             {
                 if (!captured.enabled()) return;
                 captured.onClick();
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 Refresh();
             });
             TextMeshProUGUI label = NewText("Text", image.transform, item.text, fontSize, color, TextAlignmentOptions.Center);
@@ -617,7 +618,7 @@ public partial class NeonMenu : MonoBehaviour
         Place(track.rectTransform, new Vector2(1, 0.5f), new Vector2(62, 36), new Vector2(-34, 0));
         Button button = track.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => { Haptics.Selection(); onToggle(); });
+        button.onClick.AddListener(() => { Haptics.Selection(); onToggle(); Sfx.Play("ui_toggle_on"); });
 
         Image knobImage = NewImage("Knob", track.transform, NeonTheme.Ground);
         knobImage.sprite = NeonTheme.Circle;
@@ -684,7 +685,7 @@ public partial class NeonMenu : MonoBehaviour
             button.onClick.AddListener(() =>
             {
                 if (setupOnline && index == 0) return; // online, White is always you (the host)
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 playerTypes[index] = playerTypes[index] == PlayerType.Human ? PlayerType.Computer : PlayerType.Human;
                 Refresh();
             });
@@ -938,7 +939,7 @@ public partial class NeonMenu : MonoBehaviour
             string name = size;
             button.onClick.AddListener(() =>
             {
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 if (!live) SetOnlineStatus($"{name} matches are coming soon!");
             });
             string text = live ? size : $"{size}\n<size=72%>Coming soon!</size>";
@@ -1024,6 +1025,7 @@ public partial class NeonMenu : MonoBehaviour
         if (OnlineClient.UpdateRequired) { ShowUpdatePicker(); return; }
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -1516,7 +1518,7 @@ public partial class NeonMenu : MonoBehaviour
         if (name != null)
         {
             name.GetComponent<TextMeshProUGUI>().raycastTarget = true;
-            name.gameObject.AddComponent<Button>().onClick.AddListener(() => { Haptics.Selection(); ShowProfile(f.userId, ShowFriends); });
+            name.gameObject.AddComponent<Button>().onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); ShowProfile(f.userId, ShowFriends); });
         }
         RowButton(row, "Challenge", NeonTheme.Lime, () => StartCoroutine(ChallengeRoutine(f)));
         RowButton(row, "Remove", NeonTheme.Cyan, () => StartCoroutine(Act(OnlineClient.Instance.RemoveFriend(f.userId, ActDone))));
@@ -1853,6 +1855,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (statsScreen != null) statsScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         menuScreen.SetActive(false);
         notifyScreen.SetActive(true);
@@ -1933,6 +1936,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(true);
@@ -1946,6 +1950,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -1974,6 +1979,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -2054,7 +2060,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private void PickSide(PieceColor side)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         sidePicker.SetActive(false);
         StartQuickPlay(side);
     }
@@ -2201,7 +2207,7 @@ public partial class NeonMenu : MonoBehaviour
         NeonTheme.StyleFilled(image, fill, shadow, tilt);
         Button button = image.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => { Haptics.Selection(); onClick(); });
+        button.onClick.AddListener(() => { Haptics.Selection(); if (text.StartsWith("<")) Sfx.Play("ui_back"); else Sfx.Tap(); onClick(); });
         TextMeshProUGUI label = NewText("Text", image.transform, text, fontSize, NeonTheme.Ground, TextAlignmentOptions.Center);
         Stretch(label.rectTransform);
         return button;

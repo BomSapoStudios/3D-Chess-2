@@ -520,6 +520,7 @@ public abstract class ChessPiece : MonoBehaviour
         if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
         {
             QueenBlitz.Route route = QueenBlitz.TakeRoute(targetPosition);
+            Sfx.Play(QueenBlitz.Current.ice ? "ice_slide" : "blitz_slide");
             if (route != null) yield return SlideRouteCoroutine(route);
             else yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;
@@ -590,7 +591,7 @@ public abstract class ChessPiece : MonoBehaviour
         transform.localPosition = endPos;
         isMoving = false;
         if (hop) PieceEffects.Land(this);
-        if (boardMove && !OnlineSession.Replaying) Haptics.Medium(); // a move lands
+        if (boardMove && !OnlineSession.Replaying) { Haptics.Medium(); GameSounds.MoveLanded(this, targetPosition); } // a move lands
         
         Debug.Log($"✅ Animation Complete: {pieceColor} {pieceType} reached {targetPosition}");
         
@@ -656,6 +657,7 @@ public abstract class ChessPiece : MonoBehaviour
                 for (float t = 0f; t < through; t += Time.deltaTime) { float k = 1f - t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
                 transform.localPosition = b;
                 Haptics.Light();
+                Sfx.Play("ui_open"); // through a portal
                 // ...and out of its partner
                 for (float t = 0f; t < through; t += Time.deltaTime) { float k = t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
                 PieceEffects.SetSquash(transform, 1f, 1f);

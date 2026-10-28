@@ -36,6 +36,7 @@ public partial class PieceEffects
         }
         if (copy == null) yield break;
         Haptics.Tick(); // a light tick per pawn swept (bunched up ones are dropped)
+        GameSounds.PawnSwept();
         if (AccessibilityPrefs.ReduceMotion)
         {
             yield return FadeAwayRoutine(copy, 0.25f); // Reduce Motion: it fades where it stood

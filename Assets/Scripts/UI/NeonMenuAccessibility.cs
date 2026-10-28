@@ -137,6 +137,7 @@ public partial class NeonMenu
         if (statsScreen != null) statsScreen.SetActive(false);
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         menuScreen.SetActive(false);
         setupScreen.SetActive(false);
         customizeScreen.SetActive(false);
@@ -213,11 +214,12 @@ public partial class NeonMenu
         if (column != null) column.offsetMin = new Vector2(24, column.offsetMin.y);
         LargerTextLayout.Pan(menuScreen, new Vector2(480, 360));
 
-        foreach (GameObject screen in new[] { setupScreen, notifyScreen, accessScreen, settingsScreen }) CompactHeader(screen);
+        foreach (GameObject screen in new[] { setupScreen, notifyScreen, accessScreen, settingsScreen, soundScreen }) CompactHeader(screen);
         LargerTextLayout.Stack(setupScreen, 74f, (RectTransform)setupScreen.transform.Find("Left Card"), (RectTransform)setupScreen.transform.Find("Right Card"));
         LargerTextLayout.Stack(notifyScreen, 74f, (RectTransform)notifyScreen.transform.Find("Permission Card"), (RectTransform)notifyScreen.transform.Find("Kinds Card"));
         LargerTextLayout.Stack(accessScreen, 74f, accessLeft, accessRight);
         LargerTextLayout.Stack(settingsScreen, 74f, settingsLeft, settingsRight);
+        LargerTextLayout.Stack(soundScreen, 74f, (RectTransform)soundScreen.transform.Find("Effects Card"), (RectTransform)soundScreen.transform.Find("Music Card"));
         LargerTextLayout.Pan(customizeScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(onlineScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(friendsScreen, new Vector2(844, 390));

@@ -484,6 +484,29 @@ ON-BOARD FEEDBACK
   • Moves, captures and Chaos spins are animated, with haptics.
   • Promotions play the animation chosen in Customize.
 
+SOUND
+  Every sound is synthesized for the game (Tools/Sound/make_sounds.py, no
+  samples) and tuned to D, the key of the menu music (Arcade Rush 1).
+  • Menu buttons bloop; back buttons bloop downward; switches blip.
+  • A move lands with a zap and a low thud, pitched by the plane it lands
+    on (higher plane, higher note). Captures clink and shatter.
+  • Check: a low sonar pulse. Your turn (vs robots or online): a chime.
+  • Game over: an arcade "level up" for a win (D major), a falling run for
+    a loss (D minor), a suspended chord for a draw.
+  • Setup: pick-up tick, set-down pitched by plane, Auto-place ripples up
+    the scale, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
+    whirr.
+  • Zombies!: zombies growl as they rise, shuffle when they step, chomp when
+    they bite, and poof when killed. OVERRUN! ends on a horde roar.
+  • Queen Blitz: the queen scrapes (or slides on ice), each pawn in a sweep
+    pops one note higher than the last, earned pawns ding into the tally,
+    CLEARED! rings out and Out of moves deflates.
+  • Settings > Sound: Sound Effects (on), Music (on, menus), Music While You
+    Play (off), each with Quiet / Medium / Loud. In a game the music is the
+    mode's own track if there is one, else the menu track, quieter. The
+    iPhone's ringer switch mutes the game, and other apps' music keeps
+    playing underneath.
+
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. ONLINE PLAY

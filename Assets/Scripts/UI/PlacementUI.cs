@@ -714,6 +714,7 @@ public class PlacementUI : MonoBehaviour
             bool currentReadiness = PlacementManager.Instance.IsPlayerReady(playerColor);
             if (currentReadiness) return;
             Haptics.Selection();
+            Sfx.Play("ready");
             PlacementManager.Instance.SetPlayerReady(playerColor, true);
             
             Debug.Log($"PlacementUI: {playerColor} readiness set to {!currentReadiness}");

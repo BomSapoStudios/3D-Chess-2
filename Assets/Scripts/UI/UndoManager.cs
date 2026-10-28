@@ -140,6 +140,7 @@ public class UndoManager : MonoBehaviour
         Restore(target);
         savedAtTurn = TurnKey; // the restored position is already saved
         Haptics.Selection();
+        Sfx.Play("undo");
     }
 
     private static void Restore(Snapshot snap)

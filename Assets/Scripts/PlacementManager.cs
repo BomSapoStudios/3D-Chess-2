@@ -484,7 +484,7 @@ public class PlacementManager : MonoBehaviour
     {
         if (!OnlineSession.CanControl(piece.pieceColor)) return; // the other player's pieces
         Debug.Log($"🎯 PlacementManager: Tray piece clicked - {piece.pieceColor} {piece.pieceType}");
-        if (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(piece.pieceColor)) Haptics.Light(); // picked up
+        if (TurnManager.Instance == null || !TurnManager.Instance.IsPlayerAI(piece.pieceColor)) { Haptics.Light(); Sfx.Play("piece_pick"); } // picked up
         
         // SELECTION STATE DEBUGGING: Identify if this is human or AI selection
         bool isPlayerHuman = TurnManager.Instance != null && !TurnManager.Instance.IsPlayerAI(piece.pieceColor);
@@ -1319,6 +1319,7 @@ public class PlacementManager : MonoBehaviour
         // Attempt to place the piece
         PlacePieceOnBoard(selectedTrayPiece, targetPosition);
         Haptics.Light(); // set down
+        Sfx.OnPlane("piece_place", targetPosition.y);
     }
     
     /// <summary>
@@ -2973,6 +2974,7 @@ public class PlacementManager : MonoBehaviour
             AIPlacement placement = engine.FindBestPlacement(playerColor);
             if (placement == null || placement.piece == null) break;
             ExecuteAIPlacement(placement.piece, placement.position);
+            Sfx.Play("piece_place", 0.7f, Sfx.Step(i % 10) - 5, vary: false); // a rising ripple
             yield return new WaitForSeconds(0.12f); // let each piece land visibly
         }
         isAutoPlacing = false;

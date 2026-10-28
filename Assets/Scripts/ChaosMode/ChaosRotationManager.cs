@@ -220,6 +220,7 @@ public class ChaosRotationManager : MonoBehaviour
     {
         chaosAnimationInProgress = true;
         OnChaosRotationStarted?.Invoke(rotationType);
+        Sfx.Play("chaos_spin");
         
         // Execute rotation without try-catch to avoid yield issues
         switch (rotationType)

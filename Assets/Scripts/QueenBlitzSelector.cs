@@ -17,7 +17,7 @@ public partial class QueenBlitzDirector
 
     private void OpenSelector()
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         selectorOpen = true;
         selectorPack = QueenBlitz.PackId;
         selectorChapter = QueenBlitz.Index / QueenBlitz.ChapterSize;
@@ -40,7 +40,7 @@ public partial class QueenBlitzDirector
     /// <summary>Start a puzzle from the selector: the same path as Next puzzle</summary>
     private void Jump(string pack, int index)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         selectorOpen = false;
         QueenBlitz.PackId = pack;
         Restart(index);
@@ -100,7 +100,7 @@ public partial class QueenBlitzDirector
             bool here = packs[i].id == selectorPack;
             if (NeonTheme.GUIButton(new Rect(cx, 0, widths[i], chipH), packs[i].name, here ? NeonTheme.Yellow : NeonTheme.Cyan, NeonTheme.Pink, !here, 14) && !here)
             {
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 selectorPack = packs[i].id;
                 selectorChapter = selectorPack == QueenBlitz.PackId ? QueenBlitz.Index / QueenBlitz.ChapterSize : 0;
             }
@@ -142,7 +142,7 @@ public partial class QueenBlitzDirector
                 Color fill = c == selectorChapter ? NeonTheme.Yellow : open ? NeonTheme.Cyan : NeonTheme.Muted;
                 if (TouchGUI.NeonButton(new Rect(tx + c * (tabW + 6f), y, tabW, tabH), $"{c + 1}", fill, NeonTheme.Pink, outlined: c != selectorChapter, fontSize: 14) && open)
                 {
-                    Haptics.Selection();
+                    Haptics.Selection(); Sfx.Tap();
                     selectorChapter = c;
                 }
             }

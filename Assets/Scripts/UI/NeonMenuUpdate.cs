@@ -71,7 +71,7 @@ public partial class NeonMenu
 
     private static void OpenStoreForUpdate()
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         Application.OpenURL(string.IsNullOrEmpty(AppStoreId) ? "itms-beta://" : $"itms-apps://apps.apple.com/app/id{AppStoreId}");
     }
 }

@@ -284,6 +284,7 @@ public class ZombieDirector : MonoBehaviour
         }
         if (empty.Count == 0) return;
         Create(ChessPieceType.Pawn, empty[Random.Range(0, empty.Count)]);
+        Sfx.Play("zombie_rise");
     }
 
     private static ChessPiece Create(ChessPieceType type, BoardPosition at)

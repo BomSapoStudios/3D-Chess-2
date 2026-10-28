@@ -82,7 +82,7 @@ public partial class NeonMenu
 
     private void StartZombieRun(AIDifficulty level)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         zombiePicker.SetActive(false);
         playerCount = 2;
         boardSize = BoardSize.Large8x8x8;
