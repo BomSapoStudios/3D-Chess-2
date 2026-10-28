@@ -31,7 +31,7 @@ public static class StoreImageRenderer
     private const int ReviewWidth = 2796, ReviewHeight = 1290;
 
     // The PlayerPrefs a run changes, put back afterwards
-    private static readonly string[] TouchedPrefs = { "StoreTestUnlockAll", "PieceShapes", "Backdrop", "PromotionStyle", "PieceSet", "DebugOpenStats", "DebugCapture", "DebugRematchDemo", "DebugAISelfTest", "DebugEffectsDemo" };
+    private static readonly string[] TouchedPrefs = { "PieceShapes", "Backdrop", "PromotionStyle", "PieceSet", "DebugOpenStats", "DebugCapture", "DebugRematchDemo", "DebugAISelfTest", "DebugEffectsDemo" };
 
     /// <summary>Seconds into each promotion animation where it looks most like itself</summary>
     private static float MidPoint(PromotionStyle.Kind kind)

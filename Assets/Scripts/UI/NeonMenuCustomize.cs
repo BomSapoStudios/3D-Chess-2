@@ -43,8 +43,6 @@ public partial class NeonMenu
     private RectTransform gridContent, boardRows;
     private ScrollRect gridScroll;
     private TextMeshProUGUI pawnBalance;
-    private int pawnTaps;
-    private float lastPawnTap;
 
     // A locked backdrop being looked at (PieceShapes.Showing does this for piece sets)
     private Backdrops.Kind? showingBackdrop;
@@ -115,21 +113,6 @@ public partial class NeonMenu
         pawnBalance.rectTransform.anchorMax = new Vector2(1, 1);
         pawnBalance.rectTransform.offsetMin = new Vector2(36, 0);
         pawnBalance.rectTransform.offsetMax = new Vector2(-8, 0);
-        // Testing: seven quick taps on the pawn balance unlock everything (and again to lock it back)
-        Button chipButton = chip.gameObject.AddComponent<Button>();
-        chipButton.transition = Selectable.Transition.None;
-        chipButton.onClick.AddListener(() =>
-        {
-            pawnTaps = Time.unscaledTime - lastPawnTap < 0.6f ? pawnTaps + 1 : 1;
-            lastPawnTap = Time.unscaledTime;
-            if (pawnTaps < 7) return;
-            pawnTaps = 0;
-            Store.TestUnlockAll = !Store.TestUnlockAll;
-            ShowToast(Store.TestUnlockAll ? "Test mode: everything unlocked" : "Test mode off: locks are back");
-            BuildCards();
-            Refresh();
-            StartPreviewForTab();
-        });
 
 #if !UNITY_WEBGL || UNITY_EDITOR
         // Restore purchases (Apple requires one): what this Apple ID bought comes back on a new phone

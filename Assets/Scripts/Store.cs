@@ -20,14 +20,14 @@ public static class Store
     public static string Id(PieceShapes.Kind set) => "set." + set;
     public static string Id(PromotionStyle.Kind promotion) => "promotion." + promotion;
     public static bool Free(PromotionStyle.Kind promotion) => promotion == PromotionStyle.Kind.Fade;
-    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || TestUnlockAll || PlayerPrefs.GetInt("Owned." + Id(promotion), 0) == 1;
+    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || PlayerPrefs.GetInt("Owned." + Id(promotion), 0) == 1;
     public static string Id(Backdrops.Kind backdrop) => "backdrop." + backdrop;
 
     public static bool Free(PieceShapes.Kind set) => set == PieceShapes.Kind.Cyberpunk;
     public static bool Free(Backdrops.Kind backdrop) => backdrop == Backdrops.Kind.NeonGlow;
 
-    public static bool Owns(PieceShapes.Kind set) => Free(set) || TestUnlockAll || PlayerPrefs.GetInt("Owned." + Id(set), 0) == 1;
-    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || TestUnlockAll || PlayerPrefs.GetInt("Owned." + Id(backdrop), 0) == 1;
+    public static bool Owns(PieceShapes.Kind set) => Free(set) || PlayerPrefs.GetInt("Owned." + Id(set), 0) == 1;
+    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || PlayerPrefs.GetInt("Owned." + Id(backdrop), 0) == 1;
 
     /// <summary>Spend pawns to unlock; false (nothing spent) if there aren't enough</summary>
     public static bool BuyWithPawns(string id, int price)
@@ -53,15 +53,5 @@ public static class Store
         foreach (PieceShapes.Kind k in PieceShapes.All) if (!Free(k)) yield return Id(k);
         foreach (Backdrops.Kind k in Backdrops.All) if (!Free(k)) yield return Id(k);
         foreach (PromotionStyle.Kind k in PromotionStyle.All) if (!Free(k)) yield return Id(k);
-    }
-
-    /// <summary>
-    /// For testing: everything counts as unlocked (nothing is bought). Toggled by tapping the
-    /// pawn balance in Customize seven times quickly.
-    /// </summary>
-    public static bool TestUnlockAll
-    {
-        get => PlayerPrefs.GetInt("StoreTestUnlockAll", 0) == 1;
-        set { PlayerPrefs.SetInt("StoreTestUnlockAll", value ? 1 : 0); PlayerPrefs.Save(); }
     }
 }
