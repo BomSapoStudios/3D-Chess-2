@@ -261,7 +261,7 @@ public partial class NeonMenu
             });
         Place((RectTransform)buy.transform, new Vector2(0.5f, 0.5f), new Vector2(280, 56), new Vector2(0, -10));
         // App Store purchase arrives with the store hookup (phase 5)
-        BlitzText("Or buy it for $2.99 soon.", 14, NeonTheme.Lavender, new Vector2(0.5f, 0.5f), new Vector2(400, 22), new Vector2(0, -60));
+        BlitzText("Or get every pack with Unlock Everything in Customize.", 14, NeonTheme.Lavender, new Vector2(0.5f, 0.5f), new Vector2(400, 22), new Vector2(0, -60));
     }
 
     private void BlitzBack(System.Action back)

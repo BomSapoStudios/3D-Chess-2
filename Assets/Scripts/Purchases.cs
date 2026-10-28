@@ -5,7 +5,7 @@ using UnityEngine.Purchasing;
 
 /// <summary>
 /// Buying Customize items with money through the App Store (Unity IAP 5, StoreKit 2). Every item
-/// that isn't free (Store.PaidIds) is a non-consumable product named Store.ProductId(id), so new
+/// that isn't free (Store.PaidIds), and Unlock Everything, is a non-consumable product named Store.ProductId(id), so new
 /// items are sold as soon as they're in the enums and in App Store Connect. A purchase or restore
 /// marks the item owned exactly like paying pawns does; the App Store is told it's done only after
 /// that's saved, so a purchase interrupted by a crash comes back on the next launch.
@@ -43,7 +43,7 @@ public class Purchases : MonoBehaviour
 #else
     private async void Awake()
     {
-        foreach (string id in Store.PaidIds()) idOfProduct[Store.ProductId(id)] = id;
+        foreach (string id in Store.ProductIds()) idOfProduct[Store.ProductId(id)] = id;
 
         // Every event first: a purchase left unfinished last time can arrive as soon as we connect
         store = UnityIAPServices.StoreController();

@@ -432,18 +432,98 @@ public partial class NeonMenu
         ShowToast("Buying with money works in the iPhone app. Pawns work here!");
 #else
         buying = true;
-        Purchases.Buy(id, outcome =>
+        Purchases.Buy(id, PurchaseDone);
+#endif
+    }
+
+    /// <summary>How an App Store purchase went (a bought item is put to use by OnPurchased)</summary>
+    private void PurchaseDone(Purchases.Outcome outcome)
+    {
+        buying = false;
+        switch (outcome)
         {
-            buying = false;
-            switch (outcome)
-            {
-                case Purchases.Outcome.Bought: break;   // OnPurchased puts it to use
-                case Purchases.Outcome.Cancelled: ShowToast("No problem, nothing was charged."); break;
-                case Purchases.Outcome.Pending: ShowToast("Waiting for approval. It unlocks as soon as it's approved."); break;
-                case Purchases.Outcome.Unavailable: ShowToast("The App Store isn't reachable right now. Try again in a moment."); break;
-                default: ShowToast("The purchase didn't go through. Nothing was charged; please try again."); break;
-            }
-        });
+            case Purchases.Outcome.Bought: break;
+            case Purchases.Outcome.Cancelled: ShowToast("No problem, nothing was charged."); break;
+            case Purchases.Outcome.Pending: ShowToast("Waiting for approval. It unlocks as soon as it's approved."); break;
+            case Purchases.Outcome.Unavailable: ShowToast("The App Store isn't reachable right now. Try again in a moment."); break;
+            default: ShowToast("The purchase didn't go through. Nothing was charged; please try again."); break;
+        }
+    }
+
+    // ───────── Unlock Everything (money only) ─────────
+
+    private Image everythingCard;
+    private TextMeshProUGUI everythingTitle, everythingBlurb, everythingPrice;
+    private GameObject everythingPill;
+
+    /// <summary>The card over the choices on every tab</summary>
+    private void BuildEverythingCard(RectTransform area)
+    {
+        everythingCard = NewImage("Unlock Everything", area, NeonTheme.Yellow);
+        everythingCard.sprite = NeonTheme.Rounded;
+        everythingCard.type = Image.Type.Sliced;
+        RectTransform rt = everythingCard.rectTransform;
+        rt.anchorMin = new Vector2(0, 1);
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(0.5f, 1);
+        rt.offsetMin = new Vector2(4, -28 - EverythingCardHeight);
+        rt.offsetMax = new Vector2(-6, -28);
+        Button b = everythingCard.gameObject.AddComponent<Button>();
+        NeonTheme.NeutralTint(b);
+        b.onClick.AddListener(BuyEverything);
+
+        everythingTitle = NewText("Title", everythingCard.transform, "UNLOCK EVERYTHING", 16, NeonTheme.Ground, TextAlignmentOptions.Left);
+        NeonTheme.ApplyFont(everythingTitle, display: true);
+        everythingTitle.rectTransform.anchorMin = new Vector2(0, 0.5f);
+        everythingTitle.rectTransform.anchorMax = new Vector2(1, 1);
+        everythingTitle.rectTransform.offsetMin = new Vector2(12, -2);
+        everythingTitle.rectTransform.offsetMax = new Vector2(-92, -4);
+        everythingBlurb = NewText("Blurb", everythingCard.transform, "", 11, NeonTheme.Ground, TextAlignmentOptions.Left);
+        everythingBlurb.fontStyle = FontStyles.Normal;
+        everythingBlurb.enableAutoSizing = true;
+        everythingBlurb.fontSizeMin = 9;
+        everythingBlurb.fontSizeMax = 11;
+        everythingBlurb.rectTransform.anchorMin = new Vector2(0, 0);
+        everythingBlurb.rectTransform.anchorMax = new Vector2(1, 0.5f);
+        everythingBlurb.rectTransform.offsetMin = new Vector2(12, 4);
+        everythingBlurb.rectTransform.offsetMax = new Vector2(-92, 0);
+
+        Image pill = NewImage("Price", everythingCard.transform, NeonTheme.Ground);
+        pill.sprite = NeonTheme.Rounded;
+        pill.type = Image.Type.Sliced;
+        pill.raycastTarget = false;
+        Place(pill.rectTransform, new Vector2(1, 0.5f), new Vector2(76, 30), new Vector2(-48, 0));
+        everythingPrice = NewText("Text", pill.transform, Store.EverythingDollars, 15, NeonTheme.Yellow, TextAlignmentOptions.Center);
+        Stretch(everythingPrice.rectTransform);
+        everythingPill = pill.gameObject;
+    }
+
+    private const float EverythingCardHeight = 48;
+
+    private void RefreshEverythingCard()
+    {
+        if (everythingCard == null) return;
+        bool owned = Store.OwnsEverything;
+        everythingCard.color = owned ? CardFill : NeonTheme.Yellow;
+        everythingCard.GetComponent<Button>().interactable = !owned;
+        everythingTitle.text = owned ? "EVERYTHING UNLOCKED" : "UNLOCK EVERYTHING";
+        everythingTitle.color = everythingBlurb.color = owned ? NeonTheme.Lime : NeonTheme.Ground;
+        everythingBlurb.text = owned
+            ? "Every set, backdrop, animation and puzzle pack is yours, new ones too."
+            : "Every set, backdrop, animation and puzzle pack, now and later";
+        everythingPill.SetActive(!owned);
+        everythingPrice.text = Purchases.Price(Store.EverythingId, Store.EverythingDollars);
+    }
+
+    private void BuyEverything()
+    {
+        if (buying || Store.OwnsEverything) return;
+        Haptics.Selection(); Sfx.Tap();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        ShowToast("Buying with money works in the iPhone app. Pawns work here!");
+#else
+        buying = true;
+        Purchases.Buy(Store.EverythingId, PurchaseDone);
 #endif
     }
 
@@ -452,6 +532,14 @@ public partial class NeonMenu
     {
         if (customizeScreen == null || !customizeScreen.activeInHierarchy) return;
         Sfx.Play("purchase");
+        if (id == Store.EverythingId)
+        {
+            // Everything's open: the item on show (if any) is put to use, and the cards lose their prices
+            if (ShowingLocked(out _, out _)) UseUnlocked();
+            else { BuildCards(); Refresh(); }
+            ShowToast("Everything unlocked! Thank you!");
+            return;
+        }
         if (ShowingLocked(out string showing, out _) && showing == id) { UseUnlocked(); return; }
         BuildCards();
         RefreshCustomize();
@@ -572,7 +660,7 @@ public partial class NeonMenu
         viewport.anchorMin = Vector2.zero;
         viewport.anchorMax = Vector2.one;
         viewport.offsetMin = Vector2.zero;
-        viewport.offsetMax = new Vector2(0, -28);
+        viewport.offsetMax = new Vector2(0, -36 - EverythingCardHeight);
         viewport.gameObject.AddComponent<RectMask2D>();
         viewport.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0); // catches drags for scrolling
 
@@ -599,7 +687,8 @@ public partial class NeonMenu
         boardRows.anchorMin = Vector2.zero;
         boardRows.anchorMax = Vector2.one;
         boardRows.offsetMin = new Vector2(2, 0);
-        boardRows.offsetMax = new Vector2(-4, -28);
+        boardRows.offsetMax = new Vector2(-4, -36 - EverythingCardHeight);
+        BuildEverythingCard(area);
         var rows = boardRows.gameObject.AddComponent<VerticalLayoutGroup>();
         rows.spacing = 10;
         rows.childControlWidth = rows.childControlHeight = true;
@@ -816,6 +905,7 @@ public partial class NeonMenu
         }
 
         pawnBalance.text = $"{PawnBank.Total:N0}";
+        RefreshEverythingCard();
 
         PieceShapes.Kind set = PieceShapes.Active;
         bool setLocked = PieceShapes.Showing.HasValue;

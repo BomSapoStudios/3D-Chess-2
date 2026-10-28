@@ -248,7 +248,7 @@ public static partial class QueenBlitz
 
     // ───────────────────────── Owning packs and opening chapters ─────────────────────────
 
-    public static bool Owns(PackInfo pack) => pack.free || PlayerPrefs.GetInt("QueenBlitzOwned." + pack.id, 0) == 1;
+    public static bool Owns(PackInfo pack) => pack.free || Store.OwnsEverything || PlayerPrefs.GetInt("QueenBlitzOwned." + pack.id, 0) == 1;
 
     /// <summary>Unlock a pack: after an App Store purchase or restore, or with pawns</summary>
     public static void Grant(string id)
