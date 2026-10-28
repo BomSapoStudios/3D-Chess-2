@@ -8,7 +8,7 @@ losses on D minor. Sounds were picked by Brandon from the sketches on the sound 
 (blob button, move C1 "zap", capture, check B "sonar", checkmate B "level up",
 ice slide, zombie rises).
 """
-import os, wave
+import os, wave, zlib
 import numpy as np
 from scipy import signal
 
@@ -160,6 +160,10 @@ def write(name, x, **kw):
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes(pcm.tobytes())
     print(f"{name:18s} {len(x) / SR:5.2f}s")
+    # Fresh random grain for the next sound, seeded by this one's name, so changing one
+    # sound's recipe doesn't re-roll the noise in every sound after it
+    global rng
+    rng = np.random.default_rng(zlib.crc32(name.encode()))
 
 # ---------------- Menus ----------------
 def ui():
