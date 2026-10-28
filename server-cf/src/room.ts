@@ -402,6 +402,12 @@ export class Room extends DurableObject<Env> {
         const result = engine.respondDraw(me.color, msg.accept === true);
         if (!result) return reply(false, 'No draw offer to answer');
         reply(true);
+        if (result.drawPending) {
+          // 3+ players: a yes, still waiting on the others (older apps ignore this event)
+          await this.persist();
+          await this.logEvent({ type: 'game:drawAgreed', color: me.color, waitingFor: engine.drawAnswersNeeded() });
+          return this.broadcast({ type: 'game:stateUpdate', reason: 'game:drawAgreed', state: this.stateForClients() });
+        }
         return this.afterResult(result, { type: msg.accept === true ? 'game:drawAccepted' : 'game:drawDeclined', color: me.color });
       }
 
@@ -684,8 +690,7 @@ export class Room extends DurableObject<Env> {
     // Take your time: a player who let a day pass without moving is out
     if (this.slowDeadlinePassed()) {
       const loser = engine.getState().currentTurn!;
-      const result = engine.resign(loser);
-      if (result.gameOver) result.gameOver.reason = 'timeout';
+      const result = engine.forfeitByTimeout(loser);
       await this.afterResult(result, { type: 'game:timeout', color: loser }, loser);
     }
 
@@ -959,6 +964,7 @@ export class Room extends DurableObject<Env> {
       winner: this.gameOver?.winner ?? null,
       endReason: this.gameOver?.reason ?? null,
       drawOfferFrom: this.engine!.drawOfferFrom,
+      drawWaitingFor: this.engine!.drawAnswersNeeded(),
       seq: this.seq,
       lobbyClosesAt: state.phase === 'waiting' ? this.meta?.expiresAt ?? null : null,
       moveDeadline: this.slowDeadline() ?? this.clockDeadline(),

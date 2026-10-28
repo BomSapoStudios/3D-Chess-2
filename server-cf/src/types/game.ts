@@ -118,6 +118,8 @@ export type EndReason =
   | 'draw_agreement'
   | 'insufficient_material'
   | 'threefold_repetition'
+  | 'fifty_moves'      // 50 moves each with no capture or pawn move
+  | 'timeout_draw'     // out of time, but the other player could never have checkmated
   | 'abandoned';
 
 export const BOARD_DIMENSIONS: Record<BoardSize, number> = {

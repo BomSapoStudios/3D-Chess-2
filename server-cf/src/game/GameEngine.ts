@@ -31,6 +31,8 @@ export interface MoveResult {
   gameOver?: { winner: PlayerColor | null; reason: EndReason };
   requiresPromotion?: { position: BoardPosition; color: PlayerColor };
   chaosRotation?: ChaosRotation; // the spin applied after this move, if any
+  /** A yes to a draw offer that still waits for other players' answers */
+  drawPending?: boolean;
 }
 
 export interface EngineSnapshot {
@@ -47,7 +49,8 @@ export interface EngineSnapshot {
   pendingPromotion: { position: BoardPosition; color: PlayerColor } | null;
   chaosCountdown: number;
   turnsSinceChaos: number;
-  drawOffer: { from: PlayerColor } | null;
+  /** A draw offer and who has said yes so far (everyone else still in the game must) */
+  drawOffer: { from: PlayerColor; accepted?: PlayerColor[] } | null;
   /** Players who started in check and haven't moved yet (no king may be taken until they have) */
   startedInCheck?: PlayerColor[];
   /** For each player in check, who checked them first (they win the pieces if that player forfeits) */
@@ -79,7 +82,7 @@ export class GameEngine {
   private turnOrder: PlayerColor[] | null = null; // null: the usual order (getActiveColors)
   private chaosCountdown: number;
   private turnsSinceChaos: number;
-  private drawOffer: { from: PlayerColor } | null = null;
+  private drawOffer: { from: PlayerColor; accepted?: PlayerColor[] } | null = null;
 
   constructor(roomCode: string, config: Partial<GameConfig> = {}) {
     this.gameId = crypto.randomUUID();
@@ -316,7 +319,7 @@ export class GameEngine {
     }
     this.startedInCheck = this.startedInCheck.filter(c => c !== color);
     // Moving instead of answering a draw offer turns it down
-    if (this.drawOffer && this.drawOffer.from !== color) this.drawOffer = null;
+    if (this.drawOffer && this.drawOffer.from !== color && !this.drawOffer.accepted?.includes(color)) this.drawOffer = null;
 
     // Execute the move
     const captured = this.board.movePiece(from, to);
@@ -400,6 +403,7 @@ export class GameEngine {
         nextColor,
         this.board,
         this.positionHistory,
+        this.quietMoves(),
       );
 
       if (!endResult) continue;
@@ -419,6 +423,10 @@ export class GameEngine {
             const winner = this.getActiveColors()[0];
             this.phase = 'gameover';
             gameOver = { winner, reason: 'checkmate' };
+          } else if (GameEndDetection.isInsufficientMaterial(this.getActiveColors(), this.board)) {
+            // Those left can't checkmate each other
+            this.phase = 'gameover';
+            gameOver = { winner: null, reason: 'insufficient_material' };
           }
         } else {
           // 2-player: checkmate ends the game
@@ -446,6 +454,12 @@ export class GameEngine {
       if (endResult.type === 'threefold_repetition') {
         this.phase = 'gameover';
         gameOver = { winner: null, reason: 'threefold_repetition' };
+        break;
+      }
+
+      if (endResult.type === 'fifty_moves') {
+        this.phase = 'gameover';
+        gameOver = { winner: null, reason: 'fifty_moves' };
         break;
       }
     }
@@ -628,6 +642,11 @@ export class GameEngine {
         this.phase = 'gameover';
         return { success: true, newState: this.getState(), eliminatedPlayer: color, conqueredBy: checker, gameOver: { winner: left[0], reason: 'resignation' } };
       }
+      if (GameEndDetection.isInsufficientMaterial(left, this.board)) {
+        // Those left can't checkmate each other
+        this.phase = 'gameover';
+        return { success: true, newState: this.getState(), eliminatedPlayer: color, conqueredBy: checker, gameOver: { winner: null, reason: 'insufficient_material' } };
+      }
       return { success: true, newState: this.getState(), eliminatedPlayer: color, conqueredBy: checker };
     }
     if (active.length <= 2) {
@@ -645,23 +664,37 @@ export class GameEngine {
   }
 
   offerDraw(color: PlayerColor): boolean {
-    this.drawOffer = { from: color };
+    this.drawOffer = { from: color, accepted: [] };
     return true;
   }
 
+  /** Who still has to answer the draw offer: everyone in the game who hasn't said yes */
+  drawAnswersNeeded(): PlayerColor[] {
+    if (!this.drawOffer) return [];
+    const yes = this.drawOffer.accepted ?? [];
+    return this.getActiveColors().filter(c => c !== this.drawOffer!.from && !yes.includes(c));
+  }
+
+  /**
+   * Answer a draw offer. A no ends the offer. With 3 or more players a yes waits for everyone
+   * else still in the game to say yes too (drawPending on the result); the last yes draws the game.
+   */
   respondDraw(color: PlayerColor, accept: boolean): MoveResult | null {
     if (this.phase !== 'playing' || !this.drawOffer || this.drawOffer.from === color) return null;
-    if (accept) {
-      this.phase = 'gameover';
+    if (!this.getActiveColors().includes(color) || this.drawOffer.accepted?.includes(color)) return null;
+    if (!accept) {
       this.drawOffer = null;
-      return {
-        success: true,
-        newState: this.getState(),
-        gameOver: { winner: null, reason: 'draw_agreement' },
-      };
+      return { success: true, newState: this.getState() };
     }
+    this.drawOffer.accepted = [...(this.drawOffer.accepted ?? []), color];
+    if (this.drawAnswersNeeded().length > 0) return { success: true, newState: this.getState(), drawPending: true };
+    this.phase = 'gameover';
     this.drawOffer = null;
-    return { success: true, newState: this.getState() };
+    return {
+      success: true,
+      newState: this.getState(),
+      gameOver: { winner: null, reason: 'draw_agreement' },
+    };
   }
 
   /** End the game with no winner (everyone left, or a lobby that never filled) */
@@ -669,16 +702,40 @@ export class GameEngine {
     this.phase = 'gameover';
   }
 
+  /**
+   * Out of time. With two players the other one wins, unless they have too little left to ever
+   * checkmate: then it's a draw (running out the clock can't beat a player who can't be mated).
+   * With more players it counts like a forfeit and the game goes on.
+   */
   forfeitByTimeout(color: PlayerColor): MoveResult {
+    const active = this.getActiveColors();
+    if (active.length > 2 && active.includes(color)) {
+      const result = this.resign(color);
+      if (result.gameOver?.reason === 'resignation') result.gameOver.reason = 'timeout';
+      return result;
+    }
     this.phase = 'gameover';
-    const active = this.getActiveColors().filter(c => c !== color);
-    const winner = active.length === 1 ? active[0] : null;
+    const others = active.filter(c => c !== color);
+    const winner = others.length === 1 ? others[0] : null;
+    const drawn = winner != null && GameEndDetection.cannotMate(winner, this.board);
     return {
       success: true,
       newState: this.getState(),
       eliminatedPlayer: color,
-      gameOver: { winner, reason: 'timeout' },
+      gameOver: drawn ? { winner: null, reason: 'timeout_draw' } : { winner, reason: 'timeout' },
     };
+  }
+
+  /** Moves in a row (by anyone) with no capture, no pawn move and no promotion; Chaos spins don't count */
+  private quietMoves(): number {
+    let n = 0;
+    for (let i = this.moveHistory.length - 1; i >= 0; i--) {
+      const m = this.moveHistory[i];
+      if (m.isChaosRotation) continue;
+      if (m.isCapture || m.isPromotion || m.pieceType === 'Pawn') break;
+      n++;
+    }
+    return n;
   }
 
   // ── Timer ────────────────────────────────────────────────────────────────────

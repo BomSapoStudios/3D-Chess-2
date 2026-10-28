@@ -1,4 +1,4 @@
-import type { PlayerColor, PieceType } from '../types/game.js';
+import type { PlayerColor } from '../types/game.js';
 import type { ChessBoard } from './ChessBoard.js';
 import { CheckDetection } from './CheckDetection.js';
 
@@ -11,17 +11,22 @@ export type GameEndResult =
   | { type: 'stalemate' }
   | { type: 'insufficient_material' }
   | { type: 'threefold_repetition' }
+  | { type: 'fifty_moves' }
   | null; // game continues
 
-// Piece values for insufficient material calculation
-const PIECE_VALUES: Record<PieceType, number> = {
-  King: 0, // King doesn't count for material
-  Queen: 9,
-  Rook: 5,
-  Bishop: 3,
-  Knight: 3,
-  Pawn: 1,
-};
+/** Moves by every player in a row with no capture and no pawn move, before the game is a draw */
+export const QUIET_MOVES_PER_PLAYER = 50;
+
+/** What a player has besides the King, for deciding whether anyone can still checkmate */
+function forces(color: PlayerColor, board: ChessBoard): { minors: number; bishops: number; heavy: boolean } {
+  const pieces = board.getPiecesByColor(color).filter(p => p.type !== 'King');
+  return {
+    minors: pieces.filter(p => p.type === 'Bishop' || p.type === 'Knight').length,
+    bishops: pieces.filter(p => p.type === 'Bishop').length,
+    // A Rook or Queen can mate, and a Pawn can become one
+    heavy: pieces.some(p => p.type === 'Queen' || p.type === 'Rook' || p.type === 'Pawn'),
+  };
+}
 
 export class GameEndDetection {
   /**
@@ -33,6 +38,7 @@ export class GameEndDetection {
     currentTurn: PlayerColor,
     board: ChessBoard,
     positionHistory: string[],
+    quietMoves = 0,
   ): GameEndResult {
     // Threefold repetition (board hash repeated 3+ times)
     const currentHash = board.hash();
@@ -49,42 +55,37 @@ export class GameEndDetection {
       return { type: 'stalemate' };
     }
 
-    // Insufficient material (only relevant in 2-player games)
-    if (activeColors.length === 2) {
-      if (GameEndDetection.isInsufficientMaterial(activeColors, board)) {
-        return { type: 'insufficient_material' };
-      }
+    // Nobody can checkmate anybody any more
+    if (GameEndDetection.isInsufficientMaterial(activeColors, board)) {
+      return { type: 'insufficient_material' };
+    }
+
+    // Nobody has made progress (a capture or a pawn move) in 50 moves each
+    if (quietMoves >= QUIET_MOVES_PER_PLAYER * activeColors.length) {
+      return { type: 'fifty_moves' };
     }
 
     return null;
   }
 
   /**
-   * Insufficient material: neither side can force checkmate.
-   * Standard cases: K vs K, K+B vs K, K+N vs K, K+B vs K+B (same color bishops).
+   * Nobody left can checkmate anybody (a dead position), so the game is a draw:
+   *   2 players: K v K, K + one Bishop or Knight v K, K + Bishop v K + Bishop.
+   *   3 or more: no Rook, Queen or Pawn anywhere and at most one Bishop or Knight on the
+   *   whole board (two players' minor pieces could otherwise team up on a third King).
    */
   static isInsufficientMaterial(activeColors: PlayerColor[], board: ChessBoard): boolean {
-    if (activeColors.length !== 2) return false;
+    const all = activeColors.map(c => forces(c, board));
+    if (all.some(f => f.heavy)) return false;
+    if (activeColors.length > 2) return all.reduce((n, f) => n + f.minors, 0) <= 1;
+    const [a, b] = all;
+    if (a.minors + b.minors <= 1) return true;
+    return a.minors === 1 && b.minors === 1 && a.bishops === 1 && b.bishops === 1;
+  }
 
-    const [colorA, colorB] = activeColors;
-    const piecesA = board.getPiecesByColor(colorA).filter(p => p.type !== 'King');
-    const piecesB = board.getPiecesByColor(colorB).filter(p => p.type !== 'King');
-
-    const matA = piecesA.reduce((s, p) => s + PIECE_VALUES[p.type], 0);
-    const matB = piecesB.reduce((s, p) => s + PIECE_VALUES[p.type], 0);
-
-    // K vs K
-    if (matA === 0 && matB === 0) return true;
-
-    // K+minor vs K
-    if ((matA <= 3 && matB === 0) || (matA === 0 && matB <= 3)) return true;
-
-    // K+B vs K+B (simplified — always draw for now; a full check would verify same-color bishops)
-    if (piecesA.length === 1 && piecesB.length === 1 &&
-        piecesA[0].type === 'Bishop' && piecesB[0].type === 'Bishop') {
-      return true;
-    }
-
-    return false;
+  /** This player alone has too little to ever checkmate: no Rook, Queen or Pawn, and at most one minor piece */
+  static cannotMate(color: PlayerColor, board: ChessBoard): boolean {
+    const f = forces(color, board);
+    return !f.heavy && f.minors <= 1;
   }
 }

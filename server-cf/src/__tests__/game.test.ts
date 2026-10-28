@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { ChessBoard } from '../game/ChessBoard';
 import { CheckDetection } from '../game/CheckDetection';
 import { GameEngine } from '../game/GameEngine';
+import { GameEndDetection } from '../game/GameEndDetection';
 import { King } from '../game/pieces/King';
 import { Rook } from '../game/pieces/Rook';
 import { Queen } from '../game/pieces/Queen';
@@ -468,6 +469,7 @@ describe('Forfeit (multiplayer)', () => {
     const board = new ChessBoard('6x6x6');
     kings(board);
     board.placePiece({ x: 4, y: 2, z: 2 }, 'Queen', 'Green');
+    board.placePiece({ x: 0, y: 3, z: 0 }, 'Rook', 'White'); // someone can still checkmate, so the game goes on
     const engine = fourPlayer(board, 'Green');
     const result = engine.resign('Green');
     expect(result.gameOver).toBeUndefined();
@@ -564,5 +566,116 @@ describe('5x5x5 board (the 2-player board)', () => {
   test('a White pawn promotes on x = 4', () => {
     expect(Pawn.isPromotionSquare({ x: 4, y: 0, z: 0 }, 'White', 5)).toBe(true);
     expect(Pawn.isPromotionSquare({ x: 3, y: 0, z: 0 }, 'White', 5)).toBe(false);
+  });
+});
+
+describe('Draws the game decides', () => {
+  type Color = 'White' | 'Black' | 'Green' | 'Purple';
+  function game(board: ChessBoard, colors: Color[], turn: Color = 'White') {
+    const engine = new GameEngine('DRAW01', { boardSize: colors.length > 2 ? '6x6x6' : '5x5x5', playerCount: colors.length });
+    colors.forEach((c, i) => engine.addPlayer(`u${i}`, c, c));
+    const e = engine as unknown as { board: ChessBoard; phase: string; currentTurn: string };
+    e.board = board;
+    e.phase = 'playing';
+    e.currentTurn = turn;
+    return engine;
+  }
+  function twoKings(size: '5x5x5' | '6x6x6' = '5x5x5') {
+    const board = new ChessBoard(size);
+    board.placePiece({ x: 0, y: 0, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 4, y: 4, z: 4 }, 'King', 'Black');
+    return board;
+  }
+  function fourKings() {
+    const board = new ChessBoard('6x6x6');
+    board.placePiece({ x: 0, y: 5, z: 0 }, 'King', 'White');
+    board.placePiece({ x: 5, y: 5, z: 5 }, 'King', 'Black');
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'King', 'Green');
+    board.placePiece({ x: 3, y: 0, z: 5 }, 'King', 'Purple');
+    return board;
+  }
+
+  test('two players: kings alone, or a lone minor piece, can\'t checkmate; a Pawn, Rook or Queen can', () => {
+    const board = twoKings();
+    expect(GameEndDetection.isInsufficientMaterial(['White', 'Black'], board)).toBe(true);
+    board.placePiece({ x: 2, y: 2, z: 2 }, 'Knight', 'White');
+    expect(GameEndDetection.isInsufficientMaterial(['White', 'Black'], board)).toBe(true);
+    board.placePiece({ x: 3, y: 1, z: 1 }, 'Pawn', 'Black'); // it can become a Queen
+    expect(GameEndDetection.isInsufficientMaterial(['White', 'Black'], board)).toBe(false);
+  });
+
+  test('four players: kings and one minor piece on the whole board is a draw; two minor pieces are not', () => {
+    const board = fourKings();
+    board.placePiece({ x: 1, y: 1, z: 1 }, 'Bishop', 'Green');
+    expect(GameEndDetection.isInsufficientMaterial(['White', 'Black', 'Green', 'Purple'], board)).toBe(true);
+    board.placePiece({ x: 4, y: 1, z: 1 }, 'Knight', 'Purple');
+    expect(GameEndDetection.isInsufficientMaterial(['White', 'Black', 'Green', 'Purple'], board)).toBe(false);
+  });
+
+  test('a forfeit that leaves only kings draws a four-player game', () => {
+    const board = fourKings();
+    board.placePiece({ x: 4, y: 2, z: 2 }, 'Queen', 'Green');
+    const result = game(board, ['White', 'Black', 'Green', 'Purple'], 'Green').resign('Green');
+    expect(result.gameOver).toEqual({ winner: null, reason: 'insufficient_material' });
+  });
+
+  test('running out the clock can\'t beat a player who has nothing to checkmate with', () => {
+    const board = twoKings();
+    board.placePiece({ x: 2, y: 2, z: 2 }, 'Queen', 'White');
+    expect(game(board, ['White', 'Black']).forfeitByTimeout('White').gameOver).toEqual({ winner: null, reason: 'timeout_draw' });
+    const board2 = twoKings();
+    board2.placePiece({ x: 2, y: 2, z: 2 }, 'Rook', 'Black');
+    expect(game(board2, ['White', 'Black']).forfeitByTimeout('White').gameOver).toEqual({ winner: 'Black', reason: 'timeout' });
+  });
+
+  test('four players: running out of time puts that player out and the game goes on', () => {
+    const board = fourKings();
+    board.placePiece({ x: 0, y: 3, z: 0 }, 'Rook', 'White');
+    const engine = game(board, ['White', 'Black', 'Green', 'Purple'], 'Green');
+    const result = engine.forfeitByTimeout('Green');
+    expect(result.gameOver).toBeUndefined();
+    expect(result.eliminatedPlayer).toBe('Green');
+    expect(engine.getState().phase).toBe('playing');
+  });
+
+  test('four players: a draw needs everyone else to say yes, and one no ends the offer', () => {
+    const board = fourKings();
+    board.placePiece({ x: 0, y: 3, z: 0 }, 'Rook', 'White');
+    const engine = game(board, ['White', 'Black', 'Green', 'Purple']);
+    engine.offerDraw('White');
+    expect(engine.respondDraw('Black', true)?.drawPending).toBe(true);
+    expect(engine.respondDraw('Black', true)).toBeNull(); // already said yes
+    expect(engine.respondDraw('Green', true)?.drawPending).toBe(true);
+    expect(engine.drawAnswersNeeded()).toEqual(['Purple']);
+    expect(engine.respondDraw('Purple', true)?.gameOver).toEqual({ winner: null, reason: 'draw_agreement' });
+
+    const engine2 = game(fourKings(), ['White', 'Black', 'Green', 'Purple']);
+    (engine2 as unknown as { board: ChessBoard }).board.placePiece({ x: 0, y: 3, z: 0 }, 'Rook', 'White');
+    engine2.offerDraw('White');
+    engine2.respondDraw('Black', true);
+    expect(engine2.respondDraw('Green', false)?.gameOver).toBeUndefined();
+    expect(engine2.drawOfferFrom).toBeNull();
+  });
+
+  test('fifty moves each with no capture or pawn move is a draw', () => {
+    const board = twoKings();
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'Rook', 'White');
+    board.placePiece({ x: 2, y: 4, z: 4 }, 'Rook', 'Black');
+    const engine = game(board, ['White', 'Black']);
+    const quiet = { moveNumber: 0, playerColor: 'White', from: { x: 0, y: 0, z: 0 }, to: { x: 0, y: 0, z: 0 }, pieceType: 'King', isCapture: false, isPromotion: false, isChaosRotation: false, notation: '', timestamp: 0 };
+    (engine as unknown as { moveHistory: unknown[] }).moveHistory = Array.from({ length: 99 }, () => ({ ...quiet }));
+    const result = engine.executeMove('White', { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+    expect(result.success).toBe(true);
+    expect(result.gameOver).toEqual({ winner: null, reason: 'fifty_moves' });
+  });
+
+  test('a pawn move resets the fifty-move count', () => {
+    const board = twoKings();
+    board.placePiece({ x: 2, y: 0, z: 0 }, 'Rook', 'White');
+    board.placePiece({ x: 2, y: 4, z: 4 }, 'Rook', 'Black');
+    const engine = game(board, ['White', 'Black']);
+    const quiet = { moveNumber: 0, playerColor: 'White', from: { x: 0, y: 0, z: 0 }, to: { x: 0, y: 0, z: 0 }, pieceType: 'King', isCapture: false, isPromotion: false, isChaosRotation: false, notation: '', timestamp: 0 };
+    (engine as unknown as { moveHistory: unknown[] }).moveHistory = [...Array.from({ length: 98 }, () => ({ ...quiet })), { ...quiet, pieceType: 'Pawn' }];
+    expect(engine.executeMove('White', { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }).gameOver).toBeUndefined();
   });
 });

@@ -58,7 +58,7 @@ const COOLDOWN_BASE_MS = 15 * 60_000;
 const COOLDOWN_MAX_MS = 4 * 3600_000;
 const COOLDOWN_RESET_MS = 7 * DAY;
 
-const DRAWS = new Set(['stalemate', 'draw_agreement', 'threefold_repetition', 'insufficient_material']);
+const DRAWS = new Set(['stalemate', 'draw_agreement', 'threefold_repetition', 'insufficient_material', 'fifty_moves', 'timeout_draw']);
 
 export const TIERS: [string, number][] = [['King', 1600], ['Queen', 1400], ['Rook', 1250], ['Bishop', 1100], ['Knight', 950], ['Pawn', -Infinity]];
 
