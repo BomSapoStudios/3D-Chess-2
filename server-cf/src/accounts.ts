@@ -3,6 +3,7 @@ import type { Env } from './index.js';
 import { isGeneratedName, randomName } from './names.js';
 import { sendPush, type PushKind, type PushMessage } from './push.js';
 import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, stats, tiersOf, type GameResult, type Mode } from './ratings.js';
+import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError, type Migration, type VerifiedPurchase } from './wallet.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accounts — one Durable Object (SQLite) holding every player account.
@@ -12,7 +13,7 @@ import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, sta
 //   same player can come back after a reinstall or from a browser.
 // • Device link codes let a player move their account to another device without
 //   signing in to anything.
-// • Friends, blocks and pending challenges live here too.
+// • Friends, blocks and pending challenges live here too, and each player's pawns (wallet.ts).
 // • Deleting an account removes everything about the player; only its random id is kept,
 //   so an old token or a game still finishing can't bring it back.
 //
@@ -68,6 +69,7 @@ export class Accounts extends DurableObject<Env> {
       DROP TABLE IF EXISTS guest_addresses;
     `);
     setupTables(this.sql);
+    setupWalletTables(this.sql);
     // Signing out everywhere bumps this; tokens carry the version they were issued at
     try { this.sql.exec('ALTER TABLE accounts ADD COLUMN token_version INTEGER DEFAULT 0'); } catch { /* already there */ }
   }
@@ -79,7 +81,7 @@ export class Accounts extends DurableObject<Env> {
       const result = await this.handle(op, body);
       return Response.json(result);
     } catch (e) {
-      if (e instanceof HttpError) return Response.json({ error: e.message }, { status: e.status });
+      if (e instanceof HttpError || e instanceof WalletError) return Response.json({ error: e.message }, { status: e.status });
       throw e;
     }
   }
@@ -125,6 +127,10 @@ export class Accounts extends DurableObject<Env> {
       case 'cooldown': return { until: cooldownUntil(this.sql, userId, Date.now()), ranked: this.hasLogin(userId, 'gamecenter') };
       case 'stats': return this.statsFor(userId, String(b.of ?? '') || userId);
       case 'leaderboard': return this.board(userId, b.mode === 'melee' ? 'melee' : 'duel', b.scope === 'everyone' ? 'everyone' : 'friends');
+      case 'wallet': this.account(userId); return walletOf(this.sql, userId);
+      case 'wallet-sync': this.account(userId); return syncWallet(this.sql, userId, b.migrate as Migration | undefined, b.events);
+      case 'wallet-spend': this.account(userId); return spendPawns(this.sql, userId, String(b.requestId ?? ''), String(b.item ?? ''));
+      case 'wallet-purchase': this.account(userId); return recordPurchases(this.sql, userId, (b.purchases as VerifiedPurchase[]) ?? []);
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
       default: throw new HttpError(404, 'Unknown operation');
     }
@@ -283,7 +289,7 @@ export class Accounts extends DurableObject<Env> {
 
   /**
    * Remove the player and everything about them: name, sign-in links, friends, blocks,
-   * notifications, ratings and game records. Other players' records of games against them
+   * notifications, ratings, game records and pawns. Other players' records of games against them
    * stay, with the opponent shown as "A player". Returns the games they were still in (the
    * Worker resigns them) and their Apple ids (to revoke Sign in with Apple).
    */
@@ -310,6 +316,7 @@ export class Accounts extends DurableObject<Env> {
     this.sql.exec('DELETE FROM reports WHERE reporter_id = ? OR reported_id = ?', id, id);
     this.sql.exec('DELETE FROM challenges WHERE to_id = ? OR from_id = ?', id, id);
     this.sql.exec('DELETE FROM pair_days WHERE pair LIKE ?', `%${id}%`);
+    purgeWallet(this.sql, id);
   }
 
   /** A finished game. One that ends after a player deleted their account keeps nothing about them. */

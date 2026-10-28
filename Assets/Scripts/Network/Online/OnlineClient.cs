@@ -256,6 +256,7 @@ public class OnlineClient : MonoBehaviour
                 PlayerPrefs.DeleteKey(key);
             PlayerPrefs.Save();
             refreshedThisSession = false;
+            Wallet.Forget();   // the pawns went with the account
         }
         done(error);
     }
@@ -422,6 +423,12 @@ public class OnlineClient : MonoBehaviour
     // ───────────────────────── HTTP ─────────────────────────
 
     private string Token => PlayerPrefs.GetString("OnlineToken", "");
+
+    /// <summary>The account this device is signed in to ("" before the first sign-in)</summary>
+    public static string UserId => PlayerPrefs.GetString("OnlineUserId", "");
+
+    /// <summary>A signed-in request (call EnsureSignedIn first); (HTTP status, body), status 0 = no connection</summary>
+    public IEnumerator Request(string method, string path, string json, Action<long, string> done) => Call(method, path, json, Token, done);
 
     /// <summary>Send a request; calls back with (HTTP status, body). Status 0 = couldn't reach the server.</summary>
     private IEnumerator Call(string method, string path, string json, string token, Action<long, string> done)

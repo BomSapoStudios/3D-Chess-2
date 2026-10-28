@@ -248,21 +248,33 @@ public static partial class QueenBlitz
 
     // ───────────────────────── Owning packs and opening chapters ─────────────────────────
 
-    public static bool Owns(PackInfo pack) => pack.free || PlayerPrefs.GetInt("QueenBlitzOwned." + pack.id, 0) == 1;
+    public static bool Owns(PackInfo pack) => pack.free || Wallet.Owns("blitz." + pack.id, "QueenBlitzOwned." + pack.id);
 
-    /// <summary>Unlock a pack: after an App Store purchase or restore, or with pawns</summary>
-    public static void Grant(string id)
+    /// <summary>Packs sold for pawns (their ids)</summary>
+    public static IEnumerable<string> PawnPacks()
     {
-        PlayerPrefs.SetInt("QueenBlitzOwned." + id, 1);
-        PlayerPrefs.Save();
+        foreach (PackInfo p in Catalog) if (p.pawnPrice > 0) yield return p.id;
     }
 
-    /// <summary>Buy a pack with pawns. False if there aren't enough.</summary>
-    public static bool BuyWithPawns(PackInfo pack)
+    /// <summary>A puzzle's id on the server: "pack.index" (dailies: "daily-YYYY-MM-DD.0")</summary>
+    public static string PuzzleId(string pack, int index) => $"{pack.Replace(':', '-').ToLowerInvariant()}.{index}";
+
+    /// <summary>Every puzzle this phone has cleared, for moving progress to the server once</summary>
+    public static List<string> ClearedPuzzleIds()
     {
-        if (Owns(pack) || pack.pawnPrice <= 0 || !PawnBank.Spend(pack.pawnPrice)) return false;
-        Grant(pack.id);
-        return true;
+        var ids = new List<string>();
+        foreach (PackInfo p in Catalog)
+            for (int i = 0, n = PuzzlesOf(p.id).Length; i < n; i++) if (EverCleared(i, p.id)) ids.Add(PuzzleId(p.id, i));
+        for (System.DateTime day = DailyEpoch; day <= Today; day = day.AddDays(1))
+            if (DailyCleared(day)) ids.Add(PuzzleId(DailyId(day), 0));
+        return ids;
+    }
+
+    /// <summary>Buy a pack with pawns (the server checks the price and the balance); done(null) once it's yours, else a message</summary>
+    public static void BuyWithPawns(PackInfo pack, System.Action<string> done)
+    {
+        if (Owns(pack) || pack.pawnPrice <= 0) { done(Owns(pack) ? null : "That pack isn't sold for pawns."); return; }
+        Wallet.Unlock("blitz." + pack.id, done);
     }
 
     public static int Chapters(string id) => Mathf.Max(1, (PuzzlesOf(id).Length + ChapterSize - 1) / ChapterSize);
@@ -407,7 +419,7 @@ public static partial class QueenBlitz
         if (!EverCleared(Index) || !PawnBank.BlitzPaysFirstClearOnly)
         {
             paid = Reward(Index);
-            PawnBank.Earn(paid);
+            PawnBank.EarnFromBlitz(PuzzleId(PackId, Index), paid);
         }
         PlayerPrefs.SetInt(Key("Cleared", Index), 1);
         int before = BestMoves(Index);
@@ -428,7 +440,7 @@ public static partial class QueenBlitz
         foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
         {
             if (p.pieceType != ChessPieceType.Queen) continue;
-            if (!PawnBank.Spend(PawnBank.AutoPlaceCost)) return;
+            if (!PawnBank.SpendAutoPlace()) return;
             AutoPlaced = true;
             PlacementManager.Instance.ExecuteAIPlacement(p, Current.best);
             return;

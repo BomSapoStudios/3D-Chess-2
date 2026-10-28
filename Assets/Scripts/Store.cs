@@ -20,29 +20,20 @@ public static class Store
     public static string Id(PieceShapes.Kind set) => "set." + set;
     public static string Id(PromotionStyle.Kind promotion) => "promotion." + promotion;
     public static bool Free(PromotionStyle.Kind promotion) => promotion == PromotionStyle.Kind.Fade;
-    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || PlayerPrefs.GetInt("Owned." + Id(promotion), 0) == 1;
+    public static bool Owns(PromotionStyle.Kind promotion) => Free(promotion) || OwnsId(Id(promotion));
     public static string Id(Backdrops.Kind backdrop) => "backdrop." + backdrop;
 
     public static bool Free(PieceShapes.Kind set) => set == PieceShapes.Kind.Cyberpunk;
     public static bool Free(Backdrops.Kind backdrop) => backdrop == Backdrops.Kind.NeonGlow;
 
-    public static bool Owns(PieceShapes.Kind set) => Free(set) || PlayerPrefs.GetInt("Owned." + Id(set), 0) == 1;
-    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || PlayerPrefs.GetInt("Owned." + Id(backdrop), 0) == 1;
+    public static bool Owns(PieceShapes.Kind set) => Free(set) || OwnsId(Id(set));
+    public static bool Owns(Backdrops.Kind backdrop) => Free(backdrop) || OwnsId(Id(backdrop));
 
-    /// <summary>Spend pawns to unlock; false (nothing spent) if there aren't enough</summary>
-    public static bool BuyWithPawns(string id, int price)
-    {
-        if (!PawnBank.Spend(price)) return false;
-        Grant(id);
-        return true;
-    }
+    /// <summary>Owned on the server (Wallet), or unlocked on this phone before the server kept it</summary>
+    public static bool OwnsId(string id) => Wallet.Owns(id, "Owned." + id);
 
-    /// <summary>Marks an item owned on this phone (paid for in pawns or money)</summary>
-    public static void Grant(string id)
-    {
-        PlayerPrefs.SetInt("Owned." + id, 1);
-        PlayerPrefs.Save();
-    }
+    /// <summary>Unlock for pawns (the server checks the price and the balance); done(null) once it's yours, else a message</summary>
+    public static void BuyWithPawns(string id, System.Action<string> done) => Wallet.Unlock(id, done);
 
     /// <summary>The App Store product ID for an item, e.g. BomSapo.Chess3D.set.abyssglow</summary>
     public static string ProductId(string id) => "BomSapo.Chess3D." + id.ToLowerInvariant();

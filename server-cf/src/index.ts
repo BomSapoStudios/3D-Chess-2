@@ -2,6 +2,8 @@ import { issueToken, verifyToken } from './auth.js';
 import { verifyIdToken, type Provider } from './oidc.js';
 import { verifyGameCenter } from './gamecenter.js';
 import { revokeApple } from './appleRevoke.js';
+import { verifyAppleTransaction, APPLE_ROOT_CA_G3 } from './appleJws.js';
+import { ECONOMY, itemOfProduct } from './economy.js';
 import type { GameConfig, PlayerColor } from './types/game.js';
 
 export { Room } from './room.js';
@@ -50,6 +52,16 @@ export { Accounts } from './accounts.js';
 //   GET  /stats?of=<userId>             → a player's ratings and stats (yours without ?of)
 //   GET  /leaderboard?mode=duel|melee&scope=friends|everyone
 //
+//   Pawns (wallet.ts; prices and earning rules in economy.ts). Each answers with the wallet:
+//   { balance, lifetime, items: ['set.abyssglow', ...], zombieLeftToday, migrated }
+//   GET  /wallet                                                        (Bearer)
+//   POST /wallet/sync  { migrate?, events: [{ id, kind: 'blitz', puzzle, pawns } |
+//                        { id, kind: 'zombie', run, brain, kills } | { id, kind: 'autoplace' }] }
+//                                       → { wallet, results }  earnings queued by the app (Bearer)
+//   POST /wallet/spend { requestId, item } → { wallet, item }   unlock for pawns (Bearer)
+//   POST /wallet/purchase { transactions: [StoreKit 2 JWS, ...] }
+//                                       → { wallet, granted, rejected }  App Store purchases (Bearer)
+//
 // The token is passed as a query parameter for WebSockets because neither
 // browsers nor Unity's WebGL WebSocket can set headers on the upgrade request.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +89,8 @@ export interface Env {
   SIWA_KEY_ID?: string;
   /** Oldest app build (OnlineClient.ClientVersion) that may play online; "0" lets every build in */
   MIN_CLIENT_VERSION?: string;
+  /** Local tests only: extra trusted root certificates (base64 DER, comma-separated) for App Store transactions */
+  TEST_APPLE_ROOTS?: string;
 }
 
 /** Call the Accounts object; returns its JSON and HTTP status */
@@ -223,6 +237,29 @@ export default {
     if (path === '/push/settings') {
       if (!user) return needUser();
       return account('push-settings', request.method === 'POST' ? { prefs: body.prefs } : {});
+    }
+
+    // Pawns: the wallet, queued earnings, unlocking with pawns, and App Store purchases
+    if (path.startsWith('/wallet')) {
+      if (!user) return needUser();
+      if (request.method === 'GET' && path === '/wallet') return account('wallet');
+      if (request.method === 'POST' && path === '/wallet/sync') return account('wallet-sync', { migrate: body.migrate, events: body.events });
+      if (request.method === 'POST' && path === '/wallet/spend') return account('wallet-spend', { requestId: body.requestId, item: body.item });
+      if (request.method === 'POST' && path === '/wallet/purchase') {
+        const list = Array.isArray(body.transactions) ? body.transactions.slice(0, ECONOMY.maxTransactionsPerCall) : [];
+        const bundleIds = env.APPLE_AUDIENCES.split(',').map(s => s.trim()).filter(Boolean);
+        const roots = [APPLE_ROOT_CA_G3, ...(env.TEST_APPLE_ROOTS ?? '').split(',').map(s => s.trim()).filter(Boolean)];
+        const purchases = [];
+        let rejected = 0;
+        for (const jws of list) {
+          const t = await verifyAppleTransaction(String(jws), bundleIds, roots);
+          const item = t ? itemOfProduct(t.productId) : null;
+          if (!t || !item) { rejected++; continue; }
+          purchases.push({ originalTransactionId: t.originalTransactionId, transactionId: t.transactionId, item, environment: t.environment, revoked: !!t.revocationDate });
+        }
+        const { status, data } = await accounts(env, 'wallet-purchase', { ...caller(), purchases });
+        return json(status === 200 ? { ...data, rejected } : data, status);
+      }
     }
 
     // Ratings and stats: a player's profile, the leaderboards, and the Find Match cooldown
