@@ -1,9 +1,8 @@
-using System;
 using UnityEngine;
 
 /// <summary>
-/// Pawns: the currency players collect in Queen Blitz and Zombie Survival (to spend later in a
-/// store for piece sets and puzzle packs). Kept on this phone for now.
+/// Pawns: the currency players collect in Queen Blitz and Zombie Survival and spend on Customize
+/// items and puzzle packs. The server keeps each account's pawns (Wallet; its rules in server-cf/src/economy.ts).
 ///
 /// Every number that decides how pawns are earned or spent lives here.
 /// </summary>
@@ -22,58 +21,42 @@ public static class PawnBank
     /// <summary>Queen Blitz: what Auto-place costs</summary>
     public const int AutoPlaceCost = 1;
 
-    /// <summary>Store prices, for when the store is built (not used yet)</summary>
+    /// <summary>Piece set price in pawns (the server charges the same: economy.ts)</summary>
     public const int PieceSetPrice = 4500;
-    public const int PuzzlePackPrice = 3000;
 
-    // ── The bank ──
-
-    private const string TotalKey = "Pawns.Total";
-    private const string EarnedKey = "Pawns.Earned";   // lifetime pawns collected (spending doesn't lower it)
-    private const string ZombieDayKey = "Pawns.ZombieDay";
-    private const string ZombieTodayKey = "Pawns.ZombieToday";
+    // ── The bank (the server keeps it: Wallet) ──
 
     /// <summary>Pawns the player has to spend</summary>
-    public static int Total => PlayerPrefs.GetInt(TotalKey, 0);
+    public static int Total => Wallet.Total;
     /// <summary>Every pawn ever collected</summary>
-    public static int LifetimeEarned => PlayerPrefs.GetInt(EarnedKey, 0);
+    public static int LifetimeEarned => Wallet.LifetimeEarned;
 
-    public static void Earn(int pawns)
+    /// <summary>A Queen Blitz puzzle's first clear</summary>
+    public static void EarnFromBlitz(string puzzleId, int pawns)
     {
-        if (pawns <= 0) return;
-        PlayerPrefs.SetInt(TotalKey, Total + pawns);
-        PlayerPrefs.SetInt(EarnedKey, LifetimeEarned + pawns);
-        PlayerPrefs.Save();
+        if (pawns > 0) Wallet.EarnBlitz(puzzleId, pawns);
     }
 
-    /// <summary>Spend pawns if there are enough; false (nothing spent) if not</summary>
-    public static bool Spend(int pawns)
-    {
-        if (pawns <= 0) return true;
-        if (Total < pawns) return false;
-        PlayerPrefs.SetInt(TotalKey, Total - pawns);
-        PlayerPrefs.Save();
-        return true;
-    }
+    /// <summary>Queen Blitz Auto-place: false if there isn't a pawn for it</summary>
+    public static bool SpendAutoPlace() => Wallet.SpendAutoPlace();
 
-    // ── Zombie Survival's daily allowance ──
+    // ── Zombie Survival's daily allowance (the server's day is UTC) ──
 
-    private static string Today => DateTime.Now.ToString("yyyy-MM-dd");
+    public static int ZombieLeftToday => Wallet.ZombieLeftToday;
 
-    /// <summary>Pawns Zombie Survival has paid today</summary>
-    public static int ZombieEarnedToday =>
-        PlayerPrefs.GetString(ZombieDayKey, "") == Today ? PlayerPrefs.GetInt(ZombieTodayKey, 0) : 0;
-
-    public static int ZombieLeftToday => Mathf.Max(0, ZombieDailyCap - ZombieEarnedToday);
-
-    /// <summary>Pay pawns earned in Zombie Survival, up to what's left of today's allowance; returns the pawns paid</summary>
-    public static int EarnFromZombies(int pawns)
+    /// <summary>
+    /// A Zombies! run's kills so far are worth `pawns` more: pays up to what's left of today's allowance
+    /// and returns the pawns paid
+    /// </summary>
+    public static int EarnFromZombies(string runId, AIDifficulty brain, int kills, int pawns)
     {
         int pay = Mathf.Min(pawns, ZombieLeftToday);
-        if (pay <= 0) return 0;
-        PlayerPrefs.SetString(ZombieDayKey, Today);
-        PlayerPrefs.SetInt(ZombieTodayKey, ZombieEarnedToday + pay);
-        Earn(pay);
-        return pay;
+        Wallet.EarnZombies(runId, brain == AIDifficulty.Hard ? "hard" : brain == AIDifficulty.Medium ? "medium" : "easy", kills, Mathf.Max(0, pay));
+        return Mathf.Max(0, pay);
     }
+
+    // ── What the phone kept before the server did (moved over once by Wallet) ──
+
+    public static int PhoneTotal => PlayerPrefs.GetInt("Pawns.Total", 0);
+    public static int PhoneLifetime => PlayerPrefs.GetInt("Pawns.Earned", 0);
 }

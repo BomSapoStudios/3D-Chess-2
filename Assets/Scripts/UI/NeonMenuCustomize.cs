@@ -137,6 +137,7 @@ public partial class NeonMenu
         Place((RectTransform)restore.transform, new Vector2(1, 0.5f), new Vector2(124, 34), new Vector2(-312, 0));
 #endif
         Purchases.PricesLoaded += RefreshCustomize;
+        Wallet.Changed += RefreshCustomize;
         Purchases.Owned += OnPurchased;
 
         // ── Body: rail | preview card | grid ──
@@ -428,14 +429,18 @@ public partial class NeonMenu
 
     private void UnlockWithPawns()
     {
-        if (!ShowingLocked(out string id, out int price)) return;
-        if (!Store.BuyWithPawns(id, price))
-        {
-            ShowToast($"Not enough pawns yet: you need {price - PawnBank.Total:N0} more.");
-            return;
-        }
+        if (buying || !ShowingLocked(out string id, out int price)) return;
+        if (PawnBank.Total < price) { ShowToast($"Not enough pawns yet: you need {price - PawnBank.Total:N0} more."); return; }
         Haptics.Selection();
-        UseUnlocked();
+        buying = true;
+        Store.BuyWithPawns(id, error =>
+        {
+            buying = false;
+            if (error != null) { ShowToast(error); return; }
+            // Still on the same item: put it to use (otherwise its card just loses the lock)
+            if (ShowingLocked(out string showing, out _) && showing == id) UseUnlocked();
+            else if (customizeScreen != null && customizeScreen.activeInHierarchy) { BuildCards(); RefreshCustomize(); }
+        });
     }
 
     private bool buying;

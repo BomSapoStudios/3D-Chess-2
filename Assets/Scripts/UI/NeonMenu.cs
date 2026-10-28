@@ -1719,6 +1719,7 @@ public partial class NeonMenu : MonoBehaviour
         OnlineClient.UpdateNeeded -= ShowUpdatePicker;
         AccessibilityPrefs.Changed -= RefreshAccess;
         Purchases.PricesLoaded -= RefreshCustomize;
+        Wallet.Changed -= RefreshCustomize;
         Purchases.Owned -= OnPurchased;
     }
 

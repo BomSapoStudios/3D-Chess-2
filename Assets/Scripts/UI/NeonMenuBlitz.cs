@@ -256,8 +256,13 @@ public partial class NeonMenu
         Button buy = NeonButton(blitzContent, $"Unlock for {pack.pawnPrice:N0} pawns", new Vector2(280, 56), enough ? NeonTheme.Lime : NeonTheme.Muted, NeonTheme.Pink, -0.6f, 18,
             () =>
             {
-                if (QueenBlitz.BuyWithPawns(pack)) { Haptics.Selection(); ShowBlitzPuzzles(pack.id, 0); }
-                else ShowToast($"You need {pack.pawnPrice - PawnBank.Total:N0} more pawns. Clear puzzles or play Zombies! to earn them.");
+                if (PawnBank.Total < pack.pawnPrice) { ShowToast($"You need {pack.pawnPrice - PawnBank.Total:N0} more pawns. Clear puzzles or play Zombies! to earn them."); return; }
+                QueenBlitz.BuyWithPawns(pack, error =>
+                {
+                    if (error != null) { ShowToast(error); return; }
+                    Haptics.Selection();
+                    if (blitzView == BlitzView.Buy) ShowBlitzPuzzles(pack.id, 0);
+                });
             });
         Place((RectTransform)buy.transform, new Vector2(0.5f, 0.5f), new Vector2(280, 56), new Vector2(0, -10));
         // App Store purchase arrives with the store hookup (phase 5)
