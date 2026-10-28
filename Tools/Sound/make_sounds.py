@@ -17,6 +17,9 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "..", "Assets", "Resources",
 rng = np.random.default_rng(7)
 
 D4 = 293.66
+SOFT_TOP = 5000   # highest harmonic in saw / square / triangle tones
+SOFT_LP = 4500    # every sound gets a gentle roll-off above this
+SOFT_ATTACK = 0.004  # and no click at the start
 def hz(semi):
     """Semitones above D4"""
     return D4 * 2 ** (semi / 12)
@@ -53,7 +56,8 @@ def osc(f0, f1, dur, kind="sine", glide=None, detune=0.0):
     ph = 2 * np.pi * np.cumsum(f) / SR
     if kind == "sine":
         return np.sin(ph)
-    top = 15000 / f.max()
+    # harmonics stop at 5 kHz: rounder, like the button taps (Brandon: everything a bit less harsh)
+    top = SOFT_TOP / f.max()
     if kind == "triangle":
         x = np.zeros(n)
         for k in range(1, int(top) + 1, 2):
@@ -138,9 +142,14 @@ def room(x, wet=0.12):
 
 def finish(x, peak_db=-1.0, loud=0.0, wet=0.12):
     """Room, gentle saturation, trim the silent tail, fades, level"""
+    # soften: a gentle one-pole roll-off of the top end and no sharp start
+    b, a = signal.butter(1, SOFT_LP / (SR / 2), "low")
+    x = signal.lfilter(b, a, x)
+    n = int(SR * SOFT_ATTACK)
+    x[:n] *= np.linspace(0, 1, n)
     if wet:
         x = room(x, wet)
-    x = np.tanh(x * 1.2) / np.tanh(1.2)
+    x = np.tanh(x * 1.05) / np.tanh(1.05)
     # trim tail below -60 dB
     a = np.abs(x)
     thresh = a.max() * 10 ** (-60 / 20)
@@ -148,7 +157,6 @@ def finish(x, peak_db=-1.0, loud=0.0, wet=0.12):
     x = x[:last[-1] + 1] if len(last) else x
     fade = min(len(x) // 4, int(SR * 0.02))
     x[-fade:] *= np.linspace(1, 0, fade)
-    x[:48] *= np.linspace(0, 1, 48)
     x = x / (np.abs(x).max() + 1e-9) * 10 ** ((peak_db + loud) / 20)
     return x
 
