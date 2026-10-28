@@ -431,12 +431,8 @@ public partial class NeonMenu
     /// <summary>Tap a puzzle in the picker (BlitzDemo)</summary>
     public void DebugStartBlitz(int index) => StartBlitz(index);
 
-    /// <summary>Tap Queen Blitz! on the menu, then Start new if a puzzle is saved (BlitzDemo)</summary>
-    public void DebugBlitzFromMenu()
-    {
-        OrResume(SavedGames.Blitz, ShowBlitzPicker)();
-        if (resumePicker != null && resumePicker.activeSelf) { resumePicker.SetActive(false); resumeStartNew?.Invoke(); }
-    }
+    /// <summary>Tap Queen Blitz! on the menu (BlitzDemo)</summary>
+    public void DebugBlitzFromMenu() => ShowBlitzPicker();
 #endif
 
     private void StartBlitz(int index)
