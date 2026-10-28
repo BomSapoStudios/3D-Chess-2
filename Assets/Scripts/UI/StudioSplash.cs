@@ -1,0 +1,135 @@
+using System.Collections;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+/// <summary>
+/// Bom Sapo Studios card shown once when the app opens: the frog logo on black, the studio name and a
+/// copyright line. It fades in, holds, then fades away to the menu underneath. A tap skips it.
+/// </summary>
+public class StudioSplash : MonoBehaviour
+{
+    private const float FadeIn = 0.6f;
+    private const float Hold = 1.8f;
+    private const float FadeOut = 0.6f;
+
+    private CanvasGroup group;
+    private bool skipped;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Create()
+    {
+        GameObject go = new GameObject("Studio Splash");
+        go.AddComponent<StudioSplash>();
+        DontDestroyOnLoad(go);
+    }
+
+    private void Awake()
+    {
+        Canvas canvas = gameObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32000; // above every menu and game canvas
+        CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(844, 390);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+        gameObject.AddComponent<GraphicRaycaster>();
+        group = gameObject.AddComponent<CanvasGroup>();
+
+        // Solid black behind everything; it also catches taps so they don't reach the menu
+        Image bg = NewRect("Background", transform).gameObject.AddComponent<Image>();
+        bg.color = Color.black;
+        Stretch(bg.rectTransform);
+
+        // Content sits in a group that fades in on its own, so the black stays up from the first frame
+        RectTransform content = NewRect("Content", transform);
+        Stretch(content);
+        CanvasGroup contentGroup = content.gameObject.AddComponent<CanvasGroup>();
+        contentGroup.alpha = 0f;
+
+        Texture2D logoTex = Resources.Load<Texture2D>("Splash/BomSapoLogo");
+        if (logoTex != null)
+        {
+            RawImage logo = NewRect("Logo", content).gameObject.AddComponent<RawImage>();
+            logo.texture = logoTex;
+            logo.raycastTarget = false;
+            Place(logo.rectTransform, new Vector2(0, 52), new Vector2(190, 190));
+        }
+
+        TextMeshProUGUI name = NewText("Name", content, "BOM SAPO", 30, Color.white, true);
+        name.characterSpacing = 18;
+        Place(name.rectTransform, new Vector2(0, -68), new Vector2(600, 40));
+
+        TextMeshProUGUI studios = NewText("Studios", content, "STUDIOS", 13, NeonTheme.Hex("7CD992"), false);
+        studios.characterSpacing = 40;
+        Place(studios.rectTransform, new Vector2(0, -96), new Vector2(600, 22));
+
+        TextMeshProUGUI copyright = NewText("Copyright", content, "© 2026 Bom Sapo Studios. All rights reserved.", 11, new Color(1, 1, 1, 0.55f), false);
+        RectTransform cr = copyright.rectTransform;
+        cr.anchorMin = cr.anchorMax = new Vector2(0.5f, 0f);
+        cr.pivot = new Vector2(0.5f, 0f);
+        cr.sizeDelta = new Vector2(600, 18);
+        cr.anchoredPosition = new Vector2(0, 14);
+
+        StartCoroutine(Run(contentGroup));
+    }
+
+    private IEnumerator Run(CanvasGroup contentGroup)
+    {
+        // Fade the logo and text in, then hold (a tap cuts either short)
+        for (float t = 0; t < FadeIn && !skipped; t += Time.unscaledDeltaTime)
+        {
+            contentGroup.alpha = t / FadeIn;
+            yield return null;
+        }
+        contentGroup.alpha = 1f;
+        for (float t = 0; t < Hold && !skipped; t += Time.unscaledDeltaTime) yield return null;
+
+        // The whole card fades away to the menu; taps stay blocked until it's gone
+        for (float t = 0; t < FadeOut; t += Time.unscaledDeltaTime)
+        {
+            group.alpha = 1f - t / FadeOut;
+            yield return null;
+        }
+        Destroy(gameObject);
+        Resources.UnloadUnusedAssets();
+    }
+
+    private void Update()
+    {
+        if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)) skipped = true;
+    }
+
+    private static RectTransform NewRect(string name, Transform parent)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
+    }
+
+    private static void Stretch(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+    }
+
+    private static void Place(RectTransform rt, Vector2 pos, Vector2 size)
+    {
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = size;
+        rt.anchoredPosition = pos;
+    }
+
+    private static TextMeshProUGUI NewText(string name, Transform parent, string text, float size, Color color, bool display)
+    {
+        TextMeshProUGUI tmp = NewRect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
+        NeonTheme.ApplyFont(tmp, display);
+        tmp.text = text;
+        tmp.fontSize = size;
+        tmp.color = color;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.raycastTarget = false;
+        return tmp;
+    }
+}
