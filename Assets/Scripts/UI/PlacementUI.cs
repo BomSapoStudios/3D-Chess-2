@@ -716,6 +716,8 @@ public class PlacementUI : MonoBehaviour
             Haptics.Selection();
             Sfx.Play("ready");
             PlacementManager.Instance.SetPlayerReady(playerColor, true);
+            // Only robots left setting up: they finish straight away
+            if (AIPlayer.Instance != null) AIPlayer.Instance.FinishPlacementNow();
             
             Debug.Log($"PlacementUI: {playerColor} readiness set to {!currentReadiness}");
         }
