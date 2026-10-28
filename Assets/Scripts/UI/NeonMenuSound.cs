@@ -49,7 +49,7 @@ public partial class NeonMenu
         LevelChips(left, () => SoundPrefs.EffectsLevel, v => { SoundPrefs.EffectsLevel = v; Sfx.Play("capture"); }, () => SoundPrefs.Effects, NeonTheme.Cyan);
         TextMeshProUGUI tip = NewText("Tip", left, "The ringer switch on the side of your iPhone mutes the game too.", 13, NeonTheme.Muted, TextAlignmentOptions.TopLeft);
         tip.fontStyle = FontStyles.Normal;
-        tip.enableWordWrapping = true;
+        tip.textWrappingMode = TextWrappingModes.Normal;
         tip.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
 
         SectionLabel(right, "Music", NeonTheme.PinkSoft);

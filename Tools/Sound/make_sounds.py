@@ -5,7 +5,7 @@ Writes 48 kHz mono WAVs to Assets/Resources/Audio/Sfx/. Needs numpy and scipy.
 
 Everything pitched is tuned to D (Arcade Rush 1 is in D minor): wins land on D major,
 losses on D minor. Sounds were picked by Brandon from the sketches on the sound plan page
-(blob button, move C3 "zap with weight", capture, check B "sonar", checkmate B "level up",
+(blob button, move C1 "zap", capture, check B "sonar", checkmate B "level up",
 ice slide, zombie rises).
 """
 import os, wave
@@ -209,13 +209,12 @@ def setup():
 
 # ---------------- Chess ----------------
 def zap(f, take):
-    """Move C3: electric zap landing on the note, with a low thud for weight"""
+    """Move C1: electric zap landing on the note (Brandon switched from C3, which added a thud)"""
     # Same note every take (the plane sets the pitch); the takes differ in sweep speed,
     # brightness and thud so repeats don't sound copied
-    glide, bright, body, low = [(0.04, 3000, 1500, 150), (0.025, 4200, 2000, 175), (0.065, 2200, 1100, 130)][take]
+    glide, bright, body = [(0.04, 3000, 1500), (0.025, 4200, 2000), (0.065, 2200, 1100)][take]
     x = tone(f * 2, 0.14, 0.25, "saw", f1=f, glide=glide, cutoff=bright)
     x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=body, detune=[0, 7, -7][take]))
-    x = at(x, 0.0, thud(low, 60, 0.18, 0.6))
     if take == 1: x = at(x, 0.0, hiss(0.03, 6000, 0.08, kind="high", att=0.001))  # a crisper spark
     if take == 2: x = at(x, 0.05, tone(f * 1.5, 0.12, 0.06, "triangle"))  # a soft fifth on top
     return x

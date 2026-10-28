@@ -15,6 +15,7 @@ public class Music : MonoBehaviour
     private AudioSource a, b; // crossfade pair; a is the one playing
     private string playing;
     private float trackGain = 1f;
+    private float volume; // SoundPrefs.MusicVolume, read again only when a setting changes
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Boot()
@@ -46,6 +47,7 @@ public class Music : MonoBehaviour
 
     private void Choose()
     {
+        volume = SoundPrefs.MusicVolume;
         bool menu = SceneManager.GetActiveScene().name == MenuScene;
         string track = null;
         float gain = 1f;
@@ -73,7 +75,7 @@ public class Music : MonoBehaviour
 
     private void Update()
     {
-        float target = SoundPrefs.MusicVolume * trackGain;
+        float target = volume * trackGain;
         float step = Time.unscaledDeltaTime / Fade;
         a.volume = Mathf.MoveTowards(a.volume, a.clip != null ? target : 0f, step * Mathf.Max(target, 0.1f));
         b.volume = Mathf.MoveTowards(b.volume, 0f, step);
