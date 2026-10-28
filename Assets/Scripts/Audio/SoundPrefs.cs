@@ -20,7 +20,8 @@ public static class SoundPrefs
     public static float EffectsVolume => Effects ? Level(EffectsLevel) : 0f;
     public static float MusicVolume => Music ? Level(MusicLevel) * 0.6f : 0f; // music sits under the effects
 
-    private static float Level(int level) => level == 0 ? 0.35f : level == 1 ? 0.65f : 1f;
+    // Far apart so each step is clearly heard: about -16 dB, -7 dB and full
+    private static float Level(int level) => level == 0 ? 0.16f : level == 1 ? 0.45f : 1f;
 
     private static void SetInt(string key, int value)
     {
