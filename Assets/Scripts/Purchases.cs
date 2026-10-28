@@ -7,8 +7,9 @@ using UnityEngine.Purchasing;
 /// Buying Customize items with money through the App Store (Unity IAP 5, StoreKit 2). Every item
 /// that isn't free (Store.PaidIds) is a non-consumable product named Store.ProductId(id), so new
 /// items are sold as soon as they're in the enums and in App Store Connect. A purchase or restore
-/// marks the item owned exactly like paying pawns does; the App Store is told it's done only after
-/// that's saved, so a purchase interrupted by a crash comes back on the next launch.
+/// is the player's at once, and its signed transaction goes to the game server (Wallet), which checks
+/// it with Apple's certificates and keeps the item with the account. The App Store is told it's done
+/// only once the server has it, so one interrupted (or offline) comes back on the next launch.
 /// Starts by itself; on the web there's no App Store and only pawns work.
 /// </summary>
 public class Purchases : MonoBehaviour
@@ -78,16 +79,33 @@ public class Purchases : MonoBehaviour
         store.FetchPurchases();   // anything bought before, on this phone or another
     }
 
+    /// <summary>Purchases already finished: the server gets any it doesn't show yet (one request for them all)</summary>
     private void OnPurchasesFetched(Orders orders)
     {
-        foreach (ConfirmedOrder order in orders.ConfirmedOrders) GrantAll(order);
+        var known = new List<KeyValuePair<string, string>>();
+        foreach (ConfirmedOrder order in orders.ConfirmedOrders)
+            foreach (string id in ItemsOf(order)) known.Add(new KeyValuePair<string, string>(id, order.Info?.Apple?.jwsRepresentation));
+        Wallet.SendPurchases(known);
     }
 
-    /// <summary>Paid for: save it as owned, then tell the App Store it's delivered</summary>
+    /// <summary>Paid for: the player has it now; the App Store is told it's delivered once the server has it</summary>
     private void OnPurchasePending(PendingOrder order)
     {
-        GrantAll(order);
-        store.ConfirmPurchase(order);
+        string jws = order.Info?.Apple?.jwsRepresentation;
+        var ids = ItemsOf(order);
+        int left = ids.Count;
+        bool allSaved = true;
+        foreach (string id in ids)
+        {
+            bool had = Store.OwnsId(id);
+            Wallet.RecordPurchase(id, jws, saved =>
+            {
+                allSaved &= saved;
+                if (--left == 0 && allSaved) store.ConfirmPurchase(order);
+            });
+            if (!had) Owned?.Invoke(id);
+        }
+        if (ids.Count == 0) store.ConfirmPurchase(order);   // nothing of ours in it
         Finish(order, Outcome.Bought);
     }
 
@@ -98,15 +116,13 @@ public class Purchases : MonoBehaviour
         Finish(order, cancelled ? Outcome.Cancelled : Outcome.Failed);
     }
 
-    private void GrantAll(Order order)
+    /// <summary>The Store ids an order is for</summary>
+    private List<string> ItemsOf(Order order)
     {
+        var ids = new List<string>();
         foreach (CartItem item in order.CartOrdered.Items())
-        {
-            if (item.Product == null || !idOfProduct.TryGetValue(item.Product.definition.id, out string id)) continue;
-            bool had = PlayerPrefs.GetInt("Owned." + id, 0) == 1;
-            Store.Grant(id);
-            if (!had) Owned?.Invoke(id);
-        }
+            if (item.Product != null && idOfProduct.TryGetValue(item.Product.definition.id, out string id)) ids.Add(id);
+        return ids;
     }
 
     private void Finish(Order order, Outcome outcome)

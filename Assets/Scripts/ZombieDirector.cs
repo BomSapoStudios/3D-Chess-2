@@ -73,6 +73,7 @@ public class ZombieDirector : MonoBehaviour
     private int bankedKills;   // most kills this run so far (Undo can't earn them twice)
     private int creditedPawns; // pawns this run's kills are worth so far, before today's cap
     private int pawnsThisRun;  // pawns paid this run (today's cap may stop it short of the kills)
+    private readonly string runId = System.Guid.NewGuid().ToString(); // the server pays each run's kills once
     private int pawnsAfterTurn, promotedAfterTurn; // zombie counts when they last finished moving
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -100,6 +101,7 @@ public class ZombieDirector : MonoBehaviour
     {
         if (Instance == this) Instance = null;
         ZombieMode.HoldTurn = false;
+        if (bankedKills > 0) Wallet.RunEnded();   // left mid-run: send what it earned
     }
 
     private void Update()
@@ -319,7 +321,7 @@ public class ZombieDirector : MonoBehaviour
         bankedKills = kills;
         int worth = Mathf.FloorToInt(kills * PawnBank.PawnsPerZombieKill(ZombieMode.Difficulty) + 0.0001f);
         if (worth <= creditedPawns) return;
-        pawnsThisRun += PawnBank.EarnFromZombies(worth - creditedPawns);
+        pawnsThisRun += PawnBank.EarnFromZombies(runId, ZombieMode.Difficulty, kills, worth - creditedPawns);
         creditedPawns = worth;
     }
 
@@ -338,6 +340,7 @@ public class ZombieDirector : MonoBehaviour
         if (ended) return;
         ended = true;
         bool best = ZombieMode.SaveBest();
+        Wallet.RunEnded();
         GameCenter.ReportZombieRun(ZombieMode.Difficulty, ZombieMode.Rounds);
         string reason = $"{how} after {ZombieMode.Rounds} round{(ZombieMode.Rounds == 1 ? "" : "s")}. Score {ZombieMode.Score}" + (best ? " (new best!)" : $" (best {ZombieMode.Best(ZombieMode.Difficulty)})")
             + $". +{pawnsThisRun} pawn{(pawnsThisRun == 1 ? "" : "s")}" + (PawnBank.ZombieLeftToday == 0 ? " (today's limit reached)" : "");

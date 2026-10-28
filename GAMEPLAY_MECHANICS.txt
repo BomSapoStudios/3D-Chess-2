@@ -338,7 +338,8 @@ Score:
 
 Pawns:
   Every zombie you destroy (pawn or promoted) earns pawns for your pawn bank: 1 on Pea,
-  1.5 on Walnut, 2 on Galaxy, with the run's total rounded down. Up to 100 pawns a day.
+  1.5 on Walnut, 2 on Galaxy, with the run's total rounded down. Up to 100 pawns a day
+  (the day is UTC, as the server counts it).
   Undo can't earn the same zombie twice. See PAWNS below.
 
 Zombie Hunt (the Turn Planner in this mode):
@@ -400,11 +401,21 @@ Scoring:
     (no fail, no pawns). X or a tap outside closes it.
 
 PAWNS
-  Pawns are what you collect, for a future store (piece sets, puzzle packs). They live in
-  a pawn bank on the phone. Queen Blitz pays each puzzle's pawns on its first clear;
-  Zombie Survival pays 1 / 1.5 / 2 a zombie (Pea / Walnut / Galaxy), up to 100 a day;
-  Auto-place costs 1. Store prices (not built yet): piece set 4,500, puzzle pack 3,000.
-  The numbers are all in Assets/Scripts/PawnBank.cs.
+  Pawns are what you collect and spend on Customize items and puzzle packs. The game server
+  keeps them with your account (pawns, items owned, puzzles cleared), so they follow you to a
+  new phone when you sign in there. Queen Blitz pays each puzzle's pawns on its first clear;
+  Zombie Survival pays 1 / 1.5 / 2 a zombie (Pea / Walnut / Galaxy), up to 100 a day (UTC);
+  Auto-place costs 1. Prices: piece set 4,500, backdrop 3,000, promotion 1,000, puzzle pack 4,500.
+  • Offline: what you earn is saved on the phone and sent when it's back online (each earning
+    counts once, however many times it's sent). Unlocking with pawns needs a connection.
+  • The server checks earnings against the rules: a puzzle pays once per account (at most 40),
+    Zombies! pays by kills within the daily cap, and impossible amounts are refused.
+  • App Store purchases are checked with Apple by the server and kept with the account. Restore
+    purchases on a new account moves them there.
+  • Updating from a build that kept pawns on the phone: the first sync brings the phone's pawns
+    (up to 10,000), items and cleared puzzles to the account, once.
+  The numbers are in server-cf/src/economy.ts (the server's) and Assets/Scripts/PawnBank.cs,
+  Store.cs and QueenBlitz.cs (what the app shows); keep them the same.
 
 Screen:
   • The puzzle name, moves left and par sit at the very top, between your pawn total and
@@ -523,12 +534,14 @@ ACCOUNT
   Sign in with Apple. You get a random online name (e.g. shinyrook359),
   which you can change, and a friend code.
   • Delete account (Settings): removes the account, name, sign-in links,
-    friends, blocks, notifications, ratings and stats from the server.
+    friends, blocks, notifications, ratings, stats and pawns (with items
+    unlocked for pawns) from the server.
     Games still in progress count as a resignation (a lobby closes; a game
     still in setup is abandoned). Opponents keep their results against
     "A player". If the account uses Sign in with Apple, the app asks Apple
     once more so the server can cut that link. Things on the phone (settings,
-    puzzles, pawns, purchases) stay; playing online again starts a new account.
+    puzzle progress) stay; playing again starts a new account with no pawns.
+    App Store purchases belong to the Apple ID: Restore purchases brings them back.
 
 PLEASE UPDATE
   • Every request says which build sent it (OnlineClient.ClientVersion, now 1).
