@@ -8,8 +8,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Neon-styled main menu and one-screen game setup. Replaces the older multi-step
-/// MainMenuController UI (which stays in the scene but is hidden).
+/// Neon-styled main menu and one-screen game setup.
 /// </summary>
 public partial class NeonMenu : MonoBehaviour
 {
@@ -59,7 +58,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private static void TryCreate()
     {
-        if (FindFirstObjectByType<MainMenuController>() == null) return;
+        if (!MenuScene.IsActive) return;
         if (FindFirstObjectByType<NeonMenu>() != null) return;
         new GameObject("Neon Menu").AddComponent<NeonMenu>();
     }
@@ -74,9 +73,11 @@ public partial class NeonMenu : MonoBehaviour
         BuildFriendsScreen();
         BuildNotifyScreen();
         BuildAccessScreen();
+        BuildSoundScreen();
         BuildSettingsScreen();
         BuildStatsScreen();
         FitScreensForTextSize();
+        PressSound.AddAll(transform); // button sounds play on touch, not on release
         ShowMenu();
         if (reopenAccessibility)
         {
@@ -107,10 +108,7 @@ public partial class NeonMenu : MonoBehaviour
             ResumeGame(rematchRoom);
         }
 
-        // The old menu builds its UI in its own Start; hide it once it exists
-        yield return null;
-        yield return null;
-        HideOldMenu();
+        EnsureEventSystem();
 
         // Games still going (say the app was closed mid-game): show them on the Online Game button
         yield return RefreshGames();
@@ -214,13 +212,8 @@ public partial class NeonMenu : MonoBehaviour
         StartCoroutine(JoinRoutine(code));
     }
 
-    private void HideOldMenu()
+    private void EnsureEventSystem()
     {
-        Canvas mine = GetComponent<Canvas>();
-        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-        {
-            if (c != mine && c.isRootCanvas) c.enabled = false;
-        }
         if (FindFirstObjectByType<EventSystem>() == null)
         {
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
@@ -339,7 +332,7 @@ public partial class NeonMenu : MonoBehaviour
         quickLayout.childForceExpandWidth = false;
         NeonButton(quickRow, "Quick Play!", new Vector2(124, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, OrResume(SavedGames.QuickPlay, ShowSidePicker));
         NeonButton(quickRow, "Zombies!", new Vector2(108, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 16, OrResume(SavedGames.Zombies, ShowZombiePicker));
-        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, OrResume(SavedGames.Blitz, ShowBlitzPicker));
+        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, ShowBlitzPicker);
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -582,7 +575,7 @@ public partial class NeonMenu : MonoBehaviour
             {
                 if (!captured.enabled()) return;
                 captured.onClick();
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 Refresh();
             });
             TextMeshProUGUI label = NewText("Text", image.transform, item.text, fontSize, color, TextAlignmentOptions.Center);
@@ -617,7 +610,7 @@ public partial class NeonMenu : MonoBehaviour
         Place(track.rectTransform, new Vector2(1, 0.5f), new Vector2(62, 36), new Vector2(-34, 0));
         Button button = track.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => { Haptics.Selection(); onToggle(); });
+        button.onClick.AddListener(() => { Haptics.Selection(); onToggle(); Sfx.Play("ui_toggle_on"); });
 
         Image knobImage = NewImage("Knob", track.transform, NeonTheme.Ground);
         knobImage.sprite = NeonTheme.Circle;
@@ -684,7 +677,7 @@ public partial class NeonMenu : MonoBehaviour
             button.onClick.AddListener(() =>
             {
                 if (setupOnline && index == 0) return; // online, White is always you (the host)
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 playerTypes[index] = playerTypes[index] == PlayerType.Human ? PlayerType.Computer : PlayerType.Human;
                 Refresh();
             });
@@ -938,7 +931,7 @@ public partial class NeonMenu : MonoBehaviour
             string name = size;
             button.onClick.AddListener(() =>
             {
-                Haptics.Selection();
+                Haptics.Selection(); Sfx.Tap();
                 if (!live) SetOnlineStatus($"{name} matches are coming soon!");
             });
             string text = live ? size : $"{size}\n<size=72%>Coming soon!</size>";
@@ -1024,6 +1017,7 @@ public partial class NeonMenu : MonoBehaviour
         if (OnlineClient.UpdateRequired) { ShowUpdatePicker(); return; }
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -1160,7 +1154,8 @@ public partial class NeonMenu : MonoBehaviour
         if (!onlineBusy) yield break;  // cancelled while signing in
         // Walked out of too many games lately: Find Match is paused for a while
         long pausedUntil = 0;
-        yield return OnlineClient.Instance.GetMatchCooldown(until => pausedUntil = until);
+        bool ranked = false;
+        yield return OnlineClient.Instance.GetMatchCooldown((until, isRanked) => { pausedUntil = until; ranked = isRanked; });
         if (pausedUntil > 0)
         {
             int minutes = Mathf.Max(1, Mathf.CeilToInt((pausedUntil - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) / 60000f));
@@ -1170,7 +1165,9 @@ public partial class NeonMenu : MonoBehaviour
             yield break;
         }
         ListenForStart();
-        SetSearching("Finding you a ranked game (10 minutes each)…");
+        // Ranked needs Game Center (one account per Apple ID); without it Find Match still plays, unranked
+        SetSearching(ranked ? "Finding you a ranked game (10 minutes each)…"
+                            : "Finding you a game (10 minutes each). Sign in to Game Center to play ranked.");
         OnlineClient.Instance.FindMatch("5x5x5",
             code => { SetSearching("Opponent found!"); OnlineClient.Instance.JoinRoom(code); },
             error => { SetSearching(null); SetOnlineStatus(error); onlineBusy = false; });
@@ -1513,7 +1510,7 @@ public partial class NeonMenu : MonoBehaviour
         if (name != null)
         {
             name.GetComponent<TextMeshProUGUI>().raycastTarget = true;
-            name.gameObject.AddComponent<Button>().onClick.AddListener(() => { Haptics.Selection(); ShowProfile(f.userId, ShowFriends); });
+            name.gameObject.AddComponent<Button>().onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); ShowProfile(f.userId, ShowFriends); });
         }
         RowButton(row, "Challenge", NeonTheme.Lime, () => StartCoroutine(ChallengeRoutine(f)));
         RowButton(row, "Remove", NeonTheme.Cyan, () => StartCoroutine(Act(OnlineClient.Instance.RemoveFriend(f.userId, ActDone))));
@@ -1850,6 +1847,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (statsScreen != null) statsScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         menuScreen.SetActive(false);
         notifyScreen.SetActive(true);
@@ -1930,6 +1928,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(true);
@@ -1943,6 +1942,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -1971,6 +1971,7 @@ public partial class NeonMenu : MonoBehaviour
     {
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         if (statsScreen != null) statsScreen.SetActive(false);
         menuScreen.SetActive(false);
@@ -2051,7 +2052,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private void PickSide(PieceColor side)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         sidePicker.SetActive(false);
         StartQuickPlay(side);
     }
@@ -2164,7 +2165,7 @@ public partial class NeonMenu : MonoBehaviour
         config.zombieMode = zombieRun;
         config.queenBlitz = blitzRun;
         config.blitzPuzzle = blitzChoice;
-        config.saveSlot = zombieRun ? SavedGames.Zombies : blitzRun ? SavedGames.Blitz : quickPlay ? SavedGames.QuickPlay : SavedGames.Local;
+        config.saveSlot = blitzRun ? "" : zombieRun ? SavedGames.Zombies : quickPlay ? SavedGames.QuickPlay : SavedGames.Local; // puzzles start fresh every time
         config.playerCount = playerCount;
         config.boardSize = boardSize;
         config.aiDifficulty = difficulty;
@@ -2198,7 +2199,8 @@ public partial class NeonMenu : MonoBehaviour
         NeonTheme.StyleFilled(image, fill, shadow, tilt);
         Button button = image.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(button);
-        button.onClick.AddListener(() => { Haptics.Selection(); onClick(); });
+        button.onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); onClick(); });
+        button.gameObject.AddComponent<PressSound>().back = text.StartsWith("<");
         TextMeshProUGUI label = NewText("Text", image.transform, text, fontSize, NeonTheme.Ground, TextAlignmentOptions.Center);
         Stretch(label.rectTransform);
         return button;

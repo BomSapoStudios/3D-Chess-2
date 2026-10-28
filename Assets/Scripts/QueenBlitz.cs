@@ -549,7 +549,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
     private static void TryCreate()
     {
         GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
-        bool inGame = Object.FindFirstObjectByType<MainMenuController>() == null;
+        bool inGame = !MenuScene.IsActive;
         QueenBlitz.Active = inGame && config != null && config.queenBlitz && !config.isOnlineGame;
         if (!QueenBlitz.Active || Instance != null) return;
         QueenBlitz.Begin(config.blitzPuzzle);
@@ -807,7 +807,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         while (Time.time < done)
         {
             int arrived = Mathf.Clamp(Mathf.FloorToInt((Time.time - funnelStarted - FunnelFlight) / FunnelStep) + 1, 0, paid);
-            if (arrived > funnelArrived) { funnelArrived = arrived; shownTotal = PawnBank.Total - paid + arrived; tallyBump = Time.time; }
+            if (arrived > funnelArrived) { GameSounds.PawnBanked(arrived); funnelArrived = arrived; shownTotal = PawnBank.Total - paid + arrived; tallyBump = Time.time; }
             yield return null;
         }
         shownTotal = PawnBank.Total;

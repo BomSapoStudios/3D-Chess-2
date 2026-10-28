@@ -847,6 +847,13 @@ public class GameEndDetectionManager : MonoBehaviour
     {
         if (OnlineSession.ShouldSend(forfeitingPlayer)) OnlineClient.Instance.SendResign(forfeitingPlayer);
 
+        // Zombie runs have no game end detection: forfeiting ends the run, scored as it stands
+        if (ZombieMode.Active && ZombieDirector.Instance != null)
+        {
+            ZombieDirector.Instance.GiveUp();
+            return;
+        }
+
         // 4 or 6 players: the game goes on without them
         if (enableGameEndDetection && IsMultiplayerInProgress() && GameStateManager.Instance != null && GameStateManager.Instance.CanMovePieces())
         {

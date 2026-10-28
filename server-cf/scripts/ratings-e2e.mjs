@@ -78,15 +78,43 @@ const guest = async name => (await post('/auth/guest', { name })).body;
 const join = async (code, who) => { const c = await client(`${WS_BASE}/rooms/${code}/connect?token=${who.token}`); const j = await c.wait(m => m.type === 'room:joined'); return [c, j]; };
 const get = (path, who) => fetch(BASE + path, { headers: { Authorization: `Bearer ${who.token}` } }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }));
 
-/** Start a 2-player game between host and guest; returns both sockets once play begins */
+/**
+ * Play n quiet moves (no captures): each turn, the side on move steps a piece to a free
+ * neighbouring cell. movers maps a colour to [socket, as?] (as: a robot seat the host plays).
+ * Ratings only move once a game has 6 moves, so rated games play these first.
+ */
+async function playMoves(movers, n) {
+  for (let i = 0; i < n; i++) {
+    const [first] = Object.values(movers);
+    const state = (await first[0].request({ type: 'room:state' })).state;
+    const color = state.currentTurn;
+    const [c, as] = movers[color];
+    const size = state.board.length;
+    const at = (p) => state.board[p.x]?.[p.y]?.[p.z];
+    let moved = false;
+    for (const piece of state.board.flat(2).filter(p => p && p.color === color)) {
+      for (let dx = -1; dx <= 1 && !moved; dx++) for (let dy = -1; dy <= 1 && !moved; dy++) for (let dz = -1; dz <= 1 && !moved; dz++) {
+        const to = { x: piece.position.x + dx, y: piece.position.y + dy, z: piece.position.z + dz };
+        if ((!dx && !dy && !dz) || [to.x, to.y, to.z].some(v => v < 0 || v >= size) || at(to)) continue;
+        const r = await c.request({ type: 'game:move', from: piece.position, to, ...(as ? { as } : {}) });
+        if (r.ok) moved = true;
+      }
+      if (moved) break;
+    }
+    if (!moved) throw new Error(`${color} found no quiet move`);
+  }
+}
+
+/** Start a 2-player game between host and guest; returns both sockets once play begins (after 6 moves, so it can be rated) */
 // Ranked games are Find Match games; TEST_MATCHED lets a test room count as one
-async function playing(host, guestP, extra = { timedMode: true, timePerPlayerSeconds: 1800 }, matched = true) {
+async function playing(host, guestP, extra = { timedMode: true, timePerPlayerSeconds: 1800 }, matched = true, moves = 6) {
   const room = (await post('/rooms', { config: { boardSize: '4x4x4', playerCount: 2, ...extra }, matched }, host.token)).body;
   const [a] = await join(room.code, host);
   const [b] = await join(room.code, guestP);
   await fillRest(a, 4, 'White'); await fillRest(b, 4, 'Black');
   await a.request({ type: 'game:ready' }); await b.request({ type: 'game:ready' });
   await a.wait(m => m.type === 'game:phaseChanged');
+  if (moves) await playMoves({ White: [a], Black: [b] }, moves);
   return { room, a, b };
 }
 
@@ -175,6 +203,7 @@ for (const [label, extra, matched] of [
   await fillRest(c[0], 6, 'Purple', [], 'Purple');
   await c[0].request({ type: 'game:ready', as: 'Purple' });
   await c[0].wait(m => m.type === 'game:phaseChanged');
+  await playMoves({ White: [c[0]], Black: [c[1]], Green: [c[2]], Purple: [c[0], 'Purple'] }, 6);
   await c[0].request({ type: 'game:resign' });   // White out first
   await c[1].request({ type: 'game:resign' });   // then Black
   await c[0].request({ type: 'game:resign', as: 'Purple' }); // the robot too: Green wins
@@ -200,6 +229,36 @@ for (const [label, extra, matched] of [
   check(ss.games === 1 && ss.wins === 1 && ss.recent[0]?.opponents[0] === 'A player', `the opponent's record keeps the win against "A player" (${ss.recent[0]?.opponents[0]})`);
   check((await get(`/stats?of=${quitter.userId}`, stayer)).status === 401, "the deleted player's stats are gone");
   b.close();
+}
+
+// 7. Thrown games: resigning or walking out before 6 moves changes nobody's rating
+{
+  const t = await guest('Tess'), u = await guest('Uma');
+  const { a, b } = await playing(t, u, undefined, true, 2);
+  await a.request({ type: 'game:resign' });
+  await b.wait(m => m.type === 'game:over', 8000);
+  await sleep(300);
+  check(!b.inbox.some(m => m.type === 'game:rated'), 'resigning after 2 moves changes nobody\'s rating');
+  const us = (await get('/stats', u)).body;
+  check(us.games === 1 && us.wins === 1 && us.duel.rating === 1000, `it still counts in the win/loss record (${us.games} games, ${us.wins} wins, rating ${us.duel.rating})`);
+  a.close(); b.close();
+}
+
+// 8. Ranked Find Match needs Game Center: a guest is told, and their Find Match game is unranked
+{
+  const g1 = await guest('Gus'), g2 = await guest('Gia');
+  check((await get('/matchmaking/cooldown', g1)).body.ranked === false, 'a guest is not ranked in Find Match');
+  const m1 = await client(`${WS_BASE}/matchmaking/connect?token=${g1.token}`);
+  const m2 = await client(`${WS_BASE}/matchmaking/connect?token=${g2.token}`);
+  m1.ws.send(JSON.stringify({ type: 'matchmaking:join', config: { boardSize: '5x5x5', playerCount: 2 } }));
+  const queued = await m1.wait(m => m.type === 'matchmaking:queued');
+  check(queued.ranked === false, 'the queue says so too');
+  m2.ws.send(JSON.stringify({ type: 'matchmaking:join', config: { boardSize: '5x5x5', playerCount: 2 } }));
+  const found = await m1.wait(m => m.type === 'matchmaking:found', 8000);
+  check(found.ranked === false, 'two guests get an unranked match');
+  const [a] = await join(found.roomCode, g1);
+  check((await a.request({ type: 'room:state' })).state.ranked === false, 'and the room is marked unranked');
+  a.close(); m1.close(); m2.close();
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nAll ratings checks passed');

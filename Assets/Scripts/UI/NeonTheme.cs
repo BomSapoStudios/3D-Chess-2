@@ -246,8 +246,11 @@ public static class NeonTheme
         style.normal.textColor = outlined ? fill : Ground;
         GUI.Label(rect, text, style);
 
+        // the sound plays as the finger touches (a click only comes when it lifts)
+        Event e = Event.current;
+        if (e.type == EventType.MouseDown && rect.Contains(e.mousePosition)) Sfx.Press(false);
         bool tapped = GUI.Button(rect, GUIContent.none, GUIStyle.none);
-        if (tapped) Haptics.Selection();
+        if (tapped) { Haptics.Selection(); Sfx.Tap(); }
         return tapped;
     }
 

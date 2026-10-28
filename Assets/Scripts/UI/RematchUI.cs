@@ -39,7 +39,7 @@ public class RematchUI : MonoBehaviour
     {
         Showing = false;
         if (FindFirstObjectByType<RematchUI>() != null) return;
-        if (FindFirstObjectByType<MainMenuController>() != null) return; // the menu, not a game
+        if (MenuScene.IsActive) return; // the menu, not a game
         new GameObject("Rematch UI").AddComponent<RematchUI>();
     }
 
@@ -73,6 +73,7 @@ public class RematchUI : MonoBehaviour
             if (outcome == NeonTheme.Lime) Haptics.Success();
             else if (outcome == NeonTheme.Pink) Haptics.Error();
             else Haptics.Warning();
+            GameSounds.GameOver(outcome);
             if (!Online && !ZombieMode.Active && !QueenBlitz.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
@@ -141,7 +142,7 @@ public class RematchUI : MonoBehaviour
 
     private void Rematch()
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         if (Online)
         {
             if (voted || OnlineClient.Instance == null) return;
@@ -159,7 +160,7 @@ public class RematchUI : MonoBehaviour
 
     private void Leave(Action go)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         leaving = true;
         Showing = false;
         go();

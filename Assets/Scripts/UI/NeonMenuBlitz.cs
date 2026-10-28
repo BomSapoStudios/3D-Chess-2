@@ -256,7 +256,7 @@ public partial class NeonMenu
         Button buy = NeonButton(blitzContent, $"Unlock for {pack.pawnPrice:N0} pawns", new Vector2(280, 56), enough ? NeonTheme.Lime : NeonTheme.Muted, NeonTheme.Pink, -0.6f, 18,
             () =>
             {
-                if (QueenBlitz.BuyWithPawns(pack)) { Haptics.Selection(); ShowBlitzPuzzles(pack.id, 0); }
+                if (QueenBlitz.BuyWithPawns(pack)) { Haptics.Selection(); Sfx.Tap(); ShowBlitzPuzzles(pack.id, 0); }
                 else ShowToast($"You need {pack.pawnPrice - PawnBank.Total:N0} more pawns. Clear puzzles or play Zombies! to earn them.");
             });
         Place((RectTransform)buy.transform, new Vector2(0.5f, 0.5f), new Vector2(280, 56), new Vector2(0, -10));
@@ -300,7 +300,7 @@ public partial class NeonMenu
                 Button tab = NeonButton(blitzContent, $"{c + 1}", new Vector2(70, 34), color, NeonTheme.Ground, 0f, 16,
                     () =>
                     {
-                        Haptics.Selection();
+                        Haptics.Selection(); Sfx.Tap();
                         if (QueenBlitz.ChapterOpen(packId, index)) ShowBlitzPuzzles(packId, index);
                         else ShowToast($"Clear {QueenBlitz.ChapterUnlock} puzzles in chapter {index} to open chapter {index + 1}.");
                     });
@@ -431,17 +431,13 @@ public partial class NeonMenu
     /// <summary>Tap a puzzle in the picker (BlitzDemo)</summary>
     public void DebugStartBlitz(int index) => StartBlitz(index);
 
-    /// <summary>Tap Queen Blitz! on the menu, then Start new if a puzzle is saved (BlitzDemo)</summary>
-    public void DebugBlitzFromMenu()
-    {
-        OrResume(SavedGames.Blitz, ShowBlitzPicker)();
-        if (resumePicker != null && resumePicker.activeSelf) { resumePicker.SetActive(false); resumeStartNew?.Invoke(); }
-    }
+    /// <summary>Tap Queen Blitz! on the menu (BlitzDemo)</summary>
+    public void DebugBlitzFromMenu() => ShowBlitzPicker();
 #endif
 
     private void StartBlitz(int index)
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         blitzPicker.SetActive(false);
         QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
         playerCount = 2;

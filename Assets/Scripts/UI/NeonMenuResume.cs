@@ -61,14 +61,14 @@ public partial class NeonMenu
 
         Button resume = NeonButton(card.transform, "Resume", new Vector2(190, 64), NeonTheme.Lime, NeonTheme.Pink, -1f, 22, () =>
         {
-            Haptics.Selection();
+            Haptics.Selection(); Sfx.Tap();
             resumePicker.SetActive(false);
             if (!SavedGames.Resume(resumeSlot)) ShowToast("Couldn't open the saved game");
         });
         Place((RectTransform)resume.transform, new Vector2(0.5f, 0f), new Vector2(190, 64), new Vector2(-105, 62));
         Button fresh = NeonButton(card.transform, "Start new", new Vector2(190, 64), NeonTheme.Pink, NeonTheme.Cyan, 1f, 22, () =>
         {
-            Haptics.Selection();
+            Haptics.Selection(); Sfx.Tap();
             resumePicker.SetActive(false);
             resumeStartNew?.Invoke(); // the save goes once the new game starts
         });

@@ -3,7 +3,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Saved games on this phone, one for each mode: Quick Play, Zombies!, Queen Blitz and Local Game.
+/// Saved games on this phone, one for each mode: Quick Play, Zombies! and Local Game. Queen Blitz
+/// puzzles aren't saved: leaving one (or closing the app) means it starts fresh next time.
 /// At the start of every turn a person plays, the position is saved (the pieces Undo keeps, plus
 /// the clocks, the count to the next Chaos spin, players knocked out and the game's settings), so
 /// the player can go back to the menu, change a setting, and carry on. Tapping the mode again
@@ -101,13 +102,14 @@ public class SavedGames : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Install()
     {
+        Delete(Blitz); // from builds that saved puzzles part way through
         SceneManager.sceneLoaded += (scene, mode) => TryCreate();
         TryCreate();
     }
 
     private static void TryCreate()
     {
-        if (Instance != null || FindFirstObjectByType<MainMenuController>() != null) { pending = null; return; }
+        if (Instance != null || MenuScene.IsActive) { pending = null; return; }
         GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
         if (config == null || config.isOnlineGame || string.IsNullOrEmpty(config.saveSlot)) { pending = null; return; }
         Instance = new GameObject("Saved Games").AddComponent<SavedGames>();

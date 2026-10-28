@@ -659,7 +659,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
         // Update check status for this specific player
         bool wasInCheck = playerCheckStatus.TryGetValue(kingColor, out bool before) && before;
         playerCheckStatus[kingColor] = true;
-        if (!wasInCheck && !OnlineSession.Replaying) Haptics.Warning(); // check!
+        if (!wasInCheck && !OnlineSession.Replaying) { Haptics.Warning(); Sfx.Play("check"); } // check!
 
         // Only update display if in Playing state - prevents interference during state transitions
         if (currentGameState == GameState.Playing)
@@ -842,7 +842,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
         }
         // Your move: a tap when it comes back to you from a robot or an online opponent
         if (newCurrentPlayer != previousPlayer && Haptics.Mine(newCurrentPlayer) && !Haptics.Mine(previousPlayer) && !OnlineSession.Replaying)
-            Haptics.Light();
+            { Haptics.Light(); Sfx.Play("your_turn"); }
     }
     
     /// <summary>

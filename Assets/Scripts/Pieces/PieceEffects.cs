@@ -206,11 +206,12 @@ public partial class PieceEffects : MonoBehaviour
     public static void Shatter(ChessPiece victim, ChessPiece attacker)
     {
         if (victim == null || !Enabled) return;
+        string sound = GameSounds.CaptureSound(victim, attacker);
         GameObject copy = VisualCopy(victim);
-        Runner.StartCoroutine(Runner.ShatterRoutine(copy, attacker, GlowColor(victim.pieceColor)));
+        Runner.StartCoroutine(Runner.ShatterRoutine(copy, attacker, GlowColor(victim.pieceColor), sound));
     }
 
-    private IEnumerator ShatterRoutine(GameObject copy, ChessPiece attacker, Color color)
+    private IEnumerator ShatterRoutine(GameObject copy, ChessPiece attacker, Color color, string sound)
     {
         Bounds bounds = BoundsOf(copy);
         Vector3 square = copy.transform.position;
@@ -232,6 +233,7 @@ public partial class PieceEffects : MonoBehaviour
         }
 
         Haptics.Heavy(); // a capture
+        Sfx.Play(sound);
         if (AccessibilityPrefs.ReduceMotion)
         {
             yield return FadeAwayRoutine(copy, 0.3f); // Reduce Motion: no flying shards, it just fades
@@ -470,6 +472,7 @@ public partial class PieceEffects : MonoBehaviour
             // In a game (not Customize's preview): Reduce Motion swaps the show for a short fade
             if (AccessibilityPrefs.ReduceMotion) kind = PromotionStyle.Kind.Fade;
             Haptics.Success();
+            Sfx.Play("promote");
         }
         if (kind == PromotionStyle.Kind.SpinMorph) Runner.StartCoroutine(Runner.SpinPromoteRoutine(copy, promoted, color));
         else if (kind == PromotionStyle.Kind.Coronation) Runner.StartCoroutine(Runner.CoronationRoutine(copy, promoted, color));

@@ -194,7 +194,7 @@ public partial class NeonMenu
             Button b = face.gameObject.AddComponent<Button>();
             NeonTheme.NeutralTint(b);
             CustomizeTab captured = t.t;
-            b.onClick.AddListener(() => { Haptics.Selection(); SelectTab(captured); });
+            b.onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); SelectTab(captured); });
             railTabs.Add((t.t, face, border, icon, label));
         }
     }
@@ -326,7 +326,7 @@ public partial class NeonMenu
         effectsPicture.raycastTarget = true;
         play.onClick.AddListener(() =>
         {
-            Haptics.Selection();
+            Haptics.Selection(); Sfx.Tap();
             effectsPicture.texture = PlayInlinePromotion(ShownPromotion);
             Cover(effectsPicture);
             playPill.SetActive(false);
@@ -435,6 +435,7 @@ public partial class NeonMenu
             return;
         }
         Haptics.Selection();
+        Sfx.Play("unlock");
         UseUnlocked();
     }
 
@@ -443,7 +444,7 @@ public partial class NeonMenu
     private void UnlockWithMoney()
     {
         if (buying || !ShowingLocked(out string id, out _)) return;
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
 #if UNITY_WEBGL && !UNITY_EDITOR
         ShowToast("Buying with money works in the iPhone app. Pawns work here!");
 #else
@@ -467,6 +468,7 @@ public partial class NeonMenu
     private void OnPurchased(string id)
     {
         if (customizeScreen == null || !customizeScreen.activeInHierarchy) return;
+        Sfx.Play("purchase");
         if (ShowingLocked(out string showing, out _) && showing == id) { UseUnlocked(); return; }
         BuildCards();
         RefreshCustomize();
@@ -486,7 +488,7 @@ public partial class NeonMenu
 
     private void RestorePurchases()
     {
-        Haptics.Selection();
+        Haptics.Selection(); Sfx.Tap();
         ShowToast("Checking the App Store for your purchases...");
         Purchases.Restore(ok =>
         {
@@ -754,7 +756,7 @@ public partial class NeonMenu
         b.onClick.AddListener(() =>
         {
             use();
-            Haptics.Selection();
+            Haptics.Selection(); Sfx.Tap();
             Refresh();
             if (tab == CustomizeTab.Pieces || tab == CustomizeTab.Backdrop) StartPreviewForTab();    // show the new set or scene
             if (tab == CustomizeTab.Effects) b.StartCoroutine(PlayAfterPick());
@@ -808,7 +810,7 @@ public partial class NeonMenu
 
         Button b = row.gameObject.AddComponent<Button>();
         NeonTheme.NeutralTint(b);
-        b.onClick.AddListener(() => { flip(); Haptics.Selection(); Refresh(); });
+        b.onClick.AddListener(() => { flip(); Haptics.Selection(); Sfx.Tap(); Refresh(); });
         boardSwitches.Add((on, track, knob.rectTransform, border));
     }
 

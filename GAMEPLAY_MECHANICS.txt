@@ -484,6 +484,32 @@ ON-BOARD FEEDBACK
   • Moves, captures and Chaos spins are animated, with haptics.
   • Promotions play the animation chosen in Customize.
 
+SOUND
+  Every sound is synthesized for the game (Tools/Sound/make_sounds.py, no
+  samples) and tuned to D, the key of the menu music (Arcade Rush 1).
+  • Menu buttons bloop; back buttons bloop downward; switches blip.
+  • A move lands with a soft zap whose tone belongs to its square: the plane
+    (height) sets the note, climbing D minor pentatonic; the row (depth) sets
+    a soft second note on top, so each square of a plane has its own two-note
+    chord; and the sound pans to where the square is on screen. Captures
+    clink and shatter.
+  • Check: a low sonar pulse. Your turn (vs robots or online): a chime.
+  • Game over: an arcade "level up" for a win (D major), a falling run for
+    a loss (D minor), a suspended chord for a draw.
+  • Setup: pick-up tick, set-down pitched by plane, Auto-place ripples up
+    the scale, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
+    whirr.
+  • Zombies!: zombies growl as they rise, shuffle when they step, chomp when
+    they bite, and poof when killed. OVERRUN! ends on a horde roar.
+  • Queen Blitz: the queen scrapes (or slides on ice), each pawn in a sweep
+    pops one note higher than the last, earned pawns ding into the tally,
+    CLEARED! rings out and Out of moves deflates.
+  • Settings > Sound: Sound Effects (on), Music (on, menus), Music While You
+    Play (off), each with Quiet / Medium / Loud. In a game the music is the
+    mode's own track if there is one, else the menu track, quieter. The
+    iPhone's ringer switch mutes the game, and other apps' music keeps
+    playing underneath.
+
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. ONLINE PLAY
@@ -517,7 +543,8 @@ PLEASE UPDATE
 PLAY ANYONE — Find Match
   • Choose board size and player count; you're matched with others who
     asked for the same. Nobody waits in the queue more than 5 minutes.
-  • Always ranked: a 10-minute clock each, no Chaos Mode.
+  • Always a 10-minute clock each, no Chaos Mode. Ranked when every player is
+    signed in to Game Center; otherwise the game is played unranked.
   • Paused for a while if you keep walking out of games (section 14).
 
 PLAY A FRIEND
@@ -562,6 +589,13 @@ no Chaos Mode, so friends can't trade rating points. Games with friends (a room
 code, a challenge or a rematch) are unranked: they can use Chaos Mode or no
 clock, and still count in your win/loss record and head-to-head, but don't
 change ratings.
+
+Ranked also needs Game Center: a Find Match game is rated only when every
+player is signed in to Game Center (one account per Apple ID), so throwaway
+guest accounts can't feed someone wins. And a game given up early, resigned or
+walked out of before 6 moves (both players' moves together), changes nobody's
+rating; it still counts in the win/loss record, and a walk-out still counts
+toward the Find Match pause.
 
 Two ladders:
   Duel   — 2-player games.

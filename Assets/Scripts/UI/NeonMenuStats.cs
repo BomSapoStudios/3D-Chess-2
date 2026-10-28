@@ -115,6 +115,7 @@ public partial class NeonMenu
         friendsScreen.SetActive(false);
         if (notifyScreen != null) notifyScreen.SetActive(false);
         if (accessScreen != null) accessScreen.SetActive(false);
+        if (soundScreen != null) soundScreen.SetActive(false);
         if (settingsScreen != null) settingsScreen.SetActive(false);
         statsScreen.SetActive(true);
         Clear(statsLeft, keep: 0);
@@ -327,7 +328,7 @@ public partial class NeonMenu
             // Tap a player to see their profile
             Button open = row.gameObject.AddComponent<Button>();
             row.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.001f);
-            open.onClick.AddListener(() => { Haptics.Selection(); ShowProfile(id == me ? null : id, ShowLeaderboard); });
+            open.onClick.AddListener(() => { Haptics.Selection(); Sfx.Tap(); ShowProfile(id == me ? null : id, ShowLeaderboard); });
         }
     }
 }

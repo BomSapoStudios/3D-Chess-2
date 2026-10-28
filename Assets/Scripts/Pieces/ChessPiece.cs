@@ -520,6 +520,7 @@ public abstract class ChessPiece : MonoBehaviour
         if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
         {
             QueenBlitz.Route route = QueenBlitz.TakeRoute(targetPosition);
+            Sfx.Play(QueenBlitz.Current.ice ? "ice_slide" : "blitz_slide");
             if (route != null) yield return SlideRouteCoroutine(route);
             else yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;
@@ -547,6 +548,8 @@ public abstract class ChessPiece : MonoBehaviour
 
         float elapsedTime = 0f;
         float distance = Vector3.Distance(startPos, endPos);
+        // The move's sound starts just before touchdown, so it lands with the piece rather than after it
+        bool sounded = !boardMove || OnlineSession.Replaying;
         float hopHeight = Mathf.Max(cell * 0.45f, distance * 0.35f) * (pieceType == ChessPieceType.Knight ? 1.5f : 1f);
         
         while (elapsedTime < duration)
@@ -582,6 +585,7 @@ public abstract class ChessPiece : MonoBehaviour
             }
             
             transform.localPosition = currentPos;
+            if (!sounded && duration - elapsedTime <= 0.06f) { sounded = true; GameSounds.MoveLanded(this, targetPosition); }
             
             yield return null;
         }
@@ -591,6 +595,7 @@ public abstract class ChessPiece : MonoBehaviour
         isMoving = false;
         if (hop) PieceEffects.Land(this);
         if (boardMove && !OnlineSession.Replaying) Haptics.Medium(); // a move lands
+        if (!sounded) GameSounds.MoveLanded(this, targetPosition);
         
         Debug.Log($"✅ Animation Complete: {pieceColor} {pieceType} reached {targetPosition}");
         
@@ -656,6 +661,7 @@ public abstract class ChessPiece : MonoBehaviour
                 for (float t = 0f; t < through; t += Time.deltaTime) { float k = 1f - t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
                 transform.localPosition = b;
                 Haptics.Light();
+                Sfx.Play("ui_open"); // through a portal
                 // ...and out of its partner
                 for (float t = 0f; t < through; t += Time.deltaTime) { float k = t / through; PieceEffects.SetSquash(transform, k, k); yield return null; }
                 PieceEffects.SetSquash(transform, 1f, 1f);

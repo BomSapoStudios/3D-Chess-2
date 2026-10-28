@@ -406,6 +406,38 @@ public class AIPlayer : MonoBehaviour
     }
     
     /// <summary>
+    /// Once every human is ready, the robots still setting up place the rest of their pieces at once and say Ready
+    /// </summary>
+    public void FinishPlacementNow()
+    {
+        if (OnlineSession.IsActive || OnlineSession.Replaying) return;
+        if (PlacementManager.Instance == null || TurnManager.Instance == null || PlayerManager.Instance == null) return;
+        if (GameStateManager.Instance == null || !GameStateManager.Instance.CanPlacePieces()) return;
+
+        var robots = new System.Collections.Generic.List<PieceColor>();
+        foreach (PieceColor color in PlayerManager.Instance.GetActivePlayers())
+        {
+            if (PlacementManager.Instance.IsPlayerReady(color)) continue;
+            if (!TurnManager.Instance.IsPlayerAI(color)) return; // a person is still setting up
+            robots.Add(color);
+        }
+        if (robots.Count == 0) return;
+
+        StopThinking();
+        foreach (PieceColor color in robots)
+        {
+            for (int guard = 0; guard < 64 && ShouldContinuePlacement(color); guard++)
+            {
+                AIPlacement placement = placementEngine.FindBestPlacement(color);
+                if (placement == null) break;
+                ExecutePlacement(placement);
+            }
+            if (!ShouldContinuePlacement(color)) PlacementManager.Instance.SetPlayerReady(color, true);
+            else RequestPlacement(color); // couldn't finish: carry on the usual way
+        }
+    }
+
+    /// <summary>
     /// Main AI thinking and placement execution coroutine
     /// </summary>
     private IEnumerator ThinkAndPlaceCoroutine(PieceColor playerColor)
