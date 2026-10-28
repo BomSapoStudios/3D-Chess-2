@@ -45,3 +45,13 @@ APNS_TOPIC = "BomSapo.Chess3D"
 
 # TOKEN_SECRET is a secret: set it with `npx wrangler secret put TOKEN_SECRET`.
 # For local development it comes from .dev.vars (not committed).
+
+# Sign in with Apple revocation when a player deletes their account (Apple requires it).
+# SIWA_KEY is a secret: `npx wrangler secret put SIWA_KEY` (paste the whole AuthKey_P7VN9J993P.p8 of a key
+# with Sign in with Apple enabled). Without it, deletion still works but the Apple link isn't cut.
+SIWA_KEY_ID = "P7VN9J993P"
+
+# Oldest app build allowed online (OnlineClient.ClientVersion in the app). Raise it only after the
+# build with that number is out on TestFlight / the App Store: older builds then get "Please update"
+# instead of breaking. "0" = every build, including ones from before this check.
+MIN_CLIENT_VERSION = "0"

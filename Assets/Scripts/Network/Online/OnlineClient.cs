@@ -17,6 +17,17 @@ public class OnlineClient : MonoBehaviour
 
     public static OnlineClient Instance { get; private set; }
 
+    /// <summary>
+    /// This build's online version, sent with every request. To retire older builds: raise this, ship
+    /// the build, then set the server's MIN_CLIENT_VERSION to the new number once it's out. Older
+    /// builds then get "Please update" instead of breaking.
+    /// </summary>
+    public const int ClientVersion = 1;
+
+    /// <summary>The server said this build is too old to play online (until the app restarts)</summary>
+    public static bool UpdateRequired { get; private set; }
+    public static event Action UpdateNeeded;
+
     public string ServerUrl
     {
         get
@@ -96,6 +107,29 @@ public class OnlineClient : MonoBehaviour
     /// (refreshing its token and name once per session), or creates a guest account.
     /// </summary>
     public IEnumerator EnsureSignedIn(Action<bool, string> done)
+    {
+        // Screens that ask at the same moment (Online and its friends poll) share one sign-in,
+        // so a new player gets one guest account, not two with one left behind on the server
+        if (!signingIn)
+        {
+            signingIn = true;
+            StartCoroutine(SharedSignIn()); // runs here, so a caller's screen closing can't leave it stuck
+        }
+        while (signingIn) yield return null;
+        done(lastSignInOk, lastSignInError);
+    }
+
+    private IEnumerator SharedSignIn()
+    {
+        yield return SignIn((ok, error) => { lastSignInOk = ok; lastSignInError = error; });
+        signingIn = false;
+    }
+
+    private bool signingIn;
+    private bool lastSignInOk;
+    private string lastSignInError;
+
+    private IEnumerator SignIn(Action<bool, string> done)
     {
         string token = Token;
         bool sameServer = PlayerPrefs.GetString("OnlineTokenServer", "") == ServerUrl; // local test server vs live
@@ -199,6 +233,30 @@ public class OnlineClient : MonoBehaviour
             if (status == 200) { SaveAuth(text); PlayerPrefs.SetInt("OnlineAppleLinked", 0); refreshedThisSession = false; }
             else error = ErrorText(status, text);
         });
+        done(error);
+    }
+
+    /// <summary>
+    /// Delete this player's account on the server (their games are resigned there), then forget it
+    /// on this device. appleCode: a fresh Sign in with Apple authorization code, so the server can
+    /// cut the game's link to the Apple ID; null if the account isn't linked or the player cancelled.
+    /// </summary>
+    public IEnumerator DeleteAccount(string appleCode, Action<string> done)
+    {
+        string error = null;
+        string body = string.IsNullOrEmpty(appleCode) ? "{}" : JsonUtility.ToJson(new DeleteBody { appleAuthorizationCode = appleCode, appleNonce = AppleSignIn.Nonce });
+        yield return Call("POST", "/account/delete", body, Token, (status, text) =>
+        {
+            if (status != 200) error = ErrorText(status, text);
+        });
+        if (error == null)
+        {
+            LeaveOnline();
+            foreach (string key in new[] { "OnlineToken", "OnlineName", "OnlineUserId", "OnlineTokenServer", "OnlineAppleLinked", "GameCenterLinked" })
+                PlayerPrefs.DeleteKey(key);
+            PlayerPrefs.Save();
+            refreshedThisSession = false;
+        }
         done(error);
     }
 
@@ -366,9 +424,15 @@ public class OnlineClient : MonoBehaviour
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
             if (!string.IsNullOrEmpty(token)) request.SetRequestHeader("Authorization", "Bearer " + token);
+            request.SetRequestHeader("X-Client-Version", ClientVersion.ToString());
             request.timeout = 15;
             yield return request.SendWebRequest();
             long status = request.result == UnityWebRequest.Result.ConnectionError ? 0 : request.responseCode;
+            if (status == 426 && !UpdateRequired)
+            {
+                UpdateRequired = true;
+                UpdateNeeded?.Invoke();
+            }
             done(status, request.downloadHandler.text);
         }
     }
@@ -420,7 +484,7 @@ public class OnlineClient : MonoBehaviour
         RoomCode = upper;
         intentionalClose = false;
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
-                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}&reveal=1"; // we handle private setup
+                     $"/rooms/{RoomCode}/connect?token={UnityWebRequest.EscapeURL(Token)}&reveal=1&cv={ClientVersion}"; // we handle private setup
 
         var opened = socket = new GameSocket(url);
         opened.OnMessage += Handle;
@@ -456,7 +520,7 @@ public class OnlineClient : MonoBehaviour
     {
         await CloseMatchmaking();
         string url = ServerUrl.Replace("https://", "wss://").Replace("http://", "ws://") +
-                     $"/matchmaking/connect?token={UnityWebRequest.EscapeURL(Token)}";
+                     $"/matchmaking/connect?token={UnityWebRequest.EscapeURL(Token)}&cv={ClientVersion}";
         var queue = matchSocket = new GameSocket(url);
         queue.OnOpen += () =>
             queue.SendText("{\"type\":\"matchmaking:join\",\"config\":{\"boardSize\":\"" + boardSize + "\",\"playerCount\":2}}");
@@ -574,6 +638,7 @@ public class OnlineClient : MonoBehaviour
 
     [Serializable] private class NameBody { public string name; }
     [Serializable] private class IdTokenBody { public string idToken; public string nonce; }
+    [Serializable] private class DeleteBody { public string appleAuthorizationCode; public string appleNonce; }
     [Serializable] private class AuthResponse { public string token; public string userId; public string name; public bool restored; }
     [Serializable] private class CreateRoomResponse { public string code; }
     [Serializable] private class LinkCodeResponse { public string code; }

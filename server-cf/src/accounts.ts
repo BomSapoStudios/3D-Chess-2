@@ -13,6 +13,8 @@ import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, sta
 // • Device link codes let a player move their account to another device without
 //   signing in to anything.
 // • Friends, blocks and pending challenges live here too.
+// • Deleting an account removes everything about the player; only its random id is kept,
+//   so an old token or a game still finishing can't bring it back.
 //
 // The Worker verifies tokens and calls this object with the caller's userId:
 //   POST https://accounts/<op>  { userId?, ...fields }  →  JSON
@@ -61,6 +63,7 @@ export class Accounts extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS challenges (to_id TEXT, from_id TEXT, room_code TEXT, created_at INTEGER, PRIMARY KEY (to_id, room_code));
       CREATE TABLE IF NOT EXISTS reports (reporter_id TEXT, reported_id TEXT, reason TEXT, created_at INTEGER, PRIMARY KEY (reporter_id, reported_id, reason));
       CREATE TABLE IF NOT EXISTS limits (account_id TEXT, kind TEXT, window_start INTEGER, count INTEGER, PRIMARY KEY (account_id, kind));
+      CREATE TABLE IF NOT EXISTS deleted_accounts (id TEXT PRIMARY KEY, deleted_at INTEGER);
       CREATE TABLE IF NOT EXISTS network_limits (address TEXT, kind TEXT, day INTEGER, count INTEGER, PRIMARY KEY (address, kind, day));
       DROP TABLE IF EXISTS guest_addresses;
     `);
@@ -115,7 +118,8 @@ export class Accounts extends DurableObject<Env> {
       case 'push-register': return this.pushRegister(userId, String(b.token ?? ''), b.sandbox === true);
       case 'push-unregister': return this.pushUnregister(String(b.token ?? ''), userId);
       case 'push-settings': return this.pushSettings(userId, b.prefs as Record<string, boolean> | undefined);
-      case 'game-result': return { changes: recordGame(this.sql, b.result as GameResult, Date.now()) };
+      case 'delete-account': return this.deleteAccount(userId);
+      case 'game-result': return this.gameResult(b.result as GameResult);
       case 'walkout': recordWalkout(this.sql, String(b.walkoutUserId ?? ''), Date.now()); return { ok: true };
       case 'cooldown': return { until: cooldownUntil(this.sql, userId, Date.now()) };
       case 'stats': return this.statsFor(userId, String(b.of ?? '') || userId);
@@ -198,6 +202,7 @@ export class Accounts extends DurableObject<Env> {
   private refresh(userId: string, tokenName: string) {
     if (!userId) throw new HttpError(401, 'Sign in first');
     const row = this.sql.exec('SELECT id, name FROM accounts WHERE id = ?', userId).toArray()[0] as unknown as AccountRow | undefined;
+    if (!row && this.isDeleted(userId)) throw new HttpError(401, 'This account was deleted');
     if (!row) return this.createAccount(userId, tokenName);
     let name = row.name;
     if (!name) {
@@ -263,6 +268,51 @@ export class Accounts extends DurableObject<Env> {
     }
     this.sql.exec('DELETE FROM link_codes WHERE code = ?', code.toUpperCase());
     return this.refresh(row.account_id as string, '');
+  }
+
+  // ── Deleting an account ──────────────────────────────────────────────────────
+
+  private isDeleted(id: string): boolean {
+    return this.sql.exec('SELECT 1 FROM deleted_accounts WHERE id = ?', id).toArray().length > 0;
+  }
+
+  /**
+   * Remove the player and everything about them: name, sign-in links, friends, blocks,
+   * notifications, ratings and game records. Other players' records of games against them
+   * stay, with the opponent shown as "A player". Returns the games they were still in (the
+   * Worker resigns them) and their Apple ids (to revoke Sign in with Apple).
+   */
+  private deleteAccount(userId: string) {
+    this.account(userId);
+    const codes = this.sql.exec('SELECT room_code FROM active_games WHERE account_id = ?', userId).toArray().map(r => r.room_code as string);
+    const appleSubjects = this.sql.exec("SELECT subject FROM logins WHERE account_id = ? AND provider = 'apple'", userId).toArray().map(r => r.subject as string);
+    this.sql.exec('INSERT OR REPLACE INTO deleted_accounts (id, deleted_at) VALUES (?, ?)', userId, Date.now());
+    this.purge(userId);
+    return { ok: true, codes, appleSubjects };
+  }
+
+  private purge(id: string) {
+    for (const [table, column] of [
+      ['accounts', 'id'], ['logins', 'account_id'], ['link_codes', 'account_id'], ['push_tokens', 'account_id'], ['push_prefs', 'account_id'],
+      ['active_games', 'account_id'], ['limits', 'account_id'], ['ratings', 'account_id'],
+      ['walkouts', 'account_id'], ['cooldowns', 'account_id'],
+    ]) this.sql.exec(`DELETE FROM ${table} WHERE ${column} = ?`, id);
+    // Their seat in other players' games stays, unlinked from them, so those players' records still add up
+    this.sql.exec("UPDATE player_games SET account_id = 'gone:' || lower(hex(randomblob(8))) WHERE account_id = ?", id);
+    this.sql.exec('DELETE FROM friends WHERE account_id = ? OR friend_id = ?', id, id);
+    this.sql.exec('DELETE FROM blocks WHERE account_id = ? OR blocked_id = ?', id, id);
+    this.sql.exec('DELETE FROM declines WHERE decliner_id = ? OR sender_id = ?', id, id);
+    this.sql.exec('DELETE FROM challenges WHERE to_id = ? OR from_id = ?', id, id);
+    this.sql.exec('DELETE FROM pair_days WHERE pair LIKE ?', `%${id}%`);
+  }
+
+  /** A finished game. One that ends after a player deleted their account keeps nothing about them. */
+  private gameResult(result: GameResult) {
+    const changes = recordGame(this.sql, result, Date.now());
+    for (const p of result.players ?? []) {
+      if (p.userId && this.isDeleted(p.userId)) { this.purge(p.userId); delete changes[p.userId]; }
+    }
+    return { changes };
   }
 
   // ── Active games (so a player can find their games again after the app restarts) ──

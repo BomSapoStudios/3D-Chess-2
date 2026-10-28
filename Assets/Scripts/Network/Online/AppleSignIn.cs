@@ -13,6 +13,8 @@ public class AppleSignIn : MonoBehaviour
     private const string ReceiverName = "AppleSignInReceiver";
     private static Action<string, string> pending; // (token, error)
 
+    /// <summary>Apple's one-time authorization code from the last sign-in (good for five minutes): deleting an account sends it so the server can revoke the sign-in</summary>
+    public static string LastAuthorizationCode { get; private set; }
     /// <summary>
     /// The one-time value behind the last sign-in. Apple's token carries its SHA-256; the server
     /// gets the value itself with the token and checks they match, so a copied token is useless.
@@ -46,7 +48,12 @@ public class AppleSignIn : MonoBehaviour
 #endif
     }
 
-    public void OnAppleSignIn(string token) => Finish(token, null);
+    public void OnAppleSignIn(string message)
+    {
+        string[] parts = message.Split('\n');
+        LastAuthorizationCode = parts.Length > 1 ? parts[1] : null;
+        Finish(parts[0], null);
+    }
     public void OnAppleSignInError(string message) => Finish(null, message);
 
     private static string Hex(byte[] bytes)

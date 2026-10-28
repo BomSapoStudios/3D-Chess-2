@@ -28,6 +28,9 @@ public static class AccessibilityPrefs
     /// <summary>Taps and buzzes on iPhone (on unless switched off)</summary>
     public static bool Haptics { get => Get("A11y.Haptics", true); set => Set("A11y.Haptics", value); }
 
+    /// <summary>A move takes two taps: the first marks the square, the second (or Move!) makes it</summary>
+    public static bool TapTwiceToMove { get => Get("A11y.TapTwiceToMove", false); set => Set("A11y.TapTwiceToMove", value); }
+
     /// <summary>How much bigger menu text is drawn: 1 normally, 1.5 or 2 with Larger Text</summary>
     public static float TextScale => LargerText ? (HugeText ? 2f : 1.5f) : 1f;
 
