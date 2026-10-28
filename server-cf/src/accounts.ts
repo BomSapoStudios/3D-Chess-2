@@ -302,6 +302,7 @@ export class Accounts extends DurableObject<Env> {
     this.sql.exec('DELETE FROM friends WHERE account_id = ? OR friend_id = ?', id, id);
     this.sql.exec('DELETE FROM blocks WHERE account_id = ? OR blocked_id = ?', id, id);
     this.sql.exec('DELETE FROM declines WHERE decliner_id = ? OR sender_id = ?', id, id);
+    this.sql.exec('DELETE FROM reports WHERE reporter_id = ? OR reported_id = ?', id, id);
     this.sql.exec('DELETE FROM challenges WHERE to_id = ? OR from_id = ?', id, id);
     this.sql.exec('DELETE FROM pair_days WHERE pair LIKE ?', `%${id}%`);
   }
