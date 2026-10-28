@@ -216,14 +216,15 @@ def zap(f, take):
     """Move: Brandon's pick, the soft C1 zap (take 3 of the earlier set). Its second note is
     move_chime, played by the game at a pitch set by the square's row (GameSounds.MoveLanded).
     Takes differ only very slightly so repeats don't sound copied."""
-    glide, bright, det = [(0.065, 2200, -7), (0.06, 2350, -4), (0.07, 2050, -10)][take]
-    x = tone(f * 2, 0.14, 0.25, "saw", f1=f, glide=glide, cutoff=bright)
-    x = at(x, 0.03, tone(f, 0.22, 0.2, "square", cutoff=1100, detune=det))
+    # kept short (Brandon: it ran past the end of the move)
+    glide, bright, det = [(0.04, 2200, -7), (0.036, 2350, -4), (0.044, 2050, -10)][take]
+    x = tone(f * 2, 0.09, 0.25, "saw", f1=f, glide=glide, cutoff=bright)
+    x = at(x, 0.02, tone(f, 0.14, 0.2, "square", cutoff=1100, detune=det))
     return x
 
 def chess():
     for k in range(3):
-        write(f"move_{k + 1}", zap(hz(12), k), loud=-3)
+        write(f"move_{k + 1}", zap(hz(12), k), loud=-3, wet=0.04)
     for k in range(3):
         # each take rings a different note of D minor (A, F, C) over a different thud
         note = [19, 15, 22][k]
@@ -368,4 +369,4 @@ if __name__ == "__main__":
     ui(); setup(); chess(); zombies(); blitz()
     # the soft note on top of a move, 50 ms in; the game picks its pitch from the square
     # (written last, so adding it didn't change any other sound's noise)
-    write("move_chime", at(buf(0.05), 0.05, tone(hz(12), 0.12, 0.5, "triangle")), loud=-3, wet=0.1)
+    write("move_chime", at(buf(0.035), 0.035, tone(hz(12), 0.09, 0.5, "triangle")), loud=-3, wet=0.04)

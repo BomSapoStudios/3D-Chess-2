@@ -548,6 +548,8 @@ public abstract class ChessPiece : MonoBehaviour
 
         float elapsedTime = 0f;
         float distance = Vector3.Distance(startPos, endPos);
+        // The move's sound starts just before touchdown, so it lands with the piece rather than after it
+        bool sounded = !boardMove || OnlineSession.Replaying;
         float hopHeight = Mathf.Max(cell * 0.45f, distance * 0.35f) * (pieceType == ChessPieceType.Knight ? 1.5f : 1f);
         
         while (elapsedTime < duration)
@@ -583,6 +585,7 @@ public abstract class ChessPiece : MonoBehaviour
             }
             
             transform.localPosition = currentPos;
+            if (!sounded && duration - elapsedTime <= 0.06f) { sounded = true; GameSounds.MoveLanded(this, targetPosition); }
             
             yield return null;
         }
@@ -591,7 +594,8 @@ public abstract class ChessPiece : MonoBehaviour
         transform.localPosition = endPos;
         isMoving = false;
         if (hop) PieceEffects.Land(this);
-        if (boardMove && !OnlineSession.Replaying) { Haptics.Medium(); GameSounds.MoveLanded(this, targetPosition); } // a move lands
+        if (boardMove && !OnlineSession.Replaying) Haptics.Medium(); // a move lands
+        if (!sounded) GameSounds.MoveLanded(this, targetPosition);
         
         Debug.Log($"✅ Animation Complete: {pieceColor} {pieceType} reached {targetPosition}");
         
