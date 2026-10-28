@@ -27,6 +27,8 @@ interface RoomMeta {
   isPublic: boolean;
   /** Made by Find Match (random opponents): only these games are ranked */
   matched?: boolean;
+  /** Find Match game where every player is signed in to Game Center (missing on older rooms: same as matched) */
+  ranked?: boolean;
   createdAt: number;
   /** Lobby closes at this time if the game hasn't started (the host can extend it) */
   expiresAt?: number;
@@ -90,6 +92,7 @@ const LIVE_IDLE_MS = 30 * MINUTE;            // Live: nobody places or moves for
 const GAME_OVER_LINGER_MS = 5 * MINUTE;      // finished games close this long after they end, connected or not
 const REMATCH_MS = 15 * 1000;                // players have this long after a game to agree to a rematch
 const LOW_CLOCK_MS = 2 * HOUR;               // Take your time: warn the player on move when this much of their day is left
+const MIN_RATED_MOVES = 6;                   // resigning or walking out before this many moves (both players' together) doesn't move ratings
 
 
 export class Room extends DurableObject<Env> {
@@ -123,11 +126,11 @@ export class Room extends DurableObject<Env> {
 
     if (url.pathname === '/init' && request.method === 'POST') {
       if (this.meta) return Response.json({ error: 'exists' }, { status: 409 });
-      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig>; reserved?: Record<string, PlayerColor>; matched?: boolean };
+      const body = await request.json() as { code: string; hostUserId: string; isPublic: boolean; config: Partial<GameConfig>; reserved?: Record<string, PlayerColor>; matched?: boolean; ranked?: boolean };
       const now = Date.now();
       this.engine = new GameEngine(body.code, sanitizeConfig(body.config));
       const lobbyMs = this.engine.config.pace === 'slow' ? this.t(LOBBY_SLOW_MS) : this.t(LOBBY_LIVE_MS);
-      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null, reserved: body.reserved ?? null, matched: body.matched === true };
+      this.meta = { code: body.code, hostUserId: body.hostUserId, isPublic: body.isPublic, createdAt: now, expiresAt: now + lobbyMs, lastActivityAt: now, emptySince: null, reserved: body.reserved ?? null, matched: body.matched === true, ranked: body.ranked ?? body.matched === true };
       // Robot seats are filled now; the host's device plays them
       for (const color of this.engine.config.aiColors ?? []) {
         const robotId = `ai:${color}`;
@@ -513,6 +516,15 @@ export class Room extends DurableObject<Env> {
     return places;
   }
 
+  /**
+   * A game given up (resigned or walked out) before it got going: kept in records, but nobody's
+   * rating moves, so losing on purpose to a second account gains nothing
+   */
+  private thrownEarly(walkouts: string[]): boolean {
+    const moves = this.engine?.getState().moveHistory.length ?? 0;
+    return moves < MIN_RATED_MOVES && (this.gameOver?.reason === 'resignation' || walkouts.length > 0);
+  }
+
   /** Tell the accounts store how the game went, then show everyone their rating change */
   private async sendResult(): Promise<void> {
     const meta = this.meta, engine = this.engine;
@@ -524,7 +536,7 @@ export class Room extends DurableObject<Env> {
     const walkouts = meta.walkouts ?? [];
     const result: GameResult = {
       roomCode: meta.code,
-      rated: this.gameOver.reason !== 'abandoned' && this.isRanked(),
+      rated: this.gameOver.reason !== 'abandoned' && this.isRanked() && !this.thrownEarly(walkouts),
       players: Object.entries(this.seats).filter(([id]) => !id.startsWith('ai:')).map(([userId, color]) => {
         const mine = state.moveHistory.filter(m => m.isCapture && m.playerColor === color);
         const takenTypes: Record<string, number> = {};
@@ -895,7 +907,7 @@ export class Room extends DurableObject<Env> {
 
   /** Ranked: a Find Match game (random opponents, so no rating farming between friends) on a clock without Chaos */
   private isRanked(): boolean {
-    return this.meta?.matched === true && this.engine != null && isRankedConfig(this.engine.config);
+    return this.meta?.matched === true && (this.meta.ranked ?? true) && this.engine != null && isRankedConfig(this.engine.config);
   }
 
   // ── Private setup ────────────────────────────────────────────────────────────

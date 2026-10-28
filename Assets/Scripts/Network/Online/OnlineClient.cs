@@ -367,14 +367,22 @@ public class OnlineClient : MonoBehaviour
     }
 
     /// <summary>When Find Match opens again for this player after walking out of games (0 = it's open)</summary>
-    public IEnumerator GetMatchCooldown(Action<long> done)
+    /// <summary>
+    /// When Find Match is open to this player again (0 = now), and whether their Find Match games are
+    /// ranked: only for players signed in to Game Center, so throwaway accounts can't farm ratings.
+    /// </summary>
+    public IEnumerator GetMatchCooldown(Action<long, bool> done)
     {
         long until = 0;
+        bool ranked = false;
         yield return Call("GET", "/matchmaking/cooldown", null, Token, (status, text) =>
         {
-            if (status == 200) until = JsonUtility.FromJson<CooldownResponse>(text).until;
+            if (status != 200) return;
+            var reply = JsonUtility.FromJson<CooldownResponse>(text);
+            until = reply.until;
+            ranked = reply.ranked;
         });
-        done(until);
+        done(until, ranked);
     }
 
     // ───────────────────────── Push notifications ─────────────────────────
@@ -642,7 +650,7 @@ public class OnlineClient : MonoBehaviour
     [Serializable] private class ErrorResponse { public string error; }
     [Serializable] private class PushPrefsResponse { public PushPrefs prefs; }
     [Serializable] private class LeaderboardResponse { public LeaderboardEntry[] players; }
-    [Serializable] private class CooldownResponse { public long until; }
+    [Serializable] private class CooldownResponse { public long until; public bool ranked; }
     [Serializable] private class SearchResponse { public FriendInfo[] results; }
 }
 

@@ -1160,7 +1160,8 @@ public partial class NeonMenu : MonoBehaviour
         if (!onlineBusy) yield break;  // cancelled while signing in
         // Walked out of too many games lately: Find Match is paused for a while
         long pausedUntil = 0;
-        yield return OnlineClient.Instance.GetMatchCooldown(until => pausedUntil = until);
+        bool ranked = false;
+        yield return OnlineClient.Instance.GetMatchCooldown((until, isRanked) => { pausedUntil = until; ranked = isRanked; });
         if (pausedUntil > 0)
         {
             int minutes = Mathf.Max(1, Mathf.CeilToInt((pausedUntil - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) / 60000f));
@@ -1170,7 +1171,9 @@ public partial class NeonMenu : MonoBehaviour
             yield break;
         }
         ListenForStart();
-        SetSearching("Finding you a ranked game (10 minutes each)…");
+        // Ranked needs Game Center (one account per Apple ID); without it Find Match still plays, unranked
+        SetSearching(ranked ? "Finding you a ranked game (10 minutes each)…"
+                            : "Finding you a game (10 minutes each). Sign in to Game Center to play ranked.");
         OnlineClient.Instance.FindMatch("5x5x5",
             code => { SetSearching("Opponent found!"); OnlineClient.Instance.JoinRoom(code); },
             error => { SetSearching(null); SetOnlineStatus(error); onlineBusy = false; });

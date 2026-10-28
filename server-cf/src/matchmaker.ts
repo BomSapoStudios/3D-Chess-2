@@ -19,6 +19,8 @@ interface Waiting {
   key: string | null;      // "5x5x5|2" once they've joined the queue
   config: Partial<GameConfig> | null;
   since: number;
+  /** Signed in to Game Center: a game is rated only if every player is */
+  ranked?: boolean;
 }
 
 const QUEUE_LIMIT_MS = 5 * 60 * 1000; // nobody waits in the queue longer than this
@@ -59,7 +61,7 @@ export class Matchmaker extends DurableObject<Env> {
     }
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], [userId]);
-    pair[1].serializeAttachment({ userId, name, key: null, config: null, since: Date.now() } satisfies Waiting);
+    pair[1].serializeAttachment({ userId, name, key: null, config: null, since: Date.now(), ranked: request.headers.get('X-Ranked') === '1' } satisfies Waiting);
     await this.scheduleAlarm();
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
@@ -86,7 +88,7 @@ export class Matchmaker extends DurableObject<Env> {
       me.key = `${config.boardSize}|${config.playerCount}`;
       me.since = Date.now();
       ws.serializeAttachment(me);
-      ws.send(JSON.stringify({ type: 'matchmaking:queued', key: me.key, waiting: this.group(me.key).length }));
+      ws.send(JSON.stringify({ type: 'matchmaking:queued', key: me.key, waiting: this.group(me.key).length, ranked: me.ranked === true }));
       await this.tryMatch(me.key);
       await this.scheduleAlarm();
     } else if (msg.type === 'matchmaking:leave') {
@@ -111,9 +113,11 @@ export class Matchmaker extends DurableObject<Env> {
 
     const players = queue.slice(0, needed);
     const host = players[0].deserializeAttachment() as Waiting;
-    const { code } = await createRoom(this.env, host.userId, first.config, false, undefined, true); // matched by Find Match: ranked
+    // Matched by Find Match; rated only when everyone is signed in to Game Center
+    const ranked = players.every(ws => (ws.deserializeAttachment() as Waiting).ranked === true);
+    const { code } = await createRoom(this.env, host.userId, first.config, false, undefined, true, ranked);
     for (const ws of players) {
-      ws.send(JSON.stringify({ type: 'matchmaking:found', roomCode: code }));
+      ws.send(JSON.stringify({ type: 'matchmaking:found', roomCode: code, ranked }));
       ws.close(1000, 'Matched');
     }
   }

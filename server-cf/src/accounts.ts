@@ -119,7 +119,8 @@ export class Accounts extends DurableObject<Env> {
       case 'delete-account': return this.deleteAccount(userId);
       case 'game-result': return this.gameResult(b.result as GameResult);
       case 'walkout': recordWalkout(this.sql, String(b.walkoutUserId ?? ''), Date.now()); return { ok: true };
-      case 'cooldown': return { until: cooldownUntil(this.sql, userId, Date.now()) };
+      // Ranked Find Match needs Game Center: one account per Apple ID, so throwaway guests can't farm ratings
+      case 'cooldown': return { until: cooldownUntil(this.sql, userId, Date.now()), ranked: this.hasLogin(userId, 'gamecenter') };
       case 'stats': return this.statsFor(userId, String(b.of ?? '') || userId);
       case 'leaderboard': return this.board(userId, b.mode === 'melee' ? 'melee' : 'duel', b.scope === 'everyone' ? 'everyone' : 'friends');
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
@@ -176,6 +177,10 @@ export class Accounts extends DurableObject<Env> {
     if (!add) return count;
     this.sql.exec('INSERT OR REPLACE INTO network_limits (address, kind, day, count) VALUES (?, ?, ?, ?)', address, kind, day, count + 1);
     return count + 1;
+  }
+
+  private hasLogin(userId: string, provider: string): boolean {
+    return this.sql.exec('SELECT 1 FROM logins WHERE account_id = ? AND provider = ?', userId, provider).toArray().length > 0;
   }
 
   private tokenVersion(userId: string): number {

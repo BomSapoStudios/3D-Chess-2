@@ -44,7 +44,8 @@ export { Accounts } from './accounts.js';
 //   GET  /rooms/:code                   → room summary (players, open seats)
 //   GET  /rooms/:code/connect?token=…   → WebSocket into the room
 //   GET  /matchmaking/connect?token=…   → WebSocket into the Find Match queue
-//   GET  /matchmaking/cooldown          → { until } (Unix ms, 0 = not paused)
+//   GET  /matchmaking/cooldown          → { until, ranked } (until: Unix ms, 0 = not paused;
+//                                         ranked: signed in to Game Center, so Find Match can rate you)
 //   GET  /stats?of=<userId>             → a player's ratings and stats (yours without ?of)
 //   GET  /leaderboard?mode=duel|melee&scope=friends|everyone
 //
@@ -92,13 +93,13 @@ function newCode(): string {
 }
 
 /** Create a room with a fresh code (retrying on the rare collision) */
-export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean, reserved?: Record<string, PlayerColor>, matched = false): Promise<{ code: string; config: GameConfig }> {
+export async function createRoom(env: Env, hostUserId: string, config: Partial<GameConfig>, isPublic: boolean, reserved?: Record<string, PlayerColor>, matched = false, ranked = matched): Promise<{ code: string; config: GameConfig }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = newCode();
     const stub = env.ROOM.get(env.ROOM.idFromName(code));
     const res = await stub.fetch('https://room/init', {
       method: 'POST',
-      body: JSON.stringify({ code, hostUserId, isPublic, config, reserved, matched }),
+      body: JSON.stringify({ code, hostUserId, isPublic, config, reserved, matched, ranked }),
     });
     if (res.ok) return await res.json() as { code: string; config: GameConfig };
   }
@@ -304,7 +305,8 @@ export default {
       if ((data.until as number) > 0) return new Response('Find Match is paused for you', { status: 403 });
       const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName('global'));
       return stub.fetch('https://matchmaker/connect', {
-        headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name },
+        // X-Ranked: signed in to Game Center (one account per Apple ID), so this player's games can be rated
+        headers: { Upgrade: 'websocket', 'X-User-Id': user.userId, 'X-User-Name': user.name, 'X-Ranked': data.ranked === true ? '1' : '0' },
       });
     }
 

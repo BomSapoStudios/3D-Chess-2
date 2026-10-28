@@ -517,7 +517,8 @@ PLEASE UPDATE
 PLAY ANYONE — Find Match
   • Choose board size and player count; you're matched with others who
     asked for the same. Nobody waits in the queue more than 5 minutes.
-  • Always ranked: a 10-minute clock each, no Chaos Mode.
+  • Always a 10-minute clock each, no Chaos Mode. Ranked when every player is
+    signed in to Game Center; otherwise the game is played unranked.
   • Paused for a while if you keep walking out of games (section 14).
 
 PLAY A FRIEND
@@ -562,6 +563,13 @@ no Chaos Mode, so friends can't trade rating points. Games with friends (a room
 code, a challenge or a rematch) are unranked: they can use Chaos Mode or no
 clock, and still count in your win/loss record and head-to-head, but don't
 change ratings.
+
+Ranked also needs Game Center: a Find Match game is rated only when every
+player is signed in to Game Center (one account per Apple ID), so throwaway
+guest accounts can't feed someone wins. And a game given up early, resigned or
+walked out of before 6 moves (both players' moves together), changes nobody's
+rating; it still counts in the win/loss record, and a walk-out still counts
+toward the Find Match pause.
 
 Two ladders:
   Duel   — 2-player games.
