@@ -39,7 +39,7 @@ public class RematchUI : MonoBehaviour
     {
         Showing = false;
         if (FindFirstObjectByType<RematchUI>() != null) return;
-        if (FindFirstObjectByType<MainMenuController>() != null) return; // the menu, not a game
+        if (MenuScene.IsActive) return; // the menu, not a game
         new GameObject("Rematch UI").AddComponent<RematchUI>();
     }
 

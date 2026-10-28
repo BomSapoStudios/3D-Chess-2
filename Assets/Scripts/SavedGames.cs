@@ -109,7 +109,7 @@ public class SavedGames : MonoBehaviour
 
     private static void TryCreate()
     {
-        if (Instance != null || FindFirstObjectByType<MainMenuController>() != null) { pending = null; return; }
+        if (Instance != null || MenuScene.IsActive) { pending = null; return; }
         GameConfiguration config = SceneController.Instance != null ? SceneController.Instance.GetCurrentGameConfiguration() : null;
         if (config == null || config.isOnlineGame || string.IsNullOrEmpty(config.saveSlot)) { pending = null; return; }
         Instance = new GameObject("Saved Games").AddComponent<SavedGames>();

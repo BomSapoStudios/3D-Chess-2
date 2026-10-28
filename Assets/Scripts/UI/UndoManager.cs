@@ -44,7 +44,7 @@ public class UndoManager : MonoBehaviour
 
     private static void TryCreate()
     {
-        if (Instance != null || FindFirstObjectByType<MainMenuController>() != null) return;
+        if (Instance != null || MenuScene.IsActive) return;
         Instance = new GameObject("Undo").AddComponent<UndoManager>();
     }
 

@@ -8,8 +8,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Neon-styled main menu and one-screen game setup. Replaces the older multi-step
-/// MainMenuController UI (which stays in the scene but is hidden).
+/// Neon-styled main menu and one-screen game setup.
 /// </summary>
 public partial class NeonMenu : MonoBehaviour
 {
@@ -59,7 +58,7 @@ public partial class NeonMenu : MonoBehaviour
 
     private static void TryCreate()
     {
-        if (FindFirstObjectByType<MainMenuController>() == null) return;
+        if (!MenuScene.IsActive) return;
         if (FindFirstObjectByType<NeonMenu>() != null) return;
         new GameObject("Neon Menu").AddComponent<NeonMenu>();
     }
@@ -109,10 +108,7 @@ public partial class NeonMenu : MonoBehaviour
             ResumeGame(rematchRoom);
         }
 
-        // The old menu builds its UI in its own Start; hide it once it exists
-        yield return null;
-        yield return null;
-        HideOldMenu();
+        EnsureEventSystem();
 
         // Games still going (say the app was closed mid-game): show them on the Online Game button
         yield return RefreshGames();
@@ -216,13 +212,8 @@ public partial class NeonMenu : MonoBehaviour
         StartCoroutine(JoinRoutine(code));
     }
 
-    private void HideOldMenu()
+    private void EnsureEventSystem()
     {
-        Canvas mine = GetComponent<Canvas>();
-        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-        {
-            if (c != mine && c.isRootCanvas) c.enabled = false;
-        }
         if (FindFirstObjectByType<EventSystem>() == null)
         {
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
