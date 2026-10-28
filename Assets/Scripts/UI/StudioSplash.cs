@@ -13,7 +13,7 @@ public class StudioSplash : MonoBehaviour
     private const float FadeIn = 0.8f;
     private const float Hold = 2f;
     private const float MinHold = 1.2f;
-    private const float FadeOut = 0.8f;
+    private const float FadeOut = 0.6f;
 
     private Canvas canvas;
     private CanvasGroup group;
@@ -95,7 +95,14 @@ public class StudioSplash : MonoBehaviour
         skipped = false;
         for (float t = 0; t < Hold && !(skipped && t >= MinHold); t += Step) yield return null;
 
-        // The whole card fades away to the menu; taps stay blocked until it's gone
+        // The logo and text fade out on the black first, then the black fades away to the menu
+        // (the logo's own black square would otherwise show against the menu); taps stay blocked until it's gone
+        for (float t = 0; t < FadeOut; t += Step)
+        {
+            contentGroup.alpha = 1f - t / FadeOut;
+            yield return null;
+        }
+        contentGroup.alpha = 0f;
         for (float t = 0; t < FadeOut; t += Step)
         {
             group.alpha = 1f - t / FadeOut;
