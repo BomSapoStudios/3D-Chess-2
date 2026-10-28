@@ -5,13 +5,15 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Bom Sapo Studios card shown once when the app opens: the frog logo on black, the studio name and a
-/// copyright line. It fades in, holds, then fades away to the menu underneath. A tap skips it.
+/// copyright line. It waits for Unity's own splash to finish, fades in, holds, then fades away to the
+/// menu underneath. A tap can cut the hold short, but only after the card has been fully up for MinHold.
 /// </summary>
 public class StudioSplash : MonoBehaviour
 {
-    private const float FadeIn = 0.6f;
-    private const float Hold = 1.8f;
-    private const float FadeOut = 0.6f;
+    private const float FadeIn = 0.8f;
+    private const float Hold = 2f;
+    private const float MinHold = 1.2f;
+    private const float FadeOut = 0.8f;
 
     private CanvasGroup group;
     private bool skipped;
@@ -76,14 +78,19 @@ public class StudioSplash : MonoBehaviour
 
     private IEnumerator Run(CanvasGroup contentGroup)
     {
-        // Fade the logo and text in, then hold (a tap cuts either short)
-        for (float t = 0; t < FadeIn && !skipped; t += Time.unscaledDeltaTime)
+        // Scripts start while Unity's "Made with Unity" splash is still drawing over everything, so the
+        // card would otherwise play out unseen underneath it
+        while (!UnityEngine.Rendering.SplashScreen.isFinished) yield return null;
+
+        // Fade the logo and text in, then hold (a tap only shortens the hold once MinHold has passed)
+        for (float t = 0; t < FadeIn; t += Time.unscaledDeltaTime)
         {
             contentGroup.alpha = t / FadeIn;
             yield return null;
         }
         contentGroup.alpha = 1f;
-        for (float t = 0; t < Hold && !skipped; t += Time.unscaledDeltaTime) yield return null;
+        skipped = false;
+        for (float t = 0; t < Hold && !(skipped && t >= MinHold); t += Time.unscaledDeltaTime) yield return null;
 
         // The whole card fades away to the menu; taps stay blocked until it's gone
         for (float t = 0; t < FadeOut; t += Time.unscaledDeltaTime)
