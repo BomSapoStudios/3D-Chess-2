@@ -341,7 +341,7 @@ public partial class NeonMenu : MonoBehaviour
         quickLayout.childForceExpandWidth = false;
         NeonButton(quickRow, "Quick Play!", new Vector2(124, 58), NeonTheme.Pink, NeonTheme.Cyan, -1.5f, 16, OrResume(SavedGames.QuickPlay, ShowSidePicker));
         NeonButton(quickRow, "Zombies!", new Vector2(108, 58), NeonTheme.Lime, NeonTheme.Pink, 1.5f, 16, OrResume(SavedGames.Zombies, ShowZombiePicker));
-        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, OrResume(SavedGames.Blitz, ShowBlitzPicker));
+        NeonButton(quickRow, "Queen Blitz!", new Vector2(110, 58), NeonTheme.Yellow, NeonTheme.Pink, -1f, 16, ShowBlitzPicker);
 
         RectTransform row = NewRect("Row", column);
         row.sizeDelta = new Vector2(370, 52);
@@ -2174,7 +2174,7 @@ public partial class NeonMenu : MonoBehaviour
         config.zombieMode = zombieRun;
         config.queenBlitz = blitzRun;
         config.blitzPuzzle = blitzChoice;
-        config.saveSlot = zombieRun ? SavedGames.Zombies : blitzRun ? SavedGames.Blitz : quickPlay ? SavedGames.QuickPlay : SavedGames.Local;
+        config.saveSlot = blitzRun ? "" : zombieRun ? SavedGames.Zombies : quickPlay ? SavedGames.QuickPlay : SavedGames.Local; // puzzles start fresh every time
         config.playerCount = playerCount;
         config.boardSize = boardSize;
         config.aiDifficulty = difficulty;
