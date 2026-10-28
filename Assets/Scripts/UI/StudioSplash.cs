@@ -15,6 +15,7 @@ public class StudioSplash : MonoBehaviour
     private const float MinHold = 1.2f;
     private const float FadeOut = 0.8f;
 
+    private Canvas canvas;
     private CanvasGroup group;
     private bool skipped;
 
@@ -28,7 +29,7 @@ public class StudioSplash : MonoBehaviour
 
     private void Awake()
     {
-        Canvas canvas = gameObject.AddComponent<Canvas>();
+        canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 32000; // above every menu and game canvas
         CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
@@ -110,6 +111,8 @@ public class StudioSplash : MonoBehaviour
 
     private void Update()
     {
+        // NeonMenu turns off every other root canvas when it builds (HideOldMenu); keep this one showing
+        if (!canvas.enabled) canvas.enabled = true;
         if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)) skipped = true;
     }
 
