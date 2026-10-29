@@ -553,7 +553,10 @@ SOUND
     in D minor (Dm Bb F C | Dm Bb C A, from the top each game), and the in-game
     notes come from that bar's chord (Assets/Scripts/Audio/Harmony.cs).
   • A move lands with a soft zap whose tone belongs to its square: the plane
-    (height) picks the note, climbing the chord; the row (depth) picks a soft
+    (height) picks the note from a set made for the cube's height, root on
+    the bottom and top planes (8 tall: the whole scale; 7: the scale without
+    its 4th; 6: a pentatonic plus the octave; 5: the chord, its 7th and the
+    octave; 4: the chord and octave); the row (depth) picks a soft
     second note one to three chord notes above it; a soft bass plays the
     chord's root; and the sound pans to where the square is on screen.
     Captures clink and shatter on the chord's root. Picking up a piece plays
