@@ -60,7 +60,11 @@ public partial class NeonMenu
         settingsAccountNote.gameObject.AddComponent<LayoutElement>().preferredHeight = 54;
         settingsAppleButton = NeonButton(Row(settingsLeft), "Sign in with Apple", new Vector2(0, 44), NeonTheme.White, NeonTheme.Cyan, 0f, 16, SettingsSignInWithApple);
         settingsAppleLabel = settingsAppleButton.GetComponentInChildren<TextMeshProUGUI>();
-        NeonButton(Row(settingsLeft), "Restore purchases", new Vector2(0, 44), NeonTheme.Lavender, NeonTheme.Pink, 0f, 16, RestorePurchases);
+        RectTransform purchases = Row(settingsLeft);
+        NeonButton(purchases, "Restore purchases", new Vector2(0, 44), NeonTheme.Lavender, NeonTheme.Pink, 0f, 15, RestorePurchases);
+#if !UNITY_WEBGL || UNITY_EDITOR
+        NeonButton(purchases, "Redeem code", new Vector2(0, 44), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, RedeemCode);
+#endif
         NeonButton(Row(settingsLeft), "Delete account", new Vector2(0, 44), NeonTheme.Pink, NeonTheme.Cyan, 0f, 16, ShowDeletePicker);
 
         // Right: the other settings screens, then help
