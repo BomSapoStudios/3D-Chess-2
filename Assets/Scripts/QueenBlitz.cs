@@ -397,6 +397,7 @@ public static partial class QueenBlitz
         Cleared = false;
         OutOfMoves = false;
         AutoPlaced = false;
+        StartAttempt();
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
         SetUpFeatures(Current);
@@ -415,6 +416,7 @@ public static partial class QueenBlitz
     /// Returns the pawns paid, and whether the moves are a new best.</summary>
     public static (int paid, bool best) RecordClear()
     {
+        LogSolve();
         int paid = 0;
         if (!EverCleared(Index) || !PawnBank.BlitzPaysFirstClearOnly)
         {
@@ -577,11 +579,14 @@ public partial class QueenBlitzDirector : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        QueenBlitz.EndAttempt(); // left or restarted without a clear: the time still counts towards it
     }
 
     private void Update()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
+        // The solve clock runs from the puzzle appearing until the last pawn falls (a long frame, such as coming back from the background, adds at most half a second)
+        if (laidOut && !ended && (state == GameState.PiecePlacement || state == GameState.Playing)) QueenBlitz.Elapsed += Mathf.Min(Time.unscaledDeltaTime, 0.5f);
         if (laidOut && ChessBoard.Instance != null) TrackTaken();
         if (state != GameState.PiecePlacement && state != GameState.Playing) return;
         if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
@@ -840,6 +845,15 @@ public partial class QueenBlitzDirector : MonoBehaviour
             NeonTheme.GUILabelStyle(NeonTheme.Yellow, size, true, TextAnchor.MiddleLeft));
     }
 
+    /// <summary>The solve clock in the bottom-left corner, just right of the left column (Move! can
+    /// reach down that column); it stops when the last pawn falls</summary>
+    private static void DrawClock(Vector2 ui)
+    {
+        Rect r = new Rect(16f + 150f + 12f, ui.y - 52f, 96f, 38f);
+        NeonTheme.GUIPanel(r, NeonTheme.Cyan, 0.85f);
+        GUI.Label(r, QueenBlitz.Clock(QueenBlitz.Elapsed), NeonTheme.GUILabelStyle(NeonTheme.Cyan, 18, true, TextAnchor.MiddleCenter));
+    }
+
     private void DrawTracker()
     {
         if (filledAt == null) return;
@@ -960,6 +974,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         }
         DrawTally();
         if (!over) DrawTracker();
+        if (!over && QueenBlitz.ShowTimer) DrawClock(ui);
         GUI.enabled = true;
         TouchGUI.End();
         if (selectorOpen) DrawSelector();

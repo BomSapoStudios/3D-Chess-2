@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Finishes for the chess pieces (Customize > Pieces > Finish). A finish restyles every piece's
-/// material on whichever piece set (PieceShapes) is chosen; textured sets keep their carved
-/// detail under it. A piece's main colour is always its side's colour.
+/// material on whichever piece set (PieceShapes) is chosen; textured sets keep their two-tone
+/// detail under it (CreateTexturedMaterial). A piece's main colour is always its side's colour.
 /// Add a finish by adding a value to Kind, a name in DisplayName and a case in CreateMaterial.
 /// </summary>
 public static class PieceSets
@@ -156,6 +156,80 @@ public static class PieceSets
         material.SetColor("_EmissionColor", tint * 0.12f);
         material.SetFloat("_Metallic", 0.6f);
         material.SetFloat("_Glossiness", 0.75f);
+        return material;
+    }
+
+    /// <summary>
+    /// The two tones of a textured set's pieces for a side: the light body is the side's colour in
+    /// the finish, the dark one an accent that sits in the detail map's carving, spots and stripes
+    /// (deep teal on the white side, deep violet on the dark side, like the sets' original looks)
+    /// </summary>
+    public static (Color dark, Color light) DetailTones(Kind kind, PieceColor player)
+    {
+        Color light = Tint(kind, player);
+        Color dark;
+        if (player == PieceColor.White) dark = kind == Kind.Classic ? new Color(0.3f, 0.42f, 0.48f) : new Color(0.12f, 0.45f, 0.58f);
+        else if (player == PieceColor.Black) dark = kind == Kind.Classic ? new Color(0.03f, 0.02f, 0.05f) : new Color(0.16f, 0.03f, 0.26f);
+        else dark = Color.Lerp(light * 0.22f, new Color(0.1f, 0.03f, 0.18f), 0.35f);
+        return (dark, light);
+    }
+
+    /// <summary>
+    /// A textured set's piece in the chosen finish. With recolour maps (Art/Pieces/export_recolor.py)
+    /// the piece keeps its original colours and only its main colour becomes the side's; otherwise
+    /// the detail map in two tones of the side's colour. The finish brings the surface (Neon Glow
+    /// glows softer than on plain pieces, so the markings aren't washed out).
+    /// </summary>
+    public static Material CreateTexturedMaterial(PieceColor player, ChessPieceType type)
+    {
+        Kind kind = Effective;
+        Material material = CreateMaterial(kind, player);
+        var (colours, mask) = PieceModels.Recolor(type);
+        Shader recolor = colours != null && mask != null ? Resources.Load<Shader>("Shaders/RecolorPiece") : null;
+        if (recolor != null)
+        {
+            var piece = new Material(recolor);
+            piece.SetTexture("_MainTex", colours);
+            piece.SetTexture("_MaskTex", mask);
+            piece.SetColor("_Tint", Tint(kind, player));
+            piece.SetFloat("_Glossiness", material.GetFloat("_Glossiness"));
+            piece.SetFloat("_Metallic", material.GetFloat("_Metallic"));
+            switch (kind)
+            {
+                case Kind.NeonGlow:
+                    piece.color = new Color(0.8f, 0.8f, 0.8f);
+                    piece.SetColor("_EmissionColor", Color.white * 0.45f);
+                    break;
+                case Kind.Crystal:
+                    piece.color = new Color(1f, 1f, 1f, material.color.a);
+                    piece.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    piece.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    piece.SetFloat("_ZWrite", 0f);
+                    piece.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                    break;
+                default:
+                    piece.color = Color.white;
+                    break;
+            }
+            return piece;
+        }
+
+        var (dark, light) = DetailTones(kind, player);
+        Texture2D tones = PieceModels.TwoTone(type, dark, light);
+        if (tones == null) return material;
+        material.mainTexture = tones;
+        float alpha = material.color.a;
+        switch (kind)
+        {
+            case Kind.NeonGlow:
+                material.color = new Color(0.75f, 0.75f, 0.75f, alpha);
+                material.SetTexture("_EmissionMap", tones);
+                material.SetColor("_EmissionColor", Color.white * 0.55f);
+                break;
+            default:
+                material.color = new Color(1f, 1f, 1f, alpha);
+                break;
+        }
         return material;
     }
 

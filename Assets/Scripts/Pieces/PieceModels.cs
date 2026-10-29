@@ -18,31 +18,45 @@ public static class PieceModels
 
     private static string Folder => PieceShapes.Folder(PieceShapes.Active);
 
-    private static readonly Dictionary<string, Texture2D> finishDetails = new Dictionary<string, Texture2D>();
+    private static readonly Dictionary<string, Texture2D> twoTones = new Dictionary<string, Texture2D>();
 
     /// <summary>
-    /// The detail map lifted so its darkest parts are mid-grey: under a finish (which multiplies
-    /// by it) the carving shows without the piece going black. Null if the set has no detail map.
+    /// The detail map coloured in two tones: its dark parts (carving, spots, stripes) in `dark`,
+    /// its light parts in `light`, at half size. The finishes multiply by it, so a textured set
+    /// keeps its markings in every finish. Null if the set has no detail map.
     /// </summary>
-    public static Texture2D FinishDetail(ChessPieceType type)
+    public static Texture2D TwoTone(ChessPieceType type, Color dark, Color light)
     {
-        string path = "Pieces/" + Folder + "/" + type + "_Detail";
-        if (finishDetails.TryGetValue(path, out Texture2D lifted)) return lifted;
+        string key = $"Pieces/{Folder}/{type}_Detail {ColorUtility.ToHtmlStringRGB(dark)} {ColorUtility.ToHtmlStringRGB(light)}";
+        if (twoTones.TryGetValue(key, out Texture2D tex)) return tex;
         Texture2D source = Detail(type);
         if (source != null && source.isReadable)
         {
-            Color32[] px = source.GetPixels32();
-            for (int i = 0; i < px.Length; i++)
+            int w = Mathf.Max(1, source.width / 2), h = Mathf.Max(1, source.height / 2);
+            Color32[] from = source.GetPixels32();
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
             {
-                byte v = (byte)(115 + px[i].r * 140 / 255);
-                px[i] = new Color32(v, v, v, 255);
+                int i = (y * 2) * source.width + x * 2;
+                float d = (from[i].r + from[i + 1].r + from[i + source.width].r + from[i + source.width + 1].r) / (4f * 255f);
+                px[y * w + x] = Color.Lerp(dark, light, d);
             }
-            lifted = new Texture2D(source.width, source.height, TextureFormat.RGBA32, true);
-            lifted.SetPixels32(px);
-            lifted.Apply(true, true);
+            tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+            tex.SetPixels32(px);
+            tex.Apply(true, true);
         }
-        finishDetails[path] = lifted;
-        return lifted;
+        twoTones[key] = tex;
+        return tex;
+    }
+
+    /// <summary>The chosen set's recolour maps for a piece (original colours, main-colour mask), if it has them</summary>
+    public static (Texture2D colours, Texture2D mask) Recolor(ChessPieceType type)
+    {
+        string path = "Pieces/" + Folder + "/" + type;
+        if (!details.TryGetValue(path + "_Color", out Texture2D colours)) details[path + "_Color"] = colours = Resources.Load<Texture2D>(path + "_Color");
+        if (!details.TryGetValue(path + "_Mask", out Texture2D mask)) details[path + "_Mask"] = mask = Resources.Load<Texture2D>(path + "_Mask");
+        return (colours, mask);
     }
 
     /// <summary>The chosen set's detail map for a piece (grayscale; the material tints it), if it has one</summary>

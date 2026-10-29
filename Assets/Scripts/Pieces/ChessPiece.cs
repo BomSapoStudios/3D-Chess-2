@@ -160,17 +160,11 @@ public abstract class ChessPiece : MonoBehaviour
         {
             targetMaterial = modeled ? PieceSets.CreateBodyMaterial(pieceColor) : PieceSets.CreateMaterial(pieceColor);
         }
-        // The textured sets: the side's colour in the chosen finish, with the texture only shading
-        // in detail (eyes, stripes, spots)
+        // The textured sets: two tones of the side's colour (a light body, deep accents in the
+        // carving, spots and stripes) under the chosen finish
         if (modeled && PieceShapes.Textured(PieceShapes.Active))
         {
-            targetMaterial = PieceSets.CreateMaterial(pieceColor); // glowing all over: these models have no light strips
-            Texture2D shade = PieceModels.FinishDetail(PieceModels.TypeOf(this));
-            if (shade != null)
-            {
-                targetMaterial.mainTexture = shade;
-                if (targetMaterial.HasProperty("_EmissionMap") && targetMaterial.IsKeywordEnabled("_EMISSION")) targetMaterial.SetTexture("_EmissionMap", shade);
-            }
+            targetMaterial = PieceSets.CreateTexturedMaterial(pieceColor, PieceModels.TypeOf(this));
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
         PieceModels.Face(this);

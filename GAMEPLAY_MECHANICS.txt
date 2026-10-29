@@ -433,6 +433,19 @@ Screen:
   • The puzzle name, moves left and par sit at the very top, between your pawn total and
     the "?" (smaller text or two lines on narrow phones), with the puzzle's tip under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
 
+Solve times (for gauging difficulty; on every puzzle while the packs are being timed):
+  • A clock counts up from the moment the puzzle appears (placing the queen included) until
+    the last pawn falls. It sits in the bottom-left corner, just right of the left column, and
+    across from CLEARED! on the result panel, with tries and the total time when it took more
+    than one. Backgrounding the app doesn't run it on.
+  • Every clear is logged on the phone (Application.persistentDataPath/queen-blitz-solves.json,
+    the newest 2,000): pack and puzzle, the clearing attempt's time, the time across every
+    attempt since the last clear, moves vs par, attempts (each start, Restart, Retry or leaving
+    and coming back counts one) and whether it was the first clear. QueenBlitz.ShowTimer in
+    Assets/Scripts/QueenBlitzTimes.cs decides who sees the clock.
+  • Queen Blitz picker > Playtest > Solve times lists them newest first, with Copy all
+    (tab-separated, for a spreadsheet) and Clear (tap twice).
+
 The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place
 her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);
 8–10 are ice (pars 1, 2, 2, 3, 2, 3, 3, 2, 4, 5).

@@ -230,6 +230,14 @@ public class RematchUI : MonoBehaviour
             if (rating.tier != rating.tierBefore) line += $"  Now {rating.tier}!";
             GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), line, NeonTheme.GUILabelStyle(change >= 0 ? NeonTheme.Lime : NeonTheme.PinkSoft, 16, true, TextAnchor.MiddleRight));
         }
+        // Queen Blitz (playtest): the solve time across from CLEARED!
+        if (tally && QueenBlitz.ShowTimer && QueenBlitz.LastSolve != null)
+        {
+            QueenBlitz.Solve solve = QueenBlitz.LastSolve;
+            string time = $"Time {QueenBlitz.Clock(solve.seconds)}";
+            if (solve.attempts > 1) time += $"  ({solve.attempts} tries, {QueenBlitz.Clock(solve.totalSeconds)} in all)";
+            GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), time, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 16, true, TextAnchor.MiddleRight));
+        }
         string reason = Reason();
         if (tally) DrawTally(new Rect(panel.x + 18, panel.y + 40, w - 36, tallyRows * (TallySize + 4f)));
         else if (!string.IsNullOrEmpty(reason))
