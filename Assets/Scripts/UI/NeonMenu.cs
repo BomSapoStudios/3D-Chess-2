@@ -1715,6 +1715,7 @@ public partial class NeonMenu : MonoBehaviour
         Purchases.PricesLoaded -= RefreshCustomize;
         Wallet.Changed -= RefreshCustomize;
         Purchases.Owned -= OnPurchased;
+        Purchases.Redeemed -= OnRedeemed;
     }
 
     private void ResetFriendsCache()

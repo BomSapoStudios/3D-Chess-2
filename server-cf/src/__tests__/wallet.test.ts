@@ -229,6 +229,13 @@ describe('StoreKit 2 transaction check', () => {
     }
   });
 
+  test('accepts a purchase redeemed with an offer code (free, offerType 3)', async () => {
+    const t = await verifyAppleTransaction(f.offerCode, bundles, roots);
+    expect(t?.productId).toBe('BomSapo.Chess3D.backdrop.deepsea');
+    const item = itemOfProduct(t!.productId)!;
+    expect(recordPurchases(sql, 'a', [{ originalTransactionId: t!.originalTransactionId, transactionId: t!.transactionId, item, environment: t!.environment }]).wallet.items).toEqual(['backdrop.deepsea']);
+  });
+
   test('reports refunds; ignores products that aren\'t ours', async () => {
     expect((await verifyAppleTransaction(f.revoked, bundles, roots))?.revocationDate).toBeGreaterThan(0);
     const other = await verifyAppleTransaction(f.notOurs, bundles, roots);

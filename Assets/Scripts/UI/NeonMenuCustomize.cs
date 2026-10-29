@@ -91,7 +91,7 @@ public partial class NeonMenu
         title.rectTransform.anchorMin = new Vector2(0, 0);
         title.rectTransform.anchorMax = new Vector2(1, 1);
         title.rectTransform.offsetMin = new Vector2(62, 0);
-        title.rectTransform.offsetMax = new Vector2(-380, 0);
+        title.rectTransform.offsetMax = new Vector2(-490, 0);
         title.rectTransform.localEulerAngles = new Vector3(0, 0, -1.5f);
 
         Button done = NeonButton(header, "Done!", new Vector2(104, 42), NeonTheme.Pink, NeonTheme.Cyan, 1.5f, 19, ShowMenu);
@@ -118,10 +118,14 @@ public partial class NeonMenu
         // Restore purchases (Apple requires one): what this Apple ID bought comes back on a new phone
         Button restore = NeonButton(header, "Restore purchases", new Vector2(124, 34), NeonTheme.Lavender, NeonTheme.Pink, 0f, 12, RestorePurchases);
         Place((RectTransform)restore.transform, new Vector2(1, 0.5f), new Vector2(124, 34), new Vector2(-312, 0));
+        // Offer codes from the App Store (one-time codes that unlock an item)
+        Button redeem = NeonButton(header, "Redeem code", new Vector2(96, 34), NeonTheme.Cyan, NeonTheme.Pink, 0f, 12, RedeemCode);
+        Place((RectTransform)redeem.transform, new Vector2(1, 0.5f), new Vector2(96, 34), new Vector2(-434, 0));
 #endif
         Purchases.PricesLoaded += RefreshCustomize;
         Wallet.Changed += RefreshCustomize;
         Purchases.Owned += OnPurchased;
+        Purchases.Redeemed += OnRedeemed;
 
         // ── Body: rail | preview card | grid ──
         RectTransform body = NewRect("Body", root);
@@ -564,6 +568,15 @@ public partial class NeonMenu
         Refresh();
         StartPreviewForTab();
     }
+
+    private void RedeemCode()
+    {
+        Haptics.Selection(); Sfx.Tap();
+        if (!Purchases.ShowRedeemSheet()) ShowToast("The App Store isn't reachable right now. Try again in a moment.");
+    }
+
+    /// <summary>An offer code came through: say what it unlocked, wherever the menu is</summary>
+    private void OnRedeemed(string id) => ShowToast($"Code redeemed: {Store.DisplayName(id)} unlocked!");
 
     private void RestorePurchases()
     {

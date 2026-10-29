@@ -41,6 +41,18 @@ public static class Store
     /// <summary>Unlock for pawns (the server checks the price and the balance); done(null) once it's yours, else a message</summary>
     public static void BuyWithPawns(string id, System.Action<string> done) => Wallet.Unlock(id, done);
 
+    /// <summary>An item's name for messages ("Abyss Glow", "Graveyard", "Everything")</summary>
+    public static string DisplayName(string id)
+    {
+        if (id == EverythingId) return "Everything";
+        int dot = id.IndexOf('.');
+        string kind = dot > 0 ? id.Substring(0, dot) : "", name = dot > 0 ? id.Substring(dot + 1) : id;
+        if (kind == "set" && System.Enum.TryParse(name, out PieceShapes.Kind set)) return PieceShapes.DisplayName(set);
+        if (kind == "backdrop" && System.Enum.TryParse(name, out Backdrops.Kind backdrop)) return Backdrops.DisplayName(backdrop);
+        if (kind == "promotion" && System.Enum.TryParse(name, out PromotionStyle.Kind promotion)) return PromotionStyle.DisplayName(promotion);
+        return name;
+    }
+
     /// <summary>The App Store product ID for an item, e.g. BomSapo.Chess3D.set.abyssglow</summary>
     public static string ProductId(string id) => "BomSapo.Chess3D." + id.ToLowerInvariant();
 

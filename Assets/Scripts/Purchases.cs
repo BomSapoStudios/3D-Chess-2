@@ -20,6 +20,10 @@ public class Purchases : MonoBehaviour
     public static event Action PricesLoaded;
     /// <summary>An item became owned through the App Store (bought, restored or re-delivered)</summary>
     public static event Action<string> Owned;
+    /// <summary>An item arrived without a Buy tap or a restore: an offer code redeemed (here or in the App Store)</summary>
+    public static event Action<string> Redeemed;
+
+    private bool restoring;
 
     private static Purchases instance;
     private StoreController store;
@@ -95,6 +99,9 @@ public class Purchases : MonoBehaviour
         var ids = ItemsOf(order);
         int left = ids.Count;
         bool allSaved = true;
+        bool asked = false;
+        foreach (CartItem item in order.CartOrdered.Items())
+            if (item.Product != null && waiting.ContainsKey(item.Product.definition.id)) asked = true;
         foreach (string id in ids)
         {
             bool had = Store.OwnsId(id);
@@ -104,6 +111,7 @@ public class Purchases : MonoBehaviour
                 if (--left == 0 && allSaved) store.ConfirmPurchase(order);
             });
             if (!had) Owned?.Invoke(id);
+            if (!had && !asked && !restoring) Redeemed?.Invoke(id);
         }
         if (ids.Count == 0) store.ConfirmPurchase(order);   // nothing of ours in it
         Finish(order, Outcome.Bought);
@@ -159,12 +167,26 @@ public class Purchases : MonoBehaviour
         instance.store.PurchaseProduct(product);
     }
 
+    /// <summary>
+    /// Apple's sheet for typing an offer code. What a code unlocks arrives like a purchase (Redeemed);
+    /// false if the App Store isn't connected or this isn't an iPhone.
+    /// </summary>
+    public static bool ShowRedeemSheet()
+    {
+        var apple = instance != null && instance.connected ? instance.store.AppleStoreExtendedPurchaseService : null;
+        if (apple == null) return false;
+        apple.PresentCodeRedemptionSheet();
+        return true;
+    }
+
     /// <summary>Asks the App Store for everything this Apple ID has bought; each one is granted as it comes back</summary>
     public static void Restore(Action<bool> done)
     {
         if (instance == null || instance.store == null || !instance.connected) { done?.Invoke(false); return; }
+        instance.restoring = true;
         instance.store.RestoreTransactions((ok, error) =>
         {
+            instance.restoring = false;
             if (!ok) Debug.LogWarning("Purchases: restore failed: " + error);
             if (ok) instance.store.FetchPurchases();
             done?.Invoke(ok);
