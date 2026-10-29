@@ -397,7 +397,8 @@ def blitz():
         x = at(x, 0, tone(hz(12 + s), 0.8, 0.1, "square", cutoff=3000, att=0.01))
     write("blitz_cleared", x, loud=-1)
     x = buf(0)
-    for k, (a, b) in enumerate([(hz(3), hz(1)), (hz(1), hz(-4))]):
+    # a minor third lower than the first version (Brandon), same sound otherwise
+    for k, (a, b) in enumerate([(hz(0), hz(-2)), (hz(-2), hz(-7))]):
         y = tone(a, 0.35 if k == 0 else 0.6, 0.35, "saw", f1=b, glide=0.3)
         n = len(y)
         cut = 600 + 1400 * np.abs(np.sin(np.linspace(0, np.pi * (1 if k == 0 else 1.5), n)))
