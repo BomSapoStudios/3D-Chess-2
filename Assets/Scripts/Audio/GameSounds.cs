@@ -11,17 +11,17 @@ public static class GameSounds
     /// <summary>
     /// A move lands with a tone that belongs to its square (a zombie shuffles instead), in the
     /// chord of this move's bar (see Harmony), so a game sounds like a song. On cubes up to 8x8x8:
-    /// the plane (height) picks the zap's note, climbing the chord; the row (depth) picks the soft
-    /// note on top, one to three chord notes above it; a soft bass plays the chord's root; and the
-    /// sound is panned to where the square is on screen, whichever way the cube is turned.
+    /// the plane (height) picks the zap's note from a set made for the cube's height (Harmony.PlaneNote);
+    /// the row (depth) picks the soft note on top, one to three chord notes above it; a soft bass
+    /// plays the chord's root; and the sound is panned to where the square is on screen, whichever
+    /// way the cube is turned.
     /// </summary>
     public static void MoveLanded(ChessPiece piece, BoardPosition to)
     {
         if (IsZombie(piece)) { Sfx.Play("zombie_step", 0.8f); return; }
         Harmony.Beat();
         float pan = ScreenPan(piece.transform.position);
-        int zap = Harmony.Tone(to.y, -5);
-        if (zap > 12) zap -= 12; // tall cubes: back down an octave
+        int zap = Harmony.PlaneNote(to.y, Planes);
         Sfx.Play("move", 1f, zap, vary: false, pan: pan);
         Sfx.Play("move_chime", 0.3f, Harmony.Tone(1 + to.z % 3, zap + 1), vary: false, pan: pan);
         Sfx.Play("move_bass", 0.5f, Harmony.RootShift, vary: false);
@@ -34,7 +34,7 @@ public static class GameSounds
     public static void Placed(int plane)
     {
         Harmony.Beat();
-        Sfx.Play("piece_place", 1f, Harmony.Tone(plane, -5), vary: false);
+        Sfx.Play("piece_place", 1f, Harmony.PlaneNote(plane, Planes), vary: false);
         Sfx.Play("move_bass", 0.35f, Harmony.RootShift, vary: false);
     }
 
@@ -51,6 +51,9 @@ public static class GameSounds
 
     /// <summary>It's your move again: two pings on the chord's root and fifth</summary>
     public static void YourTurn() => Sfx.Play("your_turn", 1f, Harmony.RootShift, vary: false);
+
+    // How many planes tall the cube is
+    private static int Planes => BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions().y : 5;
 
     /// <summary>-0.7 (left of the screen) to 0.7 (right)</summary>
     private static float ScreenPan(Vector3 world)
