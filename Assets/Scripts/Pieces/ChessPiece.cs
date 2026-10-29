@@ -514,7 +514,7 @@ public abstract class ChessPiece : MonoBehaviour
         if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
         {
             QueenBlitz.Route route = QueenBlitz.TakeRoute(targetPosition);
-            Sfx.Play(QueenBlitz.Current.ice ? "ice_slide" : "blitz_slide");
+            GameSounds.QueenSlide(QueenBlitz.Current.ice);
             if (route != null) yield return SlideRouteCoroutine(route);
             else yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;

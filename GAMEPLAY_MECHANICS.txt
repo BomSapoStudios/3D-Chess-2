@@ -549,16 +549,21 @@ SOUND
   Every sound is synthesized for the game (Tools/Sound/make_sounds.py, no
   samples) and tuned to D, the key of the menu music (Arcade Rush 1).
   • Menu buttons bloop; back buttons bloop downward; switches blip.
+  • A game plays like a song: each move is one bar of an eight-bar chord loop
+    in D minor (Dm Bb F C | Dm Bb C A, from the top each game), and the in-game
+    notes come from that bar's chord (Assets/Scripts/Audio/Harmony.cs).
   • A move lands with a soft zap whose tone belongs to its square: the plane
-    (height) sets the note, climbing D minor pentatonic; the row (depth) sets
-    a soft second note on top, so each square of a plane has its own two-note
-    chord; and the sound pans to where the square is on screen. Captures
-    clink and shatter.
-  • Check: a low sonar pulse. Your turn (vs robots or online): a chime.
+    (height) picks the note, climbing the chord; the row (depth) picks a soft
+    second note one to three chord notes above it; a soft bass plays the
+    chord's root; and the sound pans to where the square is on screen.
+    Captures clink and shatter on the chord's root. Picking up a piece plays
+    a soft note of the chord that's sounding.
+  • Check: a low sonar pulse. Your turn (vs robots or online): a chime on the
+    chord's root and fifth.
   • Game over: an arcade "level up" for a win (D major), a falling run for
     a loss (D minor), a suspended chord for a draw.
-  • Setup: pick-up tick, set-down pitched by plane, Auto-place ripples up
-    the scale, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
+  • Setup: pick-up tick, set-down pitched by plane (each placement is a bar of
+    the chord loop), Auto-place ripples up the chord, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
     whirr.
   • Zombies!: zombies growl as they rise, shuffle when they step, chomp when
     they bite, and poof when killed. OVERRUN! ends on a horde roar.
