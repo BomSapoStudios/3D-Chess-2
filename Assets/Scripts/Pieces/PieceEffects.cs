@@ -233,7 +233,7 @@ public partial class PieceEffects : MonoBehaviour
         }
 
         Haptics.Heavy(); // a capture
-        Sfx.Play(sound);
+        GameSounds.Capture(sound);
         if (AccessibilityPrefs.ReduceMotion)
         {
             yield return FadeAwayRoutine(copy, 0.3f); // Reduce Motion: no flying shards, it just fades

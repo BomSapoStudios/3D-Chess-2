@@ -554,7 +554,7 @@ public class InputManager : MonoBehaviour
         selectedPiece = piece;
         selectedPiece.OnSelected();
         Haptics.Light(); // picked up
-        Sfx.Play("piece_pick");
+        GameSounds.Pick();
         
         // Add visual feedback for mobile users
         Debug.Log($"🔍 SelectPiece: About to call ShowValidMoveIndicators for {piece.pieceColor} {piece.pieceType}");
@@ -1077,7 +1077,7 @@ public class InputManager : MonoBehaviour
             break;
         }
         Haptics.Selection();
-        Sfx.Play("piece_pick", 0.7f);
+        GameSounds.Pick(0.7f);
     }
 
     private void DisarmMove()

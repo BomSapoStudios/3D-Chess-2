@@ -3,22 +3,12 @@ using UnityEngine;
 
 /// <summary>
 /// Sound effects. Clips live in Resources/Audio/Sfx (made by Tools/Sound/make_sounds.py); a name
-/// with takes (move_1, move_2, move_3) picks one at random. Every sound gets a small random pitch
-/// shift so repeats don't sound copied. Respects the Sound switches; the iPhone's silent switch
+/// with takes (move_1, move_2, move_3) picks one at random. Sounds outside the game's chords (see
+/// Harmony) get a tiny random pitch shift so repeats don't sound copied. Respects the Sound switches; the iPhone's silent switch
 /// mutes everything (the app uses the Ambient audio session).
 /// </summary>
 public static class Sfx
 {
-    // Semitone steps of D minor pentatonic, for sounds that climb (planes, sweeps, tallies)
-    private static readonly int[] Scale = { 0, 3, 5, 7, 10 };
-
-    /// <summary>Semitones for the n-th step up the scale (0 = the root)</summary>
-    public static int Step(int n)
-    {
-        if (n < 0) n = 0;
-        return 12 * (n / Scale.Length) + Scale[n % Scale.Length];
-    }
-
     /// <summary>
     /// Plays a sound. semitones moves it up or down in pitch; vary adds the small random shift;
     /// pan places it between the speakers (-1 left, 1 right)
@@ -31,14 +21,8 @@ public static class Sfx
         float now = Time.unscaledTime;
         if (lastPlayed.TryGetValue(name, out float last) && now - last < 0.03f) return; // same sound twice in one beat
         lastPlayed[name] = now;
-        float pitch = Mathf.Pow(2f, semitones / 12f) * (vary ? Random.Range(0.97f, 1.03f) : 1f);
+        float pitch = Mathf.Pow(2f, semitones / 12f) * (vary ? Random.Range(0.985f, 1.015f) : 1f);
         Host.Play(clip, volume * SoundPrefs.EffectsVolume, pitch, pan);
-    }
-
-    /// <summary>Plays a sound pitched by the board plane it happens on: higher plane, higher note</summary>
-    public static void OnPlane(string name, int plane, float volume = 1f)
-    {
-        Play(name, volume, Step(plane) - 5, vary: false);
     }
 
     /// <summary>

@@ -842,7 +842,7 @@ public class PersistentCheckStatusUI : MonoBehaviour
         }
         // Your move: a tap when it comes back to you from a robot or an online opponent
         if (newCurrentPlayer != previousPlayer && Haptics.Mine(newCurrentPlayer) && !Haptics.Mine(previousPlayer) && !OnlineSession.Replaying)
-            { Haptics.Light(); Sfx.Play("your_turn"); }
+            { Haptics.Light(); GameSounds.YourTurn(); }
     }
     
     /// <summary>
