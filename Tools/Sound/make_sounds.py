@@ -369,9 +369,9 @@ def gust(dur, c0, cpeak, c1, flutter=0.15):
     return hp(y, 90) * env * (1 + flutter * wob)
 
 def blitz():
-    # the queen's slide: a gentle gust of wind (Brandon: the whooshes were still too harsh).
-    # Low-passed noise that breathes in and out, no band-pass edge or bright top
-    write("blitz_slide", gust(0.55, 250, 900, 350), loud=-9, wet=0.1)
+    # the queen's slide: a light breeze (Brandon: whooshes, then a gust, were still too harsh).
+    # Low-passed noise that breathes in and out, kept low, quiet and barely fluttering
+    write("blitz_slide", lp(gust(0.6, 180, 520, 220, flutter=0.06), 680), loud=-17, wet=0.12)
     # pawn knocked flying: one pop (pitched up a scale at run time)
     x = tone(hz(12) * 0.7, 0.18, 0.4, "square", f1=hz(12), glide=0.03, cutoff=2400)
     x = at(x, 0, hiss(0.03, 3000, 0.15, q=1.5, att=0.001))
