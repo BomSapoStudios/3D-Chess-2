@@ -30,7 +30,7 @@ const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60_000; // an unanswered friend reque
 const LINK_CODE_LIFETIME_MS = 10 * 60_000;
 const LIMITS = { reroll: 10, friendRequest: 30, challenge: 60, room: 100, block: 100, report: 20 } as const; // per account per day
 const NETWORK_LIMITS = {                   // per network per day (homes, schools and phone carriers share addresses)
-  guest: 50,                               // new accounts
+  guest: 200,                              // new accounts (phone carriers put many players behind one address)
   linkMiss: 20,                            // wrong device link codes
 } as const;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
