@@ -272,15 +272,17 @@ public class RematchUI : MonoBehaviour
 
         if (QueenBlitz.Active)
         {
-            // Puzzles: try again, or on to the next one
+            // Puzzles: try again, on to the next one, or back to the pack's page
             bool exists = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
             bool more = exists && QueenBlitz.PuzzleOpen(QueenBlitz.PackId, QueenBlitz.Index + 1);
-            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 404f); // narrower with Larger Text at 2x
-            if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
+            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 464f); // narrower with Larger Text at 2x
+            int font = k < 1f ? 15 : 17;
+            if (TouchGUI.NeonButton(new Rect(x, rowY, 92 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: font)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
             GUI.enabled = more;
-            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
+            if (TouchGUI.NeonButton(new Rect(x + 102 * k, rowY, 140 * k, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: font)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
             GUI.enabled = true;
-            if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
+            if (TouchGUI.NeonButton(new Rect(x + 252 * k, rowY, 116 * k, 50), "Puzzles", NeonTheme.Cyan, NeonTheme.Pink, fontSize: font)) ToPuzzles();
+            if (TouchGUI.NeonButton(new Rect(x + 378 * k, rowY, 86 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: font)) GoHome(null);
             string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}"
                 : exists ? $"Clear {QueenBlitz.ChapterUnlock} in this chapter to open the next one"
                 : QueenBlitz.IsDaily(QueenBlitz.PackId) ? "A new daily puzzle comes out tomorrow!"
