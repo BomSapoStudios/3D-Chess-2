@@ -50,6 +50,7 @@ public static class Store
         if (kind == "set" && System.Enum.TryParse(name, out PieceShapes.Kind set)) return PieceShapes.DisplayName(set);
         if (kind == "backdrop" && System.Enum.TryParse(name, out Backdrops.Kind backdrop)) return Backdrops.DisplayName(backdrop);
         if (kind == "promotion" && System.Enum.TryParse(name, out PromotionStyle.Kind promotion)) return PromotionStyle.DisplayName(promotion);
+        if (kind == "blitz" && QueenBlitz.Info(name).id == name) return QueenBlitz.Info(name).name + " puzzle pack";
         return name;
     }
 
@@ -64,10 +65,11 @@ public static class Store
         foreach (PromotionStyle.Kind k in PromotionStyle.All) if (!Free(k)) yield return Id(k);
     }
 
-    /// <summary>Everything sold on the App Store: each paid item and Unlock Everything</summary>
+    /// <summary>Everything sold on the App Store: each paid item, each sold Queen Blitz pack, and Unlock Everything</summary>
     public static IEnumerable<string> ProductIds()
     {
         foreach (string id in PaidIds()) yield return id;
+        foreach (string pack in QueenBlitz.PawnPacks()) yield return "blitz." + pack;
         yield return EverythingId;
     }
 }

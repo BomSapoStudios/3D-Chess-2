@@ -199,6 +199,13 @@ describe('economy', () => {
     expect(itemOfProduct('BomSapo.Chess3D.coins.1000')).toBeNull();
   });
 
+  test('Queen Blitz packs: an App Store product, and pawns can buy them too', () => {
+    expect(itemOfProduct('BomSapo.Chess3D.blitz.cuberun')).toBe('blitz.cuberun');
+    expect(itemOfProduct('BomSapo.Chess3D.blitz.deepfreeze')).toBe('blitz.deepfreeze');
+    expect(priceOf('blitz.feast')).toBe(ECONOMY.prices.blitz);
+    expect(recordPurchases(sql, 'a', [{ originalTransactionId: '1020', transactionId: '1020', item: 'blitz.blockade', environment: 'Sandbox' }]).wallet.items).toEqual(['blitz.blockade']);
+  });
+
   test('Unlock Everything is an App Store product pawns can\'t buy', () => {
     expect(itemOfProduct('BomSapo.Chess3D.bundle.everything')).toBe(EVERYTHING);
     expect(priceOf(EVERYTHING)).toBeNull();

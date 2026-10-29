@@ -332,8 +332,30 @@ public partial class NeonMenu
                 });
             });
         Place((RectTransform)buy.transform, new Vector2(0.5f, 0.5f), new Vector2(280, 56), new Vector2(0, -10));
-        // App Store purchase arrives with the store hookup (phase 5)
-        BlitzText("Or get every pack with Unlock Everything in Customize.", 14, NeonTheme.Lavender, new Vector2(0.5f, 0.5f), new Vector2(400, 22), new Vector2(0, -60));
+        // Or with money (the App Store), at the price in the player's own currency
+        string price = Purchases.Price(QueenBlitz.StoreId(pack), QueenBlitz.PackDollars);
+        Button money = NeonButton(blitzContent, $"Buy for {price}", new Vector2(280, 48), NeonTheme.Cyan, NeonTheme.Pink, 0.6f, 17, () => BuyPackWithMoney(pack));
+        Place((RectTransform)money.transform, new Vector2(0.5f, 0.5f), new Vector2(280, 48), new Vector2(0, -72));
+        BlitzText("Every pack is also in Unlock Everything (Customize).", 14, NeonTheme.Lavender, new Vector2(0.5f, 0.5f), new Vector2(400, 22), new Vector2(0, -118));
+    }
+
+    private bool blitzBuying;
+
+    private void BuyPackWithMoney(QueenBlitz.PackInfo pack)
+    {
+        if (blitzBuying || QueenBlitz.Owns(pack)) return;
+        Haptics.Selection(); Sfx.Tap();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        ShowToast("Buying with money works in the iPhone app. Pawns work here!");
+#else
+        blitzBuying = true;
+        Purchases.Buy(QueenBlitz.StoreId(pack), outcome =>
+        {
+            blitzBuying = false;
+            if (outcome == Purchases.Outcome.Bought) { if (blitzView == BlitzView.Buy) ShowBlitzPuzzles(pack.id, 0); return; }
+            PurchaseDone(outcome);   // the same messages as Customize
+        });
+#endif
     }
 
     private void BlitzBack(System.Action back)

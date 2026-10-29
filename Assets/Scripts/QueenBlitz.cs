@@ -81,6 +81,10 @@ public static partial class QueenBlitz
     /// <summary>Clears in a chapter that open the next one</summary>
     public const int ChapterUnlock = 7;
     public const int PackPawnPrice = 4500;
+    public const string PackDollars = "$2.99";
+
+    /// <summary>A pack's id in the wallet and the App Store ("blitz.feast" → BomSapo.Chess3D.blitz.feast)</summary>
+    public static string StoreId(PackInfo pack) => "blitz." + pack.id;
 
     // Every pack in menu order; ones without a file yet are skipped (see Available)
     private static readonly PackInfo[] Catalog =
@@ -88,8 +92,9 @@ public static partial class QueenBlitz
         new PackInfo { id = "starter", name = "Starter", free = true },
         new PackInfo { id = "blitz-5", name = "High Five", free = true },
         new PackInfo { id = "blitz-6", name = "Six Shooter", free = true },
-        new PackInfo { id = "cube-run", name = "Cube Run", pawnPrice = PackPawnPrice },
-        new PackInfo { id = "deep-freeze", name = "Deep Freeze", pawnPrice = PackPawnPrice },
+        // Sold packs' ids have no hyphens: they're in App Store product ids (BomSapo.Chess3D.blitz.<id>)
+        new PackInfo { id = "cuberun", name = "Cube Run", pawnPrice = PackPawnPrice },
+        new PackInfo { id = "deepfreeze", name = "Deep Freeze", pawnPrice = PackPawnPrice },
         new PackInfo { id = "blockade", name = "Blockade", pawnPrice = PackPawnPrice },
         new PackInfo { id = "feast", name = "Feast", pawnPrice = PackPawnPrice },
         new PackInfo { id = "review", name = "Review", free = true, review = true },
