@@ -204,8 +204,9 @@ def ui():
 
 # ---------------- Setup ----------------
 def setup():
-    x = hiss(0.04, 3000, 0.3, q=2, att=0.001)
-    write("piece_pick", at(x, 0.0, tone(hz(19), 0.06, 0.15)), loud=-8, wet=0.05)
+    # a soft lift: a quiet rounded "puh" rising a little, no click (Brandon: much more gentle)
+    x = tone(hz(7), 0.07, 0.5, f1=hz(12), glide=0.04, att=0.008, shape=0.8)
+    write("piece_pick", hp(x, 250), loud=-15, wet=0.03)
     x = tone(hz(12), 0.2, 0.4, "triangle")
     x = at(x, 0, thud(160, 70, 0.12, 0.5))
     write("piece_place", x, loud=-5, wet=0.08)
