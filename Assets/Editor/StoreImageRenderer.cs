@@ -201,9 +201,11 @@ public static class StoreImageRenderer
     private static IEnumerable<Backdrops.Kind> LockedBackdrops => Backdrops.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
     private static IEnumerable<PromotionStyle.Kind> LockedPromotions => PromotionStyle.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
 
-    // "New Items Only": just the items with no promo image in the output folder yet
+    // "New Items Only": just the items missing an image in the output folder (the promo or the
+    // review shot: the promos are rendered first, so checking only the promo skipped the reviews)
     private static bool Wanted(string storeId) =>
-        !SessionState.GetBool(NewOnlyKey, false) || !File.Exists(Path.Combine(OutputFolder, ProductId(storeId) + ".png"));
+        !SessionState.GetBool(NewOnlyKey, false) || !File.Exists(Path.Combine(OutputFolder, ProductId(storeId) + ".png"))
+        || !File.Exists(Path.Combine(OutputFolder, ProductId(storeId) + "_review.png"));
 
     // ───────── Piece sets: the six pieces in a row on the menu's violet ─────────
 
