@@ -29,6 +29,10 @@ PRIMARY = {
 }
 K = 6              # colour clusters per texture
 NEAR, FAR = 0.045, 0.09   # colour distance (OKLab) fully in / fully out of the main colour
+# ("Set", "Piece"): NEAR and FAR scaled, for a main colour spread over several shades
+TOLERANCE = {
+    ("Aliens", "King"): 2.2,  # the robe runs from tan to deep brown
+}
 
 args = sys.argv[sys.argv.index("--") + 1:]
 SRC, OUT = args[0], args[1]
@@ -99,7 +103,8 @@ for set_name in ONLY:
         pick = order[PRIMARY.get((set_name, piece), 0)]
         main = centres[pick] / w
         d = np.sqrt((((lab - main) * np.array([0.5, 1, 1])) ** 2).sum(1))
-        mask = np.clip((FAR - d) / (FAR - NEAR), 0, 1)
+        k = TOLERANCE.get((set_name, piece), 1.0)
+        mask = np.clip((FAR * k - d) / ((FAR - NEAR) * k), 0, 1)
         lum = 0.2126 * rgb[:, 0] + 0.7152 * rgb[:, 1] + 0.0722 * rgb[:, 2]
         main_lum = np.median(lum[mask > 0.9]) if (mask > 0.9).any() else lum.mean()
         shade = np.clip(lum / max(main_lum, 1e-3) / 2, 0, 1)
