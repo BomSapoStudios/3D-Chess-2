@@ -72,7 +72,7 @@ public partial class NeonMenu
         RectTransform root = customizeScreen.GetComponent<RectTransform>();
         Stretch(root);
         var hooks = customizeScreen.AddComponent<ScreenHooks>();
-        hooks.disabled = () => { StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; showingPromotion = null; };
+        hooks.disabled = () => { ShowPieceLegend(false); StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; showingPromotion = null; };
         hooks.enabled = () => { if (previewBorder != null) { RefreshCustomize(); StartPreviewForTab(); } };
 
         // ── Top bar: Back, title, then Redeem code, Restore purchases and pawns at the right edge ──
@@ -187,6 +187,7 @@ public partial class NeonMenu
     private void SelectTab(CustomizeTab t)
     {
         tab = t;
+        ShowPieceLegend(false);
         PieceShapes.Showing = null;
         showingBackdrop = null;
         showingPromotion = null;
@@ -328,6 +329,8 @@ public partial class NeonMenu
         effectsBlurb = PreviewBlurb(ev);
         effectsBlurb.GetComponent<LayoutElement>().preferredHeight = 52; // these run to three lines
         effectsUnlock = BuildUnlockPanel(ev);
+
+        BuildPieceLegend(card.transform, piecesPicture); // last, so it covers the card
     }
 
     private void ShowEffectsThumb()
@@ -930,6 +933,7 @@ public partial class NeonMenu
         if (setLocked) ShowUnlock(piecesUnlock, Store.PieceSetPawns, Purchases.Price(Store.Id(set), Store.PieceSetDollars)); else piecesUnlock.root.SetActive(false);
         piecesName.text = PieceShapes.DisplayName(set);
         piecesBlurb.text = PieceShapes.Description(set);
+        RefreshPieceLegend();
         PieceColor[] sides = { PieceColor.White, PieceColor.Black, PieceColor.Green, PieceColor.Purple, PieceColor.Yellow, PieceColor.Orange };
         for (int i = 0; i < teamDots.Length; i++) teamDots[i].color = PieceSets.Tint(PieceSets.Effective, sides[i]);
 

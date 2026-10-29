@@ -204,8 +204,11 @@ def ui():
 
 # ---------------- Setup ----------------
 def setup():
-    x = hiss(0.04, 3000, 0.3, q=2, att=0.001)
-    write("piece_pick", at(x, 0.0, tone(hz(19), 0.06, 0.15)), loud=-8, wet=0.05)
+    # the menu tap's bubble, a little lower and softer (Brandon: gentle, like a menu tap). On D,
+    # so the game can pitch it to a note of the chord that's sounding (Harmony.cs)
+    x = tone(hz(0), 0.07, 0.6, f1=hz(12), glide=0.03, att=0.003, shape=0.8)
+    x = at(x, 0.01, tone(hz(19), 0.04, 0.1, "triangle"))
+    write("piece_pick", hp(x, 250), loud=-13, wet=0.02)
     x = tone(hz(12), 0.2, 0.4, "triangle")
     x = at(x, 0, thud(160, 70, 0.12, 0.5))
     write("piece_place", x, loud=-5, wet=0.08)
@@ -234,15 +237,15 @@ def chess():
     for k in range(3):
         write(f"move_{k + 1}", zap(hz(12), k), loud=-3, wet=0.04)
     for k in range(3):
-        # each take rings a different note of D minor (A, F, C) over a different thud
-        note = [19, 15, 22][k]
+        # all on D, root and fifth only, so the game can move it onto any chord's root
+        # (Harmony.cs); the takes differ in their thud and glass shards
         x = thud([140, 165, 120][k], 55, 0.25, 0.7)
-        x = at(x, 0, tone(hz(note), 0.4, 0.25, "triangle"))
-        x = at(x, 0, tone(hz(note + 7), 0.25, 0.12))
+        x = at(x, 0, tone(hz(12), 0.4, 0.25, "triangle"))
+        x = at(x, 0, tone(hz(19), 0.25, 0.12))
         x = at(x, 0.01, hiss(0.25, 5000, 0.12, kind="high"))
-        # little glass shards
+        # little glass shards, on roots and fifths
         for j in range(4):
-            x = at(x, 0.03 + j * 0.025 + rng.uniform(0, 0.01), tone(hz(31 + rng.integers(0, 7)), 0.06, 0.05))
+            x = at(x, 0.03 + j * 0.025 + rng.uniform(0, 0.01), tone(hz([31, 36, 43][rng.integers(0, 3)]), 0.06, 0.05))
         write(f"capture_{k + 1}", x, loud=-1)
     # Check B: low sonar pulse with a ping
     x = tone(hz(-17), 0.6, 0.6, att=0.02)  # A2
@@ -250,8 +253,8 @@ def chess():
     x = at(x, 0.35, tone(hz(22), 0.5, 0.06))
     write("check", x, loud=-1, wet=0.2)
     # your turn: friendly two-note bell
-    # small and polite (the first version was too big): two quick high pings
-    x = tone(hz(27), 0.12, 0.3, att=0.002)
+    # small and polite (the first version was too big): two quick high pings, root then fifth
+    x = tone(hz(24), 0.12, 0.3, att=0.002)
     x = at(x, 0.08, tone(hz(31), 0.18, 0.3, att=0.002))
     write("your_turn", hp(x, 400), loud=-10, wet=0.06)
     # Checkmate B: arcade level up, D major
@@ -334,14 +337,45 @@ def zombies():
     write("level_up", x, loud=-3)
 
 # ---------------- Queen Blitz ----------------
+def whoosh(dur, f0, fpeak, f1, q=1.0, body=0.0):
+    """Air rushing past: band-passed noise gliding f0 -> fpeak -> f1, swelling to the middle"""
+    n = int(SR * dur)
+    half = n // 2
+    x = noise(dur)
+    a = sweep_bp(x[:half], f0, fpeak, q)
+    b = sweep_bp(x[half:], fpeak, f1, q)
+    y = np.concatenate([a, b])
+    shape = np.sin(np.linspace(0, np.pi, n)) ** 1.6  # swell up, then away
+    y = y / (np.abs(y).max() + 1e-9) * shape
+    if body:
+        y = y + lp(noise(dur), 350) * shape * body
+    return y
+
+def gust(dur, c0, cpeak, c1, flutter=0.15):
+    """A breath of wind: low-passed noise whose cutoff swells c0 -> cpeak -> c1, slow rise, long fade, a little flutter"""
+    n = int(SR * dur)
+    x = noise(dur)
+    t = np.linspace(0, 1, n)
+    env = np.sin(np.pi * np.minimum(t / 0.45, 1) / 2) ** 2 * np.where(t < 0.45, 1, np.cos(np.pi / 2 * (t - 0.45) / 0.55) ** 1.5)
+    cut = np.where(t < 0.45, c0 + (cpeak - c0) * np.sin(np.pi / 2 * t / 0.45), cpeak + (c1 - cpeak) * (t - 0.45) / 0.55)
+    y = np.zeros(n)
+    zi = None
+    for i in range(0, n, 256):
+        b, a = signal.butter(2, cut[i] / (SR / 2), "low")
+        if zi is None:
+            zi = signal.lfilter_zi(b, a) * 0
+        y[i:i + 256], zi = signal.lfilter(b, a, x[i:i + 256], zi=zi)
+    wob = lp(noise(dur), 8, order=1)
+    wob /= np.abs(wob).max() + 1e-9
+    return hp(y, 90) * env * (1 + flutter * wob)
+
 def blitz():
-    # dusty scrape, grainy
-    x = noise(0.55)
-    x = sweep_bp(x, 900, 500, q=0.7)
-    grain = 0.6 + 0.4 * np.abs(lp(rng.standard_normal(len(x)), 40))
-    grain /= grain.max()
-    x = x / np.abs(x).max() * grain * env(len(x), 0.03, 0.7) * 0.5
-    write("blitz_slide", x, loud=-7, wet=0.06)
+    # the queen's slide: a light breeze (Brandon: whooshes, then a gust, were still too harsh).
+    # Low-passed noise that breathes in and out, quiet and barely fluttering
+    # Brandon liked the lightest one but higher (band x2.6), then softer and gentler: a longer
+    # swell, a mellower top and 4 dB quieter
+    x = hp(lp(gust(0.75, 390, 1040, 468, flutter=0.03), 1352), 260)
+    write("blitz_slide", lp(x, 1100, order=1), loud=-22, wet=0.14)
     # pawn knocked flying: one pop (pitched up a scale at run time)
     x = tone(hz(12) * 0.7, 0.18, 0.4, "square", f1=hz(12), glide=0.03, cutoff=2400)
     x = at(x, 0, hiss(0.03, 3000, 0.15, q=1.5, att=0.001))
@@ -358,14 +392,16 @@ def blitz():
     x = tone(hz(24), 0.25, 0.3, "triangle")
     x = at(x, 0.0, tone(hz(31), 0.18, 0.12))
     write("pawn_ding", x, loud=-6, wet=0.1)
+    # just the bright final chord (Brandon dropped the four-note run-up before it). F major, the
+    # bright chord inside D minor, so it fits the game's chord loop (Harmony.cs); it was D major,
+    # whose F# clashed with the key
     x = buf(0)
-    for k, s in enumerate([0, 4, 7, 12]):
-        x = at(x, k * 0.07, tone(hz(12 + s), 0.18, 0.25, "triangle"))
-    for s in [0, 4, 7, 12, 16]:
-        x = at(x, 0.3, tone(hz(12 + s), 0.8, 0.1, "square", cutoff=3000, att=0.01))
+    for s in [3, 7, 10, 15, 19]:
+        x = at(x, 0, tone(hz(12 + s), 0.8, 0.1, "square", cutoff=3000, att=0.01))
     write("blitz_cleared", x, loud=-1)
     x = buf(0)
-    for k, (a, b) in enumerate([(hz(3), hz(1)), (hz(1), hz(-4))]):
+    # a minor third lower than the first version (Brandon), same sound otherwise
+    for k, (a, b) in enumerate([(hz(0), hz(-2)), (hz(-2), hz(-7))]):
         y = tone(a, 0.35 if k == 0 else 0.6, 0.35, "saw", f1=b, glide=0.3)
         n = len(y)
         cut = 600 + 1400 * np.abs(np.sin(np.linspace(0, np.pi * (1 if k == 0 else 1.5), n)))
@@ -378,3 +414,7 @@ if __name__ == "__main__":
     # the soft note on top of a move, 50 ms in; the game picks its pitch from the square
     # (written last, so adding it didn't change any other sound's noise)
     write("move_chime", at(buf(0.035), 0.035, tone(hz(12), 0.09, 0.5, "triangle")), loud=-3, wet=0.04)
+    # the soft bass under a move: the root of the bar's chord (D3, moved by the game)
+    x = tone(hz(-12), 0.45, 0.6, "triangle", att=0.008)
+    x = at(x, 0, tone(hz(0), 0.3, 0.15, "triangle", att=0.008))  # an octave up, so phone speakers carry it
+    write("move_bass", lp(x, 900), loud=-8, wet=0.06)

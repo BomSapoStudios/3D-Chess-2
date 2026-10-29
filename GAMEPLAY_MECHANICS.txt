@@ -129,6 +129,8 @@ Every game starts with a placement phase. You design your own opening.
 
 Your bench (every board size):
   1 King, 1 Queen, 2 Rooks, 2 Bishops, 2 Knights   (8 pieces)
+  Each bench tile shows the piece's picture in your chosen set with its name
+  under it (KING, ROOK...), so themed sets are easy to read.
 
 Rules:
   • Every piece must be placed before Ready can be pressed.
@@ -143,6 +145,11 @@ Rules:
   • When play starts, a Pawn appears directly in front of each placed piece
     (one step along your advance axis), giving every player 8 Pawns.
   • Play starts once every player is Ready.
+
+Piece names:
+  • Tapping any piece (yours or anyone's, on the board or a bench, in setup or
+    play) shows its name over it for about two seconds ("WHITE KNIGHT",
+    "BLACK ROOK"; zombies read "ZOMBIE"). Not shown in Queen Blitz.
 
 Changing your mind:
   • Tap a placed piece, then tap another square in your zone to move it.
@@ -174,6 +181,13 @@ CHECKMATE
   In check with no legal move that escapes it.
     2 players: the game ends; the checkmating player wins.
     4/6 players: the checkmated player is out (see Conquest, section 6).
+  Winning by checkmate sets off a party: neon confetti from both bottom
+  corners and the top, and the winner's pieces dance in place (the mated
+  King wobbles and tips over) for a few seconds, then everything goes back
+  exactly where it was. Only for a checkmate win as this phone sees it: you
+  won (online, the winner's phone), or robots played each other; never for a
+  loss, draw, forfeit or timeout. With Reduce Motion: a small, slow sprinkle
+  and a gentle bob.
 
 STALEMATE
   Not in check but no legal move.
@@ -404,7 +418,8 @@ Scoring:
     ends "OUT OF MOVES" (Retry, Puzzles, Home). Nothing is paid or recorded for a miss.
   • The first time you clear a puzzle you keep all of its pawns (the puzzle card shows
     what each one pays). Replays pay nothing; the card then shows your best moves vs par.
-  • Undo, Restart, Retry and Next puzzle. The in-game Menu shows only Resume Game, Queen
+  • Undo, Restart, Retry and Next puzzle. CLEARED! offers Retry, Next puzzle, Puzzles (back to
+    the pack page you came from, on that chapter) and Home. The in-game Menu shows only Resume Game, Queen
     Blitz (back to the puzzle picker, on that pack and chapter) and Main Menu.
   • Puzzle selector: tap the title bar (grid icon at its end), during placement or play, for a
     card with the pack's puzzles a chapter at a time (Playing, Best moves/par, Par, or Locked by
@@ -432,6 +447,29 @@ PAWNS
 Screen:
   • The puzzle name, moves left and par sit at the very top, between your pawn total and
     the "?" (smaller text or two lines on narrow phones), with the puzzle's tip under them. Turn Planner and the turn line are hidden; How to Play shows only these rules.
+
+Solve times (for gauging difficulty; on every puzzle while the packs are being timed):
+  • A clock counts up from the moment the puzzle appears (placing the queen included) until
+    the last pawn falls. It sits in the bottom-left corner, just right of the left column, and
+    across from CLEARED! on the result panel, with tries and the total time when it took more
+    than one. Backgrounding the app doesn't run it on.
+  • Every clear is logged on the phone (Application.persistentDataPath/queen-blitz-solves.json,
+    the newest 2,000): pack and puzzle, the clearing attempt's time, the time across every
+    attempt since the last clear, moves vs par, attempts (each start, Restart, Retry or leaving
+    and coming back counts one) and whether it was the first clear. QueenBlitz.ShowTimer in
+    Assets/Scripts/QueenBlitzTimes.cs decides who sees the clock.
+  • Queen Blitz picker > Playtest > Solve times lists them newest first, with Copy all
+    (tab-separated, for a spreadsheet) and Clear (tap twice).
+  • Every player's times also go to the server, to tune packs by real difficulty: one record
+    per puzzle (and per version of it, by a signature of its layout) holding the clock time
+    over every attempt up to the first clear, the attempts, and at the clear the moves and
+    whether Auto-place was used. Leaving, Restart, closing or even killing the app never
+    resets it (the time is saved every 20 seconds and on going to the background); replays
+    after the first clear don't count, nor do puzzles cleared before records were kept.
+    Records ride along on the wallet sync (no requests of their own); the server keeps them
+    with the account (deleting it deletes them) and only ever shows totals per puzzle:
+    Tools/QueenBlitz/stats.py prints players, clear rate, median/p75/p90 time to clear,
+    median tries and how many are stuck, per pack (GET /blitz/stats with the STATS_KEY secret).
 
 The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place
 her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);
@@ -511,16 +549,24 @@ SOUND
   Every sound is synthesized for the game (Tools/Sound/make_sounds.py, no
   samples) and tuned to D, the key of the menu music (Arcade Rush 1).
   • Menu buttons bloop; back buttons bloop downward; switches blip.
+  • A game plays like a song: each move is one bar of an eight-bar chord loop
+    in D minor (Dm Bb F C | Dm Bb C A, from the top each game), and the in-game
+    notes come from that bar's chord (Assets/Scripts/Audio/Harmony.cs).
   • A move lands with a soft zap whose tone belongs to its square: the plane
-    (height) sets the note, climbing D minor pentatonic; the row (depth) sets
-    a soft second note on top, so each square of a plane has its own two-note
-    chord; and the sound pans to where the square is on screen. Captures
-    clink and shatter.
-  • Check: a low sonar pulse. Your turn (vs robots or online): a chime.
+    (height) picks the note from a set made for the cube's height, root on
+    the bottom and top planes (8 tall: the whole scale; 7: the scale without
+    its 4th; 6: a pentatonic plus the octave; 5: the chord, its 7th and the
+    octave; 4: the chord and octave); the row (depth) picks a soft
+    second note one to three chord notes above it; a soft bass plays the
+    chord's root; and the sound pans to where the square is on screen.
+    Captures clink and shatter on the chord's root. Picking up a piece plays
+    a soft note of the chord that's sounding.
+  • Check: a low sonar pulse. Your turn (vs robots or online): a chime on the
+    chord's root and fifth.
   • Game over: an arcade "level up" for a win (D major), a falling run for
     a loss (D minor), a suspended chord for a draw.
-  • Setup: pick-up tick, set-down pitched by plane, Auto-place ripples up
-    the scale, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
+  • Setup: pick-up tick, set-down pitched by plane (each placement is a bar of
+    the chord loop), Auto-place ripples up the chord, Ready locks in. Undo rewinds; promotions glitch; Chaos spins
     whirr.
   • Zombies!: zombies growl as they rise, shuffle when they step, chomp when
     they bite, and poof when killed. OVERRUN! ends on a horde roar.
@@ -750,7 +796,9 @@ The home screen's Settings button (beside Customize) opens:
 16. CUSTOMIZE ("MAKE IT YOURS")
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Piece set            — the look of the pieces.
+  Piece set            — the look of the pieces. "Who's who" on the turning
+                         set opens a legend: each of the set's six pieces
+                         with its name and the plain chess piece it stands for.
   Backdrop             — the scene the board floats in.
   Promotion animation  — tap any card to preview it on a pawn becoming
                          a Queen:

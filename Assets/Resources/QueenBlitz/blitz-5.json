@@ -16,7 +16,7 @@
       "tip": "",
       "tricks": [],
       "lured": 0,
-      "score": 8,
+      "score": 12,
       "tier": "Warm-up"
     },
     {
@@ -32,7 +32,7 @@
       "tip": "",
       "tricks": [],
       "lured": 0,
-      "score": 8,
+      "score": 12,
       "tier": "Warm-up"
     },
     {
@@ -48,7 +48,7 @@
       "tip": "The blocks are there for a reason.",
       "tricks": ["walls"],
       "lured": 0,
-      "score": 22,
+      "score": 26,
       "tier": "Easy"
     },
     {
@@ -64,7 +64,7 @@
       "tip": "Think in three dimensions.",
       "tricks": ["diagonal"],
       "lured": 0,
-      "score": 22,
+      "score": 26,
       "tier": "Easy"
     },
     {
@@ -80,7 +80,7 @@
       "tip": "Sometimes the best stop has no pawn on it.",
       "tricks": ["stop"],
       "lured": 0,
-      "score": 22,
+      "score": 26,
       "tier": "Easy"
     },
     {
@@ -96,24 +96,24 @@
       "tip": "The blocks are there for a reason.",
       "tricks": ["walls"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Easy"
     },
     {
-      "name": "Skylight",
+      "name": "Trap Door",
       "size": 5,
-      "queen": [3, 1, 3],
-      "best": [3, 1, 3],
-      "pawns": [1, 1, 1, 1, 3, 1, 2, 1, 2, 2, 3, 2, 3, 3, 3, 4, 3, 4],
-      "blocks": [1, 2, 1, 0, 2, 0],
+      "queen": [4, 1, 2],
+      "best": [4, 1, 2],
+      "pawns": [3, 3, 2, 4, 0, 1, 4, 2, 3, 4, 3, 2, 4, 3, 3, 4, 3, 4],
+      "blocks": [],
       "par": 4,
       "ice": false,
-      "line": [3, 1, 3, 1, 1, 1, 0, 1, 2, 0, 3, 0, 4, 3, 4],
-      "tip": "The blocks are there for a reason.",
-      "tricks": ["walls"],
-      "lured": 0,
-      "score": 26,
-      "tier": "Easy"
+      "line": [4, 1, 2, 2, 3, 2, 4, 3, 2, 4, 3, 4, 4, 0, 1],
+      "tip": "Don't ride the obvious row.",
+      "tricks": ["bait"],
+      "lured": 1,
+      "tier": "Easy",
+      "score": 35
     },
     {
       "name": "Back Door",
@@ -128,7 +128,7 @@
       "tip": "Think in three dimensions.",
       "tricks": ["diagonal"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Easy"
     },
     {
@@ -144,7 +144,7 @@
       "tip": "Sometimes the best stop has no pawn on it.",
       "tricks": ["stop"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Easy"
     },
     {
@@ -160,7 +160,7 @@
       "tip": "Think in three dimensions.",
       "tricks": ["diagonal"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Easy"
     },
     {
@@ -176,7 +176,7 @@
       "tip": "The blocks are there for a reason.",
       "tricks": ["walls"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Medium"
     },
     {
@@ -192,7 +192,7 @@
       "tip": "Think in three dimensions.",
       "tricks": ["diagonal"],
       "lured": 0,
-      "score": 26,
+      "score": 32,
       "tier": "Medium"
     },
     {
@@ -208,39 +208,43 @@
       "tip": "Sometimes the best stop has no pawn on it.",
       "tricks": ["stop"],
       "lured": 0,
-      "score": 27,
+      "score": 32,
       "tier": "Medium"
     },
     {
-      "name": "Quiet Hour",
+      "name": "Wormhole",
       "size": 5,
-      "queen": [4, 4, 0],
-      "best": [4, 4, 0],
-      "pawns": [1, 0, 3, 1, 1, 0, 1, 1, 3, 1, 2, 1, 1, 3, 2, 2, 2, 0, 3, 3, 0],
-      "blocks": [1, 2, 3],
-      "par": 5,
+      "queen": [2, 3, 4],
+      "best": [2, 3, 4],
+      "pawns": [1, 0, 1, 1, 3, 1, 1, 3, 2, 2, 2, 1, 2, 3, 2, 3, 1, 1, 4, 0, 1],
+      "blocks": [],
+      "par": 3,
       "ice": false,
-      "line": [4, 4, 0, 1, 1, 0, 1, 1, 3, 1, 0, 3, 1, 2, 1, 1, 3, 2],
-      "tip": "The blocks are there for a reason.",
-      "tricks": ["walls"],
+      "line": [2, 3, 4, 1, 3, 1, 4, 0, 1, 1, 0, 1],
+      "portals": [2, 3, 1, 0, 0, 1, 1, 3, 4, 0, 0, -1, 0],
+      "ramps": [],
+      "tip": "Step into a portal and come out somewhere else.",
+      "tricks": ["portal"],
       "lured": 0,
-      "score": 30,
+      "score": 26,
       "tier": "Medium"
     },
     {
-      "name": "Turnstile",
+      "name": "Step Up",
       "size": 5,
-      "queen": [1, 4, 3],
-      "best": [1, 4, 3],
-      "pawns": [0, 1, 3, 0, 2, 2, 0, 3, 1, 1, 1, 0, 1, 2, 1, 1, 3, 2, 2, 1, 1, 3, 1, 2, 4, 1, 3],
-      "blocks": [2, 1, 3],
-      "par": 5,
+      "queen": [3, 2, 2],
+      "best": [3, 2, 2],
+      "pawns": [0, 3, 2, 1, 3, 3, 2, 2, 2, 2, 3, 2, 3, 3, 1],
+      "blocks": [],
+      "par": 3,
       "ice": false,
-      "line": [1, 4, 3, 1, 1, 0, 4, 1, 3, 3, 0, 4, 0, 0, 4, 0, 3, 1],
-      "tip": "The blocks are there for a reason.",
-      "tricks": ["walls"],
+      "line": [3, 2, 2, 0, 3, 2, 0, 3, 4, 3, 3, 1],
+      "portals": [],
+      "ramps": [1, 2, 2, -1, 0, 0],
+      "tip": "Ramps lift the queen up a floor.",
+      "tricks": ["ramp"],
       "lured": 0,
-      "score": 30,
+      "score": 26,
       "tier": "Medium"
     },
     {
@@ -256,7 +260,7 @@
       "tip": "On ice, the blocks are your brakes.",
       "tricks": ["diagonal", "ice"],
       "lured": 0,
-      "score": 30,
+      "score": 48,
       "tier": "Medium"
     },
     {
@@ -272,23 +276,25 @@
       "tip": "Sometimes the best stop has no pawn on it.",
       "tricks": ["stop", "ice"],
       "lured": 0,
-      "score": 30,
+      "score": 48,
       "tier": "Medium"
     },
     {
-      "name": "Crossroads",
+      "name": "Stairway",
       "size": 5,
-      "queen": [4, 4, 1],
-      "best": [4, 4, 1],
-      "pawns": [0, 0, 4, 1, 0, 3, 1, 1, 3, 2, 2, 2, 2, 2, 4, 3, 3, 1, 3, 3, 4, 4, 4, 0, 4, 4, 2, 4, 4, 3, 4, 4, 4],
+      "queen": [3, 4, 3],
+      "best": [3, 4, 3],
+      "pawns": [0, 3, 2, 2, 2, 2, 3, 1, 3, 3, 2, 2, 3, 2, 3, 3, 3, 3],
       "blocks": [],
-      "par": 5,
+      "par": 3,
       "ice": false,
-      "line": [4, 4, 1, 1, 1, 4, 4, 4, 4, 4, 4, 0, 0, 0, 4, 1, 0, 3],
-      "tip": "Think in three dimensions.",
-      "tricks": ["diagonal"],
+      "line": [3, 4, 3, 3, 1, 3, 3, 2, 2, 0, 3, 2],
+      "portals": [],
+      "ramps": [1, 2, 2, -1, 0, 0],
+      "tip": "Ramps lift the queen up a floor.",
+      "tricks": ["ramp"],
       "lured": 0,
-      "score": 30,
+      "score": 26,
       "tier": "Medium"
     },
     {
@@ -304,7 +310,7 @@
       "tip": "The biggest sweep isn't always the best one.",
       "tricks": ["greed"],
       "lured": 1,
-      "score": 39,
+      "score": 41,
       "tier": "Medium"
     },
     {
@@ -320,7 +326,7 @@
       "tip": "The biggest sweep isn't always the best one.",
       "tricks": ["greed"],
       "lured": 1,
-      "score": 39,
+      "score": 41,
       "tier": "Medium"
     },
     {
@@ -336,7 +342,7 @@
       "tip": "Think in three dimensions.",
       "tricks": ["diagonal", "ice"],
       "lured": 1,
-      "score": 46,
+      "score": 60,
       "tier": "Hard"
     },
     {
@@ -368,7 +374,7 @@
       "tip": "Two tricks at once.",
       "tricks": ["stop", "walls"],
       "lured": 1,
-      "score": 50,
+      "score": 49,
       "tier": "Hard"
     },
     {
@@ -384,24 +390,24 @@
       "tip": "Two tricks at once.",
       "tricks": ["bait", "greed"],
       "lured": 3,
-      "score": 66,
+      "score": 55,
       "tier": "Hard"
     },
     {
-      "name": "Trick Shot",
+      "name": "Frostbite Bluff",
       "size": 5,
-      "queen": [],
-      "best": [1, 3, 0],
-      "pawns": [1, 0, 3, 1, 1, 3, 1, 2, 3, 1, 3, 2, 1, 3, 3, 2, 0, 2, 2, 2, 2, 2, 3, 3, 3, 0, 1, 3, 4, 3, 4, 0, 0],
-      "blocks": [],
+      "queen": [4, 4, 1],
+      "best": [4, 4, 1],
+      "pawns": [1, 1, 1, 1, 4, 4, 2, 1, 2, 3, 1, 3, 3, 2, 4, 4, 2, 4, 4, 3, 2, 4, 3, 4],
+      "blocks": [1, 0, 0],
       "par": 5,
-      "ice": false,
-      "line": [1, 3, 0, 1, 3, 3, 4, 0, 0, 1, 0, 3, 1, 2, 3, 3, 4, 3],
-      "tip": "Two tricks at once.",
-      "tricks": ["bait", "greed"],
-      "lured": 3,
-      "score": 69,
-      "tier": "Hard"
+      "ice": true,
+      "line": [4, 4, 1, 4, 1, 4, 1, 4, 4, 1, 1, 1, 4, 1, 4, 4, 4, 4],
+      "tip": "Nothing here is what it seems.",
+      "tricks": ["bait", "greed", "stop", "ice"],
+      "lured": 2,
+      "tier": "Hard",
+      "score": 76
     },
     {
       "name": "Sleight of Hand",
@@ -416,7 +422,7 @@
       "tip": "Two tricks at once.",
       "tricks": ["bait", "greed"],
       "lured": 3,
-      "score": 71,
+      "score": 61,
       "tier": "Hard"
     },
     {
@@ -432,7 +438,7 @@
       "tip": "Nothing here is what it seems.",
       "tricks": ["bait", "greed", "walls"],
       "lured": 3,
-      "score": 77,
+      "score": 63,
       "tier": "Hard"
     },
     {
@@ -448,7 +454,7 @@
       "tip": "Nothing here is what it seems.",
       "tricks": ["bait", "greed", "stop"],
       "lured": 3,
-      "score": 77,
+      "score": 63,
       "tier": "Hard"
     },
     {
@@ -464,7 +470,7 @@
       "tip": "Nothing here is what it seems.",
       "tricks": ["bait", "greed", "walls"],
       "lured": 3,
-      "score": 78,
+      "score": 63,
       "tier": "Hard"
     },
     {
@@ -480,80 +486,72 @@
       "tip": "Nothing here is what it seems.",
       "tricks": ["bait", "greed", "stop", "ice"],
       "lured": 3,
-      "score": 81,
+      "score": 79,
       "tier": "Hard"
     },
     {
-      "name": "Wormhole",
+      "name": "Hush Money",
       "size": 5,
-      "queen": [2, 3, 4],
-      "best": [2, 3, 4],
-      "pawns": [1, 0, 1, 1, 3, 1, 1, 3, 2, 2, 2, 1, 2, 3, 2, 3, 1, 1, 4, 0, 1],
-      "blocks": [],
-      "par": 3,
+      "queen": [3, 0, 2],
+      "best": [3, 0, 2],
+      "pawns": [0, 2, 0, 1, 1, 0, 1, 2, 0, 2, 0, 0, 2, 2, 0, 3, 1, 0, 3, 2, 0, 4, 2, 0],
+      "blocks": [2, 1, 1, 3, 1, 1],
+      "par": 5,
       "ice": false,
-      "line": [2, 3, 4, 1, 3, 1, 4, 0, 1, 1, 0, 1],
-      "portals": [2, 3, 1, 0, 0, 1, 1, 3, 4, 0, 0, -1, 0],
-      "ramps": [],
-      "tip": "Step into a portal and come out somewhere else.",
-      "tricks": ["portal"],
+      "line": [3, 0, 2, 2, 0, 1, 1, 1, 0, 0, 2, 0, 4, 2, 0, 2, 0, 0],
+      "tip": "Nothing here is what it seems.",
+      "tricks": ["quiet", "stop", "walls"],
       "lured": 0,
-      "score": 16,
-      "tier": "Hard"
+      "tier": "Hard",
+      "score": 54
     },
     {
-      "name": "Warp Speed",
+      "name": "Cold Feet",
       "size": 5,
-      "queen": [1, 4, 4],
-      "best": [1, 4, 4],
-      "pawns": [0, 1, 0, 0, 1, 3, 1, 1, 1, 1, 2, 0, 1, 3, 3, 2, 3, 0],
-      "blocks": [],
-      "par": 3,
-      "ice": false,
-      "line": [1, 4, 4, 1, 1, 1, 0, 1, 0, 0, 1, 3],
-      "portals": [3, 4, 0, -1, 0, 0, 0, 1, 2, 0, 0, 1, 0],
-      "ramps": [],
-      "tip": "Step into a portal and come out somewhere else.",
-      "tricks": ["portal"],
+      "queen": [],
+      "best": [0, 2, 4],
+      "pawns": [0, 3, 3, 2, 0, 0, 2, 2, 2, 3, 0, 1, 3, 1, 2, 3, 3, 3, 4, 0, 2, 4, 2, 2],
+      "blocks": [2, 3, 3],
+      "par": 5,
+      "ice": true,
+      "line": [0, 2, 4, 0, 4, 2, 4, 0, 2, 2, 0, 0, 4, 2, 2, 2, 4, 4],
+      "tip": "Sometimes the best stop has no pawn on it.",
+      "tricks": ["stop", "ice"],
       "lured": 0,
-      "score": 16,
-      "tier": "Hard"
+      "tier": "Hard",
+      "score": 57
     },
     {
-      "name": "Step Up",
+      "name": "Slippery Slope",
       "size": 5,
-      "queen": [3, 2, 2],
-      "best": [3, 2, 2],
-      "pawns": [0, 3, 2, 1, 3, 3, 2, 2, 2, 2, 3, 2, 3, 3, 1],
-      "blocks": [],
-      "par": 3,
-      "ice": false,
-      "line": [3, 2, 2, 0, 3, 2, 0, 3, 4, 3, 3, 1],
-      "portals": [],
-      "ramps": [1, 2, 2, -1, 0, 0],
-      "tip": "Ramps lift the queen up a floor.",
-      "tricks": ["ramp"],
-      "lured": 0,
-      "score": 16,
-      "tier": "Hard"
+      "queen": [1, 0, 3],
+      "best": [1, 0, 3],
+      "pawns": [1, 0, 0, 1, 0, 1, 1, 0, 2, 2, 0, 3, 2, 1, 2, 3, 0, 3, 3, 2, 1, 4, 0, 0, 4, 0, 1, 4, 0, 2, 4, 3, 0],
+      "blocks": [4, 4, 0],
+      "par": 5,
+      "ice": true,
+      "line": [1, 0, 3, 1, 0, 0, 4, 3, 0, 1, 0, 3, 4, 0, 3, 4, 0, 0],
+      "tip": "Two tricks at once.",
+      "tricks": ["bait", "stop", "ice"],
+      "lured": 1,
+      "tier": "Hard",
+      "score": 65
     },
     {
-      "name": "Stairway",
+      "name": "Card Sharp",
       "size": 5,
-      "queen": [3, 4, 3],
-      "best": [3, 4, 3],
-      "pawns": [0, 3, 2, 2, 2, 2, 3, 1, 3, 3, 2, 2, 3, 2, 3, 3, 3, 3],
-      "blocks": [],
-      "par": 3,
+      "queen": [4, 3, 2],
+      "best": [4, 3, 2],
+      "pawns": [1, 1, 2, 1, 2, 1, 1, 3, 0, 3, 2, 1, 4, 3, 0, 4, 3, 1, 4, 3, 3],
+      "blocks": [2, 1, 2],
+      "par": 5,
       "ice": false,
-      "line": [3, 4, 3, 3, 1, 3, 3, 2, 2, 0, 3, 2],
-      "portals": [],
-      "ramps": [1, 2, 2, -1, 0, 0],
-      "tip": "Ramps lift the queen up a floor.",
-      "tricks": ["ramp"],
-      "lured": 0,
-      "score": 16,
-      "tier": "Hard"
+      "line": [4, 3, 2, 3, 2, 1, 4, 3, 0, 4, 3, 3, 1, 0, 3, 1, 3, 0],
+      "tip": "Nothing here is what it seems.",
+      "tricks": ["bait", "greed", "walls"],
+      "lured": 3,
+      "tier": "Hard",
+      "score": 63
     },
     {
       "name": "Skyway",
@@ -570,7 +568,7 @@
       "tip": "On ice she keeps sliding, even through a portal.",
       "tricks": ["portal", "ice"],
       "lured": 0,
-      "score": 20,
+      "score": 48,
       "tier": "Hard"
     },
     {
@@ -588,7 +586,7 @@
       "tip": "On ice, the back of a portal is as good as a wall.",
       "tricks": ["brake", "ice"],
       "lured": 0,
-      "score": 20,
+      "score": 48,
       "tier": "Hard"
     },
     {
@@ -606,7 +604,7 @@
       "tip": "Portals and ramps work together.",
       "tricks": ["diagonal", "both"],
       "lured": 0,
-      "score": 30,
+      "score": 46,
       "tier": "Hard"
     },
     {
@@ -660,7 +658,7 @@
       "tip": "Portals and ramps work together.",
       "tricks": ["bait", "stop", "both"],
       "lured": 2,
-      "score": 62,
+      "score": 66,
       "tier": "Hard"
     },
     {
@@ -678,7 +676,7 @@
       "tip": "On ice, the back of a portal is as good as a wall.",
       "tricks": ["greed", "stop", "brake", "ice"],
       "lured": 2,
-      "score": 67,
+      "score": 82,
       "tier": "Devious"
     },
     {
@@ -694,7 +692,7 @@
       "tip": "Two tricks at once.",
       "tricks": ["bait", "greed"],
       "lured": 3,
-      "score": 70,
+      "score": 61,
       "tier": "Devious"
     },
     {
@@ -712,7 +710,7 @@
       "tip": "Ramps lift the queen up a floor.",
       "tricks": ["bait", "greed", "ramp"],
       "lured": 3,
-      "score": 70,
+      "score": 63,
       "tier": "Devious"
     },
     {
@@ -730,7 +728,7 @@
       "tip": "On ice she keeps sliding, even through a portal.",
       "tricks": ["bait", "greed", "ramp", "ice"],
       "lured": 3,
-      "score": 74,
+      "score": 85,
       "tier": "Devious"
     },
     {
@@ -766,7 +764,7 @@
       "tip": "Not every portal goes somewhere useful.",
       "tricks": ["bait", "greed", "portal", "decoy"],
       "lured": 3,
-      "score": 75,
+      "score": 74,
       "tier": "Devious"
     },
     {
@@ -784,7 +782,7 @@
       "tip": "On ice, the back of a portal is as good as a wall.",
       "tricks": ["bait", "greed", "brake", "ice"],
       "lured": 3,
-      "score": 76,
+      "score": 85,
       "tier": "Devious"
     },
     {
@@ -800,7 +798,7 @@
       "tip": "Not every block is in the way.",
       "tricks": ["bait", "greed", "walls", "decoy"],
       "lured": 3,
-      "score": 80,
+      "score": 74,
       "tier": "Devious"
     },
     {
@@ -816,7 +814,7 @@
       "tip": "Nothing here is what it seems.",
       "tricks": ["bait", "greed", "stop", "ice"],
       "lured": 3,
-      "score": 83,
+      "score": 79,
       "tier": "Devious"
     },
     {
@@ -832,7 +830,7 @@
       "tip": "Not every block is in the way.",
       "tricks": ["bait", "greed", "quiet", "stop", "walls", "decoy"],
       "lured": 3,
-      "score": 100,
+      "score": 90,
       "tier": "Devious"
     }
   ]

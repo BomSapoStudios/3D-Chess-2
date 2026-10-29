@@ -257,13 +257,17 @@ public class PlacementUI : MonoBehaviour
             {
                 Color old = GUI.color;
                 GUI.color = chosen ? Color.black : Color.white;
-                GUI.DrawTexture(new Rect(r.x + 7f, r.y + 5f, size - 14f, size - 14f), icon, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(new Rect(r.x + 9f, r.y + 3f, size - 18f, size - 18f), icon, ScaleMode.ScaleToFit, true);
                 GUI.color = old;
             }
             PlayerSymbols.DrawGUI(new Rect(r.x + 3f, r.y + 3f, 15f, 15f), color);
+            // The piece's name under its picture: in a themed set the picture alone may not say
+            GUIStyle nameStyle = NeonTheme.GUILabelStyle(chosen ? NeonTheme.Ground : NeonTheme.White, 10, true, TextAnchor.MiddleCenter);
+            nameStyle.wordWrap = false;
+            GUI.Label(new Rect(r.x, r.yMax - 15f, size, 13f), t.ToString().ToUpperInvariant(), nameStyle);
             int count = byType[t].Count;
             if (count > 1)
-                GUI.Label(new Rect(r.xMax - 26f, r.yMax - 20f, 24f, 18f), $"x{count}", NeonTheme.GUILabelStyle(chosen ? NeonTheme.Ground : NeonTheme.White, 12, true, TextAnchor.MiddleRight));
+                GUI.Label(new Rect(r.xMax - 26f, r.y + 2f, 24f, 16f), $"x{count}", NeonTheme.GUILabelStyle(chosen ? NeonTheme.Ground : NeonTheme.White, 12, true, TextAnchor.MiddleRight));
             x += size + gap;
         }
     }

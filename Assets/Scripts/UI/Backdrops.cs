@@ -109,13 +109,12 @@ public static class Backdrops
             cam.backgroundColor = NeonTheme.Ground;
             RenderSettings.skybox = null;
             Scenery.Clear();
-            if (probe != null)
-            {
-                probe.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.SolidColor;
-                probe.backgroundColor = NeonTheme.Ground;
-                probe.RenderProbe();
-                UseProbeAsEnvironment();
-            }
+            cam.cullingMask &= ~(1 << StudioLayer);
+            EnsureProbe();
+            probe.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.SolidColor;
+            probe.backgroundColor = NeonTheme.Ground;
+            probe.RenderProbe();
+            UseProbeAsEnvironment();
             return true;
         }
 
@@ -160,6 +159,7 @@ public static class Backdrops
 
         RenderSettings.skybox = sky;
         cam.clearFlags = CameraClearFlags.Skybox;
+        cam.cullingMask &= ~(1 << StudioLayer);
 
         if (kind == Kind.NeonDesert) Scenery.BuildDesert(cam);
         else if (kind == Kind.CyberCity) Scenery.BuildCity(cam);
@@ -183,6 +183,14 @@ public static class Backdrops
     /// </summary>
     private static void RefreshReflections()
     {
+        EnsureProbe();
+        probe.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.Skybox;
+        probe.RenderProbe();
+        UseProbeAsEnvironment();
+    }
+
+    private static void EnsureProbe()
+    {
         // Mobile quality levels often switch realtime probes off
         QualitySettings.realtimeReflectionProbes = true;
         if (probe == null)
@@ -192,13 +200,51 @@ public static class Backdrops
             probe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
             probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
             probe.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.NoTimeSlicing;
-            probe.cullingMask = 0; // sky only
             probe.size = new Vector3(500, 500, 500);
             probe.resolution = 128;
+            probe.farClipPlane = StudioDistance * 2f;
+            BuildStudio(go.transform);
         }
-        probe.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.Skybox;
-        probe.RenderProbe();
-        UseProbeAsEnvironment();
+        probe.cullingMask = 1 << StudioLayer; // the sky and the studio panels
+    }
+
+    // Studio light panels for the reflections: on dark skies Chrome and Crystal had nothing bright
+    // to reflect and went black. Far beyond every camera's far plane (and on their own layer) so
+    // only the probe sees them: a big soft panel overhead and eight tall strips round the horizon,
+    // with gaps between so mirror pieces still read as mirrors.
+    private const int StudioLayer = 31;
+    private const float StudioDistance = 3000f;
+
+    private static void BuildStudio(Transform parent)
+    {
+        Shader shader = Resources.Load<Shader>("Shaders/StudioPanel");
+        if (shader == null) { Debug.LogWarning("Backdrops: StudioPanel shader missing"); return; }
+        var root = new GameObject("Studio Panels");
+        root.transform.SetParent(parent, false);
+        var bright = new Material(shader) { color = new Color(1.1f, 1.1f, 1.2f) };
+        var soft = new Material(shader) { color = new Color(0.9f, 0.92f, 1.05f) };
+        Panel(root.transform, bright, 90f, 0f, 2600f, 2600f);   // overhead
+        // The camera looks down on the board, so the pieces' sides mirror what's just below the
+        // horizon: tall strips reaching from below it to above, all the way round
+        for (int i = 0; i < 8; i++)
+            Panel(root.transform, soft, -5f, 22.5f + 45f * i, 650f, 2400f);
+    }
+
+    private static void Panel(Transform parent, Material material, float elevation, float heading, float width, float height)
+    {
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        UnityEngine.Object.Destroy(quad.GetComponent<Collider>());
+        quad.name = "Studio Panel";
+        quad.layer = StudioLayer;
+        quad.transform.SetParent(parent, false);
+        Quaternion toward = Quaternion.Euler(-elevation, heading, 0f);
+        quad.transform.localPosition = toward * Vector3.forward * StudioDistance;
+        quad.transform.localRotation = toward;
+        quad.transform.localScale = new Vector3(width, height, 1f);
+        var renderer = quad.GetComponent<MeshRenderer>();
+        renderer.sharedMaterial = material;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
     }
 
     // Also make the captured sky the scene's default reflection, so every renderer

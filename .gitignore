@@ -54,3 +54,4 @@ Builds/
 
 # Local secrets for the old server
 server-v2/.env
+__pycache__/

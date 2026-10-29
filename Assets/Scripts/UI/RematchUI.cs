@@ -74,6 +74,7 @@ public class RematchUI : MonoBehaviour
             else if (outcome == NeonTheme.Pink) Haptics.Error();
             else Haptics.Warning();
             GameSounds.GameOver(outcome);
+            Celebrate(outcome);
             if (!Online && !ZombieMode.Active && !QueenBlitz.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
@@ -230,6 +231,14 @@ public class RematchUI : MonoBehaviour
             if (rating.tier != rating.tierBefore) line += $"  Now {rating.tier}!";
             GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), line, NeonTheme.GUILabelStyle(change >= 0 ? NeonTheme.Lime : NeonTheme.PinkSoft, 16, true, TextAnchor.MiddleRight));
         }
+        // Queen Blitz (playtest): the solve time across from CLEARED!
+        if (tally && QueenBlitz.ShowTimer && QueenBlitz.LastSolve != null)
+        {
+            QueenBlitz.Solve solve = QueenBlitz.LastSolve;
+            string time = $"Time {QueenBlitz.Clock(solve.seconds)}";
+            if (solve.attempts > 1) time += $"  ({solve.attempts} tries, {QueenBlitz.Clock(solve.totalSeconds)} in all)";
+            GUI.Label(new Rect(panel.x + 18, panel.y + 8, w - 36, 34), time, NeonTheme.GUILabelStyle(NeonTheme.Cyan, 16, true, TextAnchor.MiddleRight));
+        }
         string reason = Reason();
         if (tally) DrawTally(new Rect(panel.x + 18, panel.y + 40, w - 36, tallyRows * (TallySize + 4f)));
         else if (!string.IsNullOrEmpty(reason))
@@ -264,15 +273,17 @@ public class RematchUI : MonoBehaviour
 
         if (QueenBlitz.Active)
         {
-            // Puzzles: try again, or on to the next one
+            // Puzzles: try again, on to the next one, or back to the pack's page
             bool exists = QueenBlitz.Index + 1 < QueenBlitz.Puzzles.Length;
             bool more = exists && QueenBlitz.PuzzleOpen(QueenBlitz.PackId, QueenBlitz.Index + 1);
-            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 404f); // narrower with Larger Text at 2x
-            if (TouchGUI.NeonButton(new Rect(x, rowY, 120 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
+            float k = Mathf.Min(1f, (panel.xMax - 18f - x) / 464f); // narrower with Larger Text at 2x
+            int font = k < 1f ? 15 : 17;
+            if (TouchGUI.NeonButton(new Rect(x, rowY, 92 * k, 50), "Retry", NeonTheme.Yellow, NeonTheme.Pink, fontSize: font)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index));
             GUI.enabled = more;
-            if (TouchGUI.NeonButton(new Rect(x + 132 * k, rowY, 150 * k, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: k < 1f ? 16 : 18)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
+            if (TouchGUI.NeonButton(new Rect(x + 102 * k, rowY, 140 * k, 50), "Next puzzle", NeonTheme.Lime, NeonTheme.Pink, fontSize: font)) Leave(() => QueenBlitzDirector.Restart(QueenBlitz.Index + 1));
             GUI.enabled = true;
-            if (TouchGUI.NeonButton(new Rect(x + 294 * k, rowY, 110 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: 17)) GoHome(null);
+            if (TouchGUI.NeonButton(new Rect(x + 252 * k, rowY, 116 * k, 50), "Puzzles", NeonTheme.Cyan, NeonTheme.Pink, fontSize: font)) ToPuzzles();
+            if (TouchGUI.NeonButton(new Rect(x + 378 * k, rowY, 86 * k, 50), "Home", NeonTheme.Cyan, NeonTheme.Pink, outlined: true, fontSize: font)) GoHome(null);
             string next = more ? $"Next: {QueenBlitz.Puzzles[QueenBlitz.Index + 1].name}"
                 : exists ? $"Clear {QueenBlitz.ChapterUnlock} in this chapter to open the next one"
                 : QueenBlitz.IsDaily(QueenBlitz.PackId) ? "A new daily puzzle comes out tomorrow!"
@@ -351,7 +362,28 @@ public class RematchUI : MonoBehaviour
         ComputerStats.Record(config.aiDifficulty, winner == null ? 0 : winner.Value == humans[0] ? 1 : -1);
     }
 
+    /// <summary>
+    /// A checkmate win: confetti, and the winner's pieces dance. Only for checkmate (not a resign,
+    /// a timeout or a draw) and only for a win as this device sees it: the person playing here won
+    /// (online, the winner's phone), or robots played each other. Conquest's final mate counts.
+    /// </summary>
+    private void Celebrate(Color outcome)
+    {
+        if (ZombieMode.Active || QueenBlitz.Active || outcome != NeonTheme.Lime) return;
+        PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
+        if (winner == null || !(Reason() ?? "").StartsWith("Checkmate", StringComparison.OrdinalIgnoreCase)) return;
+        // Local games: a robot beating the people here is no party (robots against robots is)
+        if (!Online && PlayerManager.Instance != null && TurnManager.Instance != null)
+        {
+            var humans = PlayerManager.Instance.GetAllPlayers().Where(c => !TurnManager.Instance.IsPlayerAI(c)).ToArray();
+            if (humans.Length > 0 && !humans.Contains(winner.Value)) return;
+        }
+        ConfettiBurst.Fire();
+        VictoryDance.Begin(winner.Value, lastMated);
+    }
+
     private string lastReason;
+    private PieceColor? lastMated;
     private bool subscribed;
 
     private string Reason()
@@ -360,6 +392,7 @@ public class RematchUI : MonoBehaviour
         {
             subscribed = true;
             GameEndDetectionManager.Instance.OnGameEnd += r => lastReason = r;
+            GameEndDetectionManager.Instance.OnCheckmate += c => lastMated = c;
         }
         return lastReason;
     }

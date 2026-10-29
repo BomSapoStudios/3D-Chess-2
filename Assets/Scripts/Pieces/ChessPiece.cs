@@ -160,31 +160,39 @@ public abstract class ChessPiece : MonoBehaviour
         {
             targetMaterial = modeled ? PieceSets.CreateBodyMaterial(pieceColor) : PieceSets.CreateMaterial(pieceColor);
         }
-        // The textured sets: the side's colour in the chosen finish, with the texture only shading
-        // in detail (eyes, stripes, spots)
+        // The textured sets: two tones of the side's colour (a light body, deep accents in the
+        // carving, spots and stripes) under the chosen finish
         if (modeled && PieceShapes.Textured(PieceShapes.Active))
         {
-            targetMaterial = PieceSets.CreateMaterial(pieceColor); // glowing all over: these models have no light strips
-            Texture2D shade = PieceModels.FinishDetail(PieceModels.TypeOf(this));
-            if (shade != null)
-            {
-                targetMaterial.mainTexture = shade;
-                if (targetMaterial.HasProperty("_EmissionMap") && targetMaterial.IsKeywordEnabled("_EMISSION")) targetMaterial.SetTexture("_EmissionMap", shade);
-            }
+            targetMaterial = PieceSets.CreateTexturedMaterial(pieceColor, PieceModels.TypeOf(this));
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
+        Material rimMaterial = PieceSets.CreateRimMaterial(pieceColor);
         PieceModels.Face(this);
 
         // Every part of the piece (knights and rooks are made of two blocks), but not
-        // the selection or check indicators added later. Model light strips glow in the team color.
+        // the selection or check indicators added later. Model light strips glow in the team color;
+        // the body gets the rim light as a second material on top.
         foreach (MeshRenderer part in GetComponentsInChildren<MeshRenderer>(true))
         {
             if (part.name.Contains("Glow") || part.name.Contains("Indicator")) continue;
-            part.sharedMaterial = part.name == PieceModels.StripName ? stripMaterial : targetMaterial;
+            if (part.name == PieceModels.StripName) part.sharedMaterials = new[] { stripMaterial };
+            else part.sharedMaterials = WithRim(part, targetMaterial, rimMaterial);
         }
         meshRenderer.material = targetMaterial;
     }
     
+    // The body material on each of the part's submeshes, then the rim light drawn over the last one
+    private static Material[] WithRim(MeshRenderer part, Material body, Material rim)
+    {
+        MeshFilter filter = part.GetComponent<MeshFilter>();
+        int submeshes = filter != null && filter.sharedMesh != null ? Mathf.Max(1, filter.sharedMesh.subMeshCount) : 1;
+        var materials = new Material[submeshes + (rim != null ? 1 : 0)];
+        for (int i = 0; i < submeshes; i++) materials[i] = body;
+        if (rim != null) materials[submeshes] = rim;
+        return materials;
+    }
+
     protected Material CreateDefaultMaterial()
     {
         // Try URP Lit shader first, fallback to Standard if not available
@@ -520,7 +528,7 @@ public abstract class ChessPiece : MonoBehaviour
         if (boardMove && QueenBlitz.Active && pieceType == ChessPieceType.Queen)
         {
             QueenBlitz.Route route = QueenBlitz.TakeRoute(targetPosition);
-            Sfx.Play(QueenBlitz.Current.ice ? "ice_slide" : "blitz_slide");
+            GameSounds.QueenSlide(QueenBlitz.Current.ice);
             if (route != null) yield return SlideRouteCoroutine(route);
             else yield return SlideCoroutine(startPos, endPos);
             transform.localPosition = endPos;
