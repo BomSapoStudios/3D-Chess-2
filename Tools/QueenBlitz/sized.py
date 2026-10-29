@@ -36,9 +36,26 @@ def normalise(e):
     return e
 
 
+# Weights from Brandon's solve times (Oct 29, High Five): ice and portal/ramp combos took far longer
+# than their old scores said, lures (bait, greed) less, and par tracked time better than tricks
+W_TRICK, W_LURED, W_PAR, W_ICE, W_WARP, W_BOTH, W_PLACE, W_DECOY = 8, 3, 6, 16, 8, 6, 3, 5
+MECHANICS = {"portal", "ramp", "both", "brake", "ice", "decoy"}
+
+
 def difficulty(p):
-    return len(p["tricks"]) * 10 + (p["lured"] or 0) * 6 + p["par"] * 4 + (p["trick_score"] or 0) \
-        + (4 if p["mech"] != "classic" else 0) + (3 if not p.get("queen") else 0)
+    return len(p["tricks"]) * W_TRICK + (p["lured"] or 0) * W_LURED + p["par"] * W_PAR + (p["trick_score"] or 0) \
+        + (W_ICE if p.get("ice") else 0) + (W_WARP if p["mech"] == "warp" else 0) \
+        + (W_BOTH if p.get("portals") and p.get("ramps") else 0) + (W_PLACE if not p.get("queen") else 0)
+
+
+def score_entry(e):
+    """The 1-100 score shown in playtest names, from a pack entry's own fields (tricks, lures, par,
+    ice, portals and ramps) with the weights above"""
+    t = [x for x in e["tricks"] if x not in MECHANICS]
+    s = len(t) * W_TRICK + (e.get("lured") or 0) * W_LURED + e["par"] * W_PAR + (W_ICE if e.get("ice") else 0) \
+        + (W_WARP if e.get("portals") or e.get("ramps") else 0) + (W_BOTH if e.get("portals") and e.get("ramps") else 0) \
+        + (W_PLACE if not e.get("queen") else 0) + (W_DECOY if "decoy" in e["tricks"] else 0)
+    return max(1, min(100, int(s)))
 
 
 def S(mech, n, pars, tricks=(0, 9), lured=(0, 3), wants=None, ice=None, pick=None):
@@ -191,7 +208,7 @@ def build(pid, name, names, out, n, cands):
         e["tricks"] = p["tricks"] + ([p["want"]] if p["mech"] == "warp" else []) + (["ice"] if p.get("ice") else []) \
             + (["decoy"] if p["has_decoys"] or p.get("decoy_portal") else [])
         e["lured"] = p["lured"]
-        e["score"] = max(1, min(100, int(difficulty(p))))
+        e["score"] = score_entry(e)
         e["tier"] = "Warm-up" if i < 2 else TIERS[c]
         puzzles.append(e)
     print(packs.write({"id": pid, "name": name, "free": True, "puzzles": puzzles}, out))
