@@ -2,6 +2,12 @@ name = "3d-chess"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
+# The app talks to api.bomsapostudios.com, where a Cloudflare rate-limiting rule stops floods before
+# they reach the Worker (so they don't use up the free plan's daily requests). The workers.dev address
+# stays on for builds that still use it; turn it off once MIN_CLIENT_VERSION has moved everyone over.
+routes = [{ pattern = "api.bomsapostudios.com", custom_domain = true }]
+workers_dev = true
+
 # Static files: Queen Blitz daily puzzles at /daily/YYYY-MM-DD.json (made by Tools/QueenBlitz/daily.py).
 # A request that matches a file is served without running the Worker, so it's free and doesn't count
 # toward the daily request limit; anything else falls through to the Worker as before.
