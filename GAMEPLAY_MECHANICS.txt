@@ -129,6 +129,8 @@ Every game starts with a placement phase. You design your own opening.
 
 Your bench (every board size):
   1 King, 1 Queen, 2 Rooks, 2 Bishops, 2 Knights   (8 pieces)
+  Each bench tile shows the piece's picture in your chosen set with its name
+  under it (KING, ROOK...), so themed sets are easy to read.
 
 Rules:
   • Every piece must be placed before Ready can be pressed.
@@ -143,6 +145,11 @@ Rules:
   • When play starts, a Pawn appears directly in front of each placed piece
     (one step along your advance axis), giving every player 8 Pawns.
   • Play starts once every player is Ready.
+
+Piece names:
+  • Tapping any piece (yours or anyone's, on the board or a bench, in setup or
+    play) shows its name over it for about two seconds ("WHITE KNIGHT",
+    "BLACK ROOK"; zombies read "ZOMBIE"). Not shown in Queen Blitz.
 
 Changing your mind:
   • Tap a placed piece, then tap another square in your zone to move it.
@@ -774,7 +781,9 @@ The home screen's Settings button (beside Customize) opens:
 16. CUSTOMIZE ("MAKE IT YOURS")
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Piece set            — the look of the pieces.
+  Piece set            — the look of the pieces. "Who's who" on the turning
+                         set opens a legend: each of the set's six pieces
+                         with its name and the plain chess piece it stands for.
   Backdrop             — the scene the board floats in.
   Promotion animation  — tap any card to preview it on a pawn becoming
                          a Queen:
