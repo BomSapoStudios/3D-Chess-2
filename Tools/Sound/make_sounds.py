@@ -334,14 +334,24 @@ def zombies():
     write("level_up", x, loud=-3)
 
 # ---------------- Queen Blitz ----------------
+def whoosh(dur, f0, fpeak, f1, q=1.0, body=0.0):
+    """Air rushing past: band-passed noise gliding f0 -> fpeak -> f1, swelling to the middle"""
+    n = int(SR * dur)
+    half = n // 2
+    x = noise(dur)
+    a = sweep_bp(x[:half], f0, fpeak, q)
+    b = sweep_bp(x[half:], fpeak, f1, q)
+    y = np.concatenate([a, b])
+    shape = np.sin(np.linspace(0, np.pi, n)) ** 1.6  # swell up, then away
+    y = y / (np.abs(y).max() + 1e-9) * shape
+    if body:
+        y = y + lp(noise(dur), 350) * shape * body
+    return y
+
 def blitz():
-    # dusty scrape, grainy
-    x = noise(0.55)
-    x = sweep_bp(x, 900, 500, q=0.7)
-    grain = 0.6 + 0.4 * np.abs(lp(rng.standard_normal(len(x)), 40))
-    grain /= grain.max()
-    x = x / np.abs(x).max() * grain * env(len(x), 0.03, 0.7) * 0.5
-    write("blitz_slide", x, loud=-7, wet=0.06)
+    # the queen's slide: a soft whoosh (Brandon: redo the scrape as a whoosh). Air rushes
+    # past, rising then falling in pitch, swelling to the middle like something flying by.
+    write("blitz_slide", whoosh(0.5, 450, 1700, 600, q=1.1), loud=-6, wet=0.08)
     # pawn knocked flying: one pop (pitched up a scale at run time)
     x = tone(hz(12) * 0.7, 0.18, 0.4, "square", f1=hz(12), glide=0.03, cutoff=2400)
     x = at(x, 0, hiss(0.03, 3000, 0.15, q=1.5, att=0.001))
