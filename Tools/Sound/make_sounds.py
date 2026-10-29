@@ -391,11 +391,10 @@ def blitz():
     x = tone(hz(24), 0.25, 0.3, "triangle")
     x = at(x, 0.0, tone(hz(31), 0.18, 0.12))
     write("pawn_ding", x, loud=-6, wet=0.1)
+    # just the bright final chord (Brandon dropped the four-note run-up before it)
     x = buf(0)
-    for k, s in enumerate([0, 4, 7, 12]):
-        x = at(x, k * 0.07, tone(hz(12 + s), 0.18, 0.25, "triangle"))
     for s in [0, 4, 7, 12, 16]:
-        x = at(x, 0.3, tone(hz(12 + s), 0.8, 0.1, "square", cutoff=3000, att=0.01))
+        x = at(x, 0, tone(hz(12 + s), 0.8, 0.1, "square", cutoff=3000, att=0.01))
     write("blitz_cleared", x, loud=-1)
     x = buf(0)
     for k, (a, b) in enumerate([(hz(3), hz(1)), (hz(1), hz(-4))]):

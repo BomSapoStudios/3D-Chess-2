@@ -404,7 +404,8 @@ Scoring:
     ends "OUT OF MOVES" (Retry, Puzzles, Home). Nothing is paid or recorded for a miss.
   • The first time you clear a puzzle you keep all of its pawns (the puzzle card shows
     what each one pays). Replays pay nothing; the card then shows your best moves vs par.
-  • Undo, Restart, Retry and Next puzzle. The in-game Menu shows only Resume Game, Queen
+  • Undo, Restart, Retry and Next puzzle. CLEARED! offers Retry, Next puzzle, Puzzles (back to
+    the pack page you came from, on that chapter) and Home. The in-game Menu shows only Resume Game, Queen
     Blitz (back to the puzzle picker, on that pack and chapter) and Main Menu.
   • Puzzle selector: tap the title bar (grid icon at its end), during placement or play, for a
     card with the pack's puzzles a chapter at a time (Playing, Best moves/par, Par, or Locked by
