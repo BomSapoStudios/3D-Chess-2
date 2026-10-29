@@ -353,7 +353,9 @@ def whoosh(dur, f0, fpeak, f1, q=1.0, body=0.0):
 def blitz():
     # the queen's slide: a soft whoosh (Brandon: redo the scrape as a whoosh). Air rushes
     # past, rising then falling in pitch, swelling to the middle like something flying by.
-    write("blitz_slide", whoosh(0.5, 450, 1700, 600, q=1.1), loud=-6, wet=0.08)
+    # Brandon picked the quick one (C) and asked for it gentler: lower peak, wider and smoother
+    # band, a slower swell, quieter and rolled off on top
+    write("blitz_slide", lp(whoosh(0.42, 550, 1900, 800, q=0.7), 2600), loud=-10, wet=0.08)
     # pawn knocked flying: one pop (pitched up a scale at run time)
     x = tone(hz(12) * 0.7, 0.18, 0.4, "square", f1=hz(12), glide=0.03, cutoff=2400)
     x = at(x, 0, hiss(0.03, 3000, 0.15, q=1.5, att=0.001))
