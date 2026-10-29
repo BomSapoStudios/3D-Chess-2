@@ -40,7 +40,7 @@ public class PieceNameChip : MonoBehaviour
 
     public static string Name(ChessPiece piece)
     {
-        if (ZombieDirector.Active && piece.pieceColor == ZombieDirector.ZombieColor)
+        if (ZombieMode.Active && piece.pieceColor == ZombieMode.ZombieColor)
             return piece.pieceType == ChessPieceType.Pawn ? "Zombie" : $"Zombie {piece.pieceType}";
         return $"{piece.pieceColor} {piece.pieceType}";
     }
