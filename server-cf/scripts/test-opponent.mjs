@@ -2,7 +2,7 @@
 // wherever the server accepts them, readies up, then on its turn tries king/rook steps until one is legal.
 //   node scripts/test-opponent.mjs <ROOMCODE> <token> [server]
 import WebSocket from 'ws';
-const [code, token, base = 'https://3d-chess.bomsapostudios.workers.dev'] = process.argv.slice(2);
+const [code, token, base = 'https://chess-api.bomsapostudios.com'] = process.argv.slice(2);
 const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/rooms/${code}/connect?token=${encodeURIComponent(token)}`);
 let rematchSent = false;
 let me = null, nextId = 1, busy = false, placed = false, mine = [];

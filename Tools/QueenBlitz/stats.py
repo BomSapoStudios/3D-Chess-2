@@ -23,7 +23,7 @@ import argparse, csv, glob, json, os, sys, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.join(HERE, "..", "..", "Assets", "Resources", "QueenBlitz")
 DAILY_DIR = os.path.join(HERE, "..", "..", "server-cf", "public", "daily")
-SERVER = "https://3d-chess.bomsapostudios.workers.dev"
+SERVER = "https://chess-api.bomsapostudios.com"
 KEY_FILE = os.path.expanduser("~/.appstore-publisher/keys/blitz-stats-key.txt")
 
 

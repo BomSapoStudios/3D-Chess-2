@@ -13,7 +13,9 @@ using UnityEngine.Networking;
 public class OnlineClient : MonoBehaviour
 {
     // Production server. Development builds can override with PlayerPrefs "ServerUrl".
-    public const string DefaultServerUrl = "https://3d-chess.bomsapostudios.workers.dev";
+    public const string DefaultServerUrl = "https://chess-api.bomsapostudios.com";
+    /// <summary>The same server's first address: a token from there is still good here</summary>
+    private const string LegacyServerUrl = "https://3d-chess.bomsapostudios.workers.dev";
 
     public static OnlineClient Instance { get; private set; }
 
@@ -125,6 +127,21 @@ public class OnlineClient : MonoBehaviour
         signingIn = false;
     }
 
+    /// <summary>
+    /// Was the saved token issued by the server this build talks to? A token from the server's old
+    /// workers.dev address counts (same server, new address), so players keep their accounts.
+    /// </summary>
+    private bool TokenFromThisServer()
+    {
+        string issuer = PlayerPrefs.GetString("OnlineTokenServer", "");
+        if (issuer == LegacyServerUrl && ServerUrl == DefaultServerUrl)
+        {
+            PlayerPrefs.SetString("OnlineTokenServer", DefaultServerUrl);
+            issuer = DefaultServerUrl;
+        }
+        return issuer == ServerUrl;
+    }
+
     private bool signingIn;
     private bool lastSignInOk;
     private string lastSignInError;
@@ -132,7 +149,7 @@ public class OnlineClient : MonoBehaviour
     private IEnumerator SignIn(Action<bool, string> done)
     {
         string token = Token;
-        bool sameServer = PlayerPrefs.GetString("OnlineTokenServer", "") == ServerUrl; // local test server vs live
+        bool sameServer = TokenFromThisServer(); // local test server vs live
         if (!string.IsNullOrEmpty(token) && sameServer)
         {
             if (refreshedThisSession) { done(true, null); yield break; }
@@ -199,7 +216,7 @@ public class OnlineClient : MonoBehaviour
     {
         bool restored = false;
         string error = null;
-        bool sameServer = PlayerPrefs.GetString("OnlineTokenServer", "") == ServerUrl;
+        bool sameServer = TokenFromThisServer();
         yield return Call("POST", "/auth/gamecenter", proofJson, HasToken && sameServer ? Token : null, (status, text) =>
         {
             if (status != 200) { error = ErrorText(status, text); return; }
