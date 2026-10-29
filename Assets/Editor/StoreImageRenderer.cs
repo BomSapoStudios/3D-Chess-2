@@ -690,7 +690,7 @@ public static class StoreImageRenderer
 
     // ───────── Game view resolution ─────────
 
-    private static void SetGameViewSize(int width, int height)
+    internal static void SetGameViewSize(int width, int height)
     {
         try
         {

@@ -233,6 +233,23 @@ public static class PieceSets
         return material;
     }
 
+    /// <summary>
+    /// The soft edge light drawn over every piece in its side's colour (Shaders/PieceRim), so pieces
+    /// stand out on dark backdrops and in Chrome and Crystal, which take their look from the backdrop.
+    /// Classic is plainer, so its rim is fainter.
+    /// </summary>
+    public static Material CreateRimMaterial(PieceColor player)
+    {
+        Shader shader = Resources.Load<Shader>("Shaders/PieceRim");
+        if (shader == null) return null;
+        Kind kind = Effective;
+        var material = new Material(shader);
+        material.SetColor("_RimColor", player == PieceColor.White ? NeonTheme.Cyan : Tint(kind == Kind.Classic ? Kind.NeonGlow : kind, player));
+        material.SetFloat("_RimPower", 2f);
+        material.SetFloat("_RimStrength", kind == Kind.Classic ? 0.7f : kind == Kind.Crystal ? 0.8f : 1.2f);
+        return material;
+    }
+
     /// <summary>The glowing light strips on modeled pieces, in the team's neon color</summary>
     public static Material CreateStripMaterial(PieceColor player)
     {

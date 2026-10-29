@@ -167,18 +167,32 @@ public abstract class ChessPiece : MonoBehaviour
             targetMaterial = PieceSets.CreateTexturedMaterial(pieceColor, PieceModels.TypeOf(this));
         }
         Material stripMaterial = modeled ? PieceSets.CreateStripMaterial(pieceColor) : null;
+        Material rimMaterial = PieceSets.CreateRimMaterial(pieceColor);
         PieceModels.Face(this);
 
         // Every part of the piece (knights and rooks are made of two blocks), but not
-        // the selection or check indicators added later. Model light strips glow in the team color.
+        // the selection or check indicators added later. Model light strips glow in the team color;
+        // the body gets the rim light as a second material on top.
         foreach (MeshRenderer part in GetComponentsInChildren<MeshRenderer>(true))
         {
             if (part.name.Contains("Glow") || part.name.Contains("Indicator")) continue;
-            part.sharedMaterial = part.name == PieceModels.StripName ? stripMaterial : targetMaterial;
+            if (part.name == PieceModels.StripName) part.sharedMaterials = new[] { stripMaterial };
+            else part.sharedMaterials = WithRim(part, targetMaterial, rimMaterial);
         }
         meshRenderer.material = targetMaterial;
     }
     
+    // The body material on each of the part's submeshes, then the rim light drawn over the last one
+    private static Material[] WithRim(MeshRenderer part, Material body, Material rim)
+    {
+        MeshFilter filter = part.GetComponent<MeshFilter>();
+        int submeshes = filter != null && filter.sharedMesh != null ? Mathf.Max(1, filter.sharedMesh.subMeshCount) : 1;
+        var materials = new Material[submeshes + (rim != null ? 1 : 0)];
+        for (int i = 0; i < submeshes; i++) materials[i] = body;
+        if (rim != null) materials[submeshes] = rim;
+        return materials;
+    }
+
     protected Material CreateDefaultMaterial()
     {
         // Try URP Lit shader first, fallback to Standard if not available

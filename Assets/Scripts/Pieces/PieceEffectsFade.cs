@@ -82,10 +82,12 @@ public partial class PieceEffects
             string n = r.gameObject.name.ToLowerInvariant();
             if (n.Contains("glow") || n.Contains("indicator") || n.Contains("highlight")) continue;
             Material[] original = r.sharedMaterials;
-            var faded = new Material[original.Length];
-            for (int i = 0; i < original.Length; i++)
+            // The rim light (PieceSets.CreateRimMaterial) is left off while see-through
+            Material[] bodies = System.Array.FindAll(original, m => m == null || m.shader == null || m.shader.name != "Chess/PieceRim");
+            var faded = new Material[bodies.Length];
+            for (int i = 0; i < bodies.Length; i++)
             {
-                Material src = original[i];
+                Material src = bodies[i];
                 Material m = template != null ? new Material(template) : new Material(Shader.Find("Standard"));
                 Color c = Color.white;
                 if (src != null && src.HasProperty("_LightTint")) c = src.GetColor("_LightTint");
