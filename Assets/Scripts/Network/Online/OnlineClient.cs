@@ -24,7 +24,7 @@ public class OnlineClient : MonoBehaviour
     /// the build, then set the server's MIN_CLIENT_VERSION to the new number once it's out. Older
     /// builds then get "Please update" instead of breaking.
     /// </summary>
-    public const int ClientVersion = 1;
+    public const int ClientVersion = 2; // 2: talks to chess-api.bomsapostudios.com (1 used the workers.dev address)
 
     /// <summary>The server said this build is too old to play online (until the app restarts)</summary>
     public static bool UpdateRequired { get; private set; }
