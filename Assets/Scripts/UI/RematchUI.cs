@@ -74,6 +74,7 @@ public class RematchUI : MonoBehaviour
             else if (outcome == NeonTheme.Pink) Haptics.Error();
             else Haptics.Warning();
             GameSounds.GameOver(outcome);
+            Celebrate(outcome);
             if (!Online && !ZombieMode.Active && !QueenBlitz.Active) RecordVsComputer();
         }
         Showing = Time.unscaledTime - gameOverAt >= ShowDelay;
@@ -361,7 +362,28 @@ public class RematchUI : MonoBehaviour
         ComputerStats.Record(config.aiDifficulty, winner == null ? 0 : winner.Value == humans[0] ? 1 : -1);
     }
 
+    /// <summary>
+    /// A checkmate win: confetti, and the winner's pieces dance. Only for checkmate (not a resign,
+    /// a timeout or a draw) and only for a win as this device sees it: the person playing here won
+    /// (online, the winner's phone), or robots played each other. Conquest's final mate counts.
+    /// </summary>
+    private void Celebrate(Color outcome)
+    {
+        if (ZombieMode.Active || QueenBlitz.Active || outcome != NeonTheme.Lime) return;
+        PieceColor? winner = GameEndDetectionManager.Instance != null ? GameEndDetectionManager.Instance.Winner : null;
+        if (winner == null || !(Reason() ?? "").StartsWith("Checkmate", StringComparison.OrdinalIgnoreCase)) return;
+        // Local games: a robot beating the people here is no party (robots against robots is)
+        if (!Online && PlayerManager.Instance != null && TurnManager.Instance != null)
+        {
+            var humans = PlayerManager.Instance.GetAllPlayers().Where(c => !TurnManager.Instance.IsPlayerAI(c)).ToArray();
+            if (humans.Length > 0 && !humans.Contains(winner.Value)) return;
+        }
+        ConfettiBurst.Fire();
+        VictoryDance.Begin(winner.Value, lastMated);
+    }
+
     private string lastReason;
+    private PieceColor? lastMated;
     private bool subscribed;
 
     private string Reason()
@@ -370,6 +392,7 @@ public class RematchUI : MonoBehaviour
         {
             subscribed = true;
             GameEndDetectionManager.Instance.OnGameEnd += r => lastReason = r;
+            GameEndDetectionManager.Instance.OnCheckmate += c => lastMated = c;
         }
         return lastReason;
     }

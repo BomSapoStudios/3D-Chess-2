@@ -181,6 +181,13 @@ CHECKMATE
   In check with no legal move that escapes it.
     2 players: the game ends; the checkmating player wins.
     4/6 players: the checkmated player is out (see Conquest, section 6).
+  Winning by checkmate sets off a party: neon confetti from both bottom
+  corners and the top, and the winner's pieces dance in place (the mated
+  King wobbles and tips over) for a few seconds, then everything goes back
+  exactly where it was. Only for a checkmate win as this phone sees it: you
+  won (online, the winner's phone), or robots played each other; never for a
+  loss, draw, forfeit or timeout. With Reduce Motion: a small, slow sprinkle
+  and a gentle bob.
 
 STALEMATE
   Not in check but no legal move.
