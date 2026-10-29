@@ -296,6 +296,7 @@ public class InputManager : MonoBehaviour
             ChessPiece hitPiece = hit.collider.GetComponent<ChessPiece>();
             if (hitPiece != null)
             {
+                PieceNameChip.Show(hitPiece); // themed sets: say which piece this is
                 
                 // Handle piece clicks based on game state
                 if (GameStateManager.Instance.CanPlacePieces())
