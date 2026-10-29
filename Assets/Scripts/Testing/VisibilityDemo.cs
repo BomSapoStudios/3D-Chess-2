@@ -35,39 +35,51 @@ public class VisibilityDemo : MonoBehaviour
             if (!p.ice && p.queen.HasValue && p.pawns.Length > most) { idx = i; most = p.pawns.Length; }
         }
         QueenBlitz.Puzzle pz = QueenBlitz.Puzzles[idx];
-        var config = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(pz.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = idx };
-        config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
-        config.ApplyToLegacyFields();
-        SceneController.Instance.LoadGameScene(config);
-        float giveUp = Time.realtimeSinceStartup + 40f;
-        while ((QueenBlitzDirector.Instance == null || GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing)
-               && Time.realtimeSinceStartup < giveUp) yield return null;
-        Debug.Log($"VISIBILITY: puzzle {idx + 1} ({most} pawns), state {GameStateManager.Instance?.currentState}");
-        yield return new WaitForSeconds(3f);
-
         string folder = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "Desktop", "visibility");
         Directory.CreateDirectory(folder);
         string only = PlayerPrefs.GetString("DebugVisibilityBackdrops", "");
+        string tag = PlayerPrefs.GetString("DebugVisibilityTag", "");
         PieceSets.Kind saved = PieceSets.Current;
-        foreach (Backdrops.Kind backdrop in Backdrops.All)
+
+        // One game per piece set (DebugVisibilitySets: comma-separated PieceShapes.Kind names; none = the chosen set)
+        string sets = PlayerPrefs.GetString("DebugVisibilitySets", "");
+        foreach (string setName in sets.Length > 0 ? sets.Split(',') : new[] { "" })
         {
-            if (only.Length > 0 && !only.Contains(backdrop.ToString())) continue;
-            float until = Time.realtimeSinceStartup + 20f;
-            while (!Backdrops.Apply(Camera.main, backdrop) && Time.realtimeSinceStartup < until) yield return null;
-            yield return new WaitForSeconds(2f);
-            foreach (PieceSets.Kind finish in PieceSets.All)
+            PieceShapes.Showing = setName.Length > 0 ? (PieceShapes.Kind?)System.Enum.Parse(typeof(PieceShapes.Kind), setName.Trim()) : null;
+            string prefix = tag + (setName.Length > 0 ? setName.Trim() + "_" : "");
+            var config = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(pz.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = idx };
+            config.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            config.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(config);
+            yield return new WaitForSeconds(1f);
+            float giveUp = Time.realtimeSinceStartup + 40f;
+            while ((QueenBlitzDirector.Instance == null || GameStateManager.Instance == null || GameStateManager.Instance.currentState != GameState.Playing)
+                   && Time.realtimeSinceStartup < giveUp) yield return null;
+            Debug.Log($"VISIBILITY: {setName} puzzle {idx + 1} ({most} pawns), state {GameStateManager.Instance?.currentState}");
+            yield return new WaitForSeconds(3f);
+
+            foreach (Backdrops.Kind backdrop in Backdrops.All)
             {
-                PieceSets.Current = finish;
-                foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None)) piece.ApplyMaterial();
-                yield return new WaitForSeconds(0.6f);
-                string file = Path.Combine(folder, $"{PlayerPrefs.GetString("DebugVisibilityTag", "")}{backdrop}_{finish}.png");
-                ScreenCapture.CaptureScreenshot(file);
-                yield return new WaitForSeconds(0.6f);
-                Debug.Log("VISIBILITY: " + file);
+                if (only.Length > 0 && !only.Contains(backdrop.ToString())) continue;
+                float until = Time.realtimeSinceStartup + 20f;
+                while (!Backdrops.Apply(Camera.main, backdrop) && Time.realtimeSinceStartup < until) yield return null;
+                yield return new WaitForSeconds(2f);
+                foreach (PieceSets.Kind finish in PieceSets.All)
+                {
+                    PieceSets.Current = finish;
+                    foreach (ChessPiece piece in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None)) piece.ApplyMaterial();
+                    yield return new WaitForSeconds(0.6f);
+                    string file = Path.Combine(folder, $"{prefix}{backdrop}_{finish}.png");
+                    ScreenCapture.CaptureScreenshot(file);
+                    yield return new WaitForSeconds(0.6f);
+                    Debug.Log("VISIBILITY: " + file);
+                }
             }
         }
+        PieceShapes.Showing = null;
         PieceSets.Current = saved;
         PlayerPrefs.DeleteKey("DebugVisibility");
+        PlayerPrefs.DeleteKey("DebugVisibilitySets");
         PlayerPrefs.SetInt("HowToPlaySeen.Blitz", blitzSeen);
         PlayerPrefs.Save();
         Debug.Log("VISIBILITY: done");
