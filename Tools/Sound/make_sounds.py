@@ -350,12 +350,28 @@ def whoosh(dur, f0, fpeak, f1, q=1.0, body=0.0):
         y = y + lp(noise(dur), 350) * shape * body
     return y
 
+def gust(dur, c0, cpeak, c1, flutter=0.15):
+    """A breath of wind: low-passed noise whose cutoff swells c0 -> cpeak -> c1, slow rise, long fade, a little flutter"""
+    n = int(SR * dur)
+    x = noise(dur)
+    t = np.linspace(0, 1, n)
+    env = np.sin(np.pi * np.minimum(t / 0.45, 1) / 2) ** 2 * np.where(t < 0.45, 1, np.cos(np.pi / 2 * (t - 0.45) / 0.55) ** 1.5)
+    cut = np.where(t < 0.45, c0 + (cpeak - c0) * np.sin(np.pi / 2 * t / 0.45), cpeak + (c1 - cpeak) * (t - 0.45) / 0.55)
+    y = np.zeros(n)
+    zi = None
+    for i in range(0, n, 256):
+        b, a = signal.butter(2, cut[i] / (SR / 2), "low")
+        if zi is None:
+            zi = signal.lfilter_zi(b, a) * 0
+        y[i:i + 256], zi = signal.lfilter(b, a, x[i:i + 256], zi=zi)
+    wob = lp(noise(dur), 8, order=1)
+    wob /= np.abs(wob).max() + 1e-9
+    return hp(y, 90) * env * (1 + flutter * wob)
+
 def blitz():
-    # the queen's slide: a soft whoosh (Brandon: redo the scrape as a whoosh). Air rushes
-    # past, rising then falling in pitch, swelling to the middle like something flying by.
-    # Brandon picked the quick one (C) and asked for it gentler: lower peak, wider and smoother
-    # band, a slower swell, quieter and rolled off on top
-    write("blitz_slide", lp(whoosh(0.42, 550, 1900, 800, q=0.7), 2600), loud=-10, wet=0.08)
+    # the queen's slide: a gentle gust of wind (Brandon: the whooshes were still too harsh).
+    # Low-passed noise that breathes in and out, no band-pass edge or bright top
+    write("blitz_slide", gust(0.55, 250, 900, 350), loud=-9, wet=0.1)
     # pawn knocked flying: one pop (pitched up a scale at run time)
     x = tone(hz(12) * 0.7, 0.18, 0.4, "square", f1=hz(12), glide=0.03, cutoff=2400)
     x = at(x, 0, hiss(0.03, 3000, 0.15, q=1.5, att=0.001))
