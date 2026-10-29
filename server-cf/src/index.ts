@@ -57,10 +57,16 @@ export { Accounts } from './accounts.js';
 //   GET  /wallet                                                        (Bearer)
 //   POST /wallet/sync  { migrate?, events: [{ id, kind: 'blitz', puzzle, pawns } |
 //                        { id, kind: 'zombie', run, brain, kills } | { id, kind: 'autoplace' }] }
-//                                       → { wallet, results }  earnings queued by the app (Bearer)
+//                       stats?: [{ puzzle, sig, seconds, attempts, cleared, moves, auto, par }] }
+//                                       → { wallet, results, statsTaken }  earnings queued by the app, plus
+//                                         Queen Blitz solve times (blitzstats.ts) (Bearer)
 //   POST /wallet/spend { requestId, item } → { wallet, item }   unlock for pawns (Bearer)
 //   POST /wallet/purchase { transactions: [StoreKit 2 JWS, ...] }
 //                                       → { wallet, granted, rejected }  App Store purchases (Bearer)
+//
+//   Queen Blitz difficulty (blitzstats.ts): totals per puzzle, for tuning packs; Tools/QueenBlitz/stats.py reads it
+//   GET  /blitz/stats?pack=blitz-5     → { puzzles: [...] }   header X-Stats-Key: the STATS_KEY secret
+//                                         (404 while STATS_KEY isn't set)
 //
 // The token is passed as a query parameter for WebSockets because neither
 // browsers nor Unity's WebGL WebSocket can set headers on the upgrade request.
@@ -89,6 +95,8 @@ export interface Env {
   SIWA_KEY_ID?: string;
   /** Oldest app build (OnlineClient.ClientVersion) that may play online; "0" lets every build in */
   MIN_CLIENT_VERSION?: string;
+  /** Reads Queen Blitz difficulty totals (GET /blitz/stats); a secret: `npx wrangler secret put STATS_KEY` */
+  STATS_KEY?: string;
   /** Local tests only: extra trusted root certificates (base64 DER, comma-separated) for App Store transactions */
   TEST_APPLE_ROOTS?: string;
 }
@@ -134,6 +142,16 @@ function networkOf(ip: string | null): string {
   return groups.slice(0, 4).join(':') + '::/64';
 }
 
+/** Compare a presented secret with the real one without leaking how much of it matched */
+async function sameSecret(given: string, real: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([given, real].map(s => crypto.subtle.digest('SHA-256', enc.encode(s))));
+  const x = new Uint8Array(a), y = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -160,7 +178,7 @@ export default {
 
     // Builds too old to play online are told to update (builds from before this check send no version)
     const clientVersion = Number(request.headers.get('X-Client-Version') ?? (socketRoute ? url.searchParams.get('cv') : null)) || 0;
-    if (clientVersion < minClientVersion && path !== '/account/delete') {
+    if (clientVersion < minClientVersion && path !== '/account/delete' && path !== '/blitz/stats') {
       return json({ error: 'A new version of 3D Chess Ultra is out. Please update to keep playing online.', updateRequired: true, minClientVersion }, 426);
     }
 
@@ -243,7 +261,7 @@ export default {
     if (path.startsWith('/wallet')) {
       if (!user) return needUser();
       if (request.method === 'GET' && path === '/wallet') return account('wallet');
-      if (request.method === 'POST' && path === '/wallet/sync') return account('wallet-sync', { migrate: body.migrate, events: body.events });
+      if (request.method === 'POST' && path === '/wallet/sync') return account('wallet-sync', { migrate: body.migrate, events: body.events, stats: body.stats });
       if (request.method === 'POST' && path === '/wallet/spend') return account('wallet-spend', { requestId: body.requestId, item: body.item });
       if (request.method === 'POST' && path === '/wallet/purchase') {
         const list = Array.isArray(body.transactions) ? body.transactions.slice(0, ECONOMY.maxTransactionsPerCall) : [];
@@ -268,6 +286,14 @@ export default {
       if (path === '/stats') return account('stats', { of: url.searchParams.get('of') ?? '' });
       if (path === '/leaderboard') return account('leaderboard', { mode: url.searchParams.get('mode'), scope: url.searchParams.get('scope') });
       return account('cooldown');
+    }
+
+    // Queen Blitz difficulty totals, for Brandon's tuning script only
+    if (request.method === 'GET' && path === '/blitz/stats') {
+      const key = request.headers.get('X-Stats-Key') ?? '';
+      if (!env.STATS_KEY || env.STATS_KEY.length < 16 || !(await sameSecret(key, env.STATS_KEY))) return json({ error: 'Not found' }, 404);
+      const { status, data } = await accounts(env, 'blitz-stats-report', { pack: url.searchParams.get('pack') ?? '' });
+      return json(data, status);
     }
 
     if (request.method === 'POST' && path === '/players/report') return user ? account('report', { reportedId: body.userId, reason: body.reason }) : needUser();

@@ -446,6 +446,16 @@ Solve times (for gauging difficulty; on every puzzle while the packs are being t
     Assets/Scripts/QueenBlitzTimes.cs decides who sees the clock.
   • Queen Blitz picker > Playtest > Solve times lists them newest first, with Copy all
     (tab-separated, for a spreadsheet) and Clear (tap twice).
+  • Every player's times also go to the server, to tune packs by real difficulty: one record
+    per puzzle (and per version of it, by a signature of its layout) holding the clock time
+    over every attempt up to the first clear, the attempts, and at the clear the moves and
+    whether Auto-place was used. Leaving, Restart, closing or even killing the app never
+    resets it (the time is saved every 20 seconds and on going to the background); replays
+    after the first clear don't count, nor do puzzles cleared before records were kept.
+    Records ride along on the wallet sync (no requests of their own); the server keeps them
+    with the account (deleting it deletes them) and only ever shows totals per puzzle:
+    Tools/QueenBlitz/stats.py prints players, clear rate, median/p75/p90 time to clear,
+    median tries and how many are stuck, per pack (GET /blitz/stats with the STATS_KEY secret).
 
 The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10 let you place
 her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);

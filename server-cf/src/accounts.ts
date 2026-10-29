@@ -3,6 +3,7 @@ import type { Env } from './index.js';
 import { isGeneratedName, randomName } from './names.js';
 import { sendPush, type PushKind, type PushMessage } from './push.js';
 import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, stats, tiersOf, type GameResult, type Mode } from './ratings.js';
+import { blitzStatsReport, purgeBlitzStats, recordBlitzStats, setupBlitzStatsTables } from './blitzstats.js';
 import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError, type Migration, type VerifiedPurchase } from './wallet.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ export class Accounts extends DurableObject<Env> {
     `);
     setupTables(this.sql);
     setupWalletTables(this.sql);
+    setupBlitzStatsTables(this.sql);
     // Signing out everywhere bumps this; tokens carry the version they were issued at
     try { this.sql.exec('ALTER TABLE accounts ADD COLUMN token_version INTEGER DEFAULT 0'); } catch { /* already there */ }
   }
@@ -128,7 +130,12 @@ export class Accounts extends DurableObject<Env> {
       case 'stats': return this.statsFor(userId, String(b.of ?? '') || userId);
       case 'leaderboard': return this.board(userId, b.mode === 'melee' ? 'melee' : 'duel', b.scope === 'everyone' ? 'everyone' : 'friends');
       case 'wallet': this.account(userId); return walletOf(this.sql, userId);
-      case 'wallet-sync': this.account(userId); return syncWallet(this.sql, userId, b.migrate as Migration | undefined, b.events);
+      case 'wallet-sync': {
+        this.account(userId);
+        const synced = syncWallet(this.sql, userId, b.migrate as Migration | undefined, b.events);
+        return { ...synced, statsTaken: recordBlitzStats(this.sql, userId, b.stats) }; // Queen Blitz solve times ride along
+      }
+      case 'blitz-stats-report': return { puzzles: blitzStatsReport(this.sql, String(b.pack ?? '')) }; // the Worker checks STATS_KEY first
       case 'wallet-spend': this.account(userId); return spendPawns(this.sql, userId, String(b.requestId ?? ''), String(b.item ?? ''));
       case 'wallet-purchase': this.account(userId); return recordPurchases(this.sql, userId, (b.purchases as VerifiedPurchase[]) ?? []);
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
@@ -317,6 +324,7 @@ export class Accounts extends DurableObject<Env> {
     this.sql.exec('DELETE FROM challenges WHERE to_id = ? OR from_id = ?', id, id);
     this.sql.exec('DELETE FROM pair_days WHERE pair LIKE ?', `%${id}%`);
     purgeWallet(this.sql, id);
+    purgeBlitzStats(this.sql, id);
   }
 
   /** A finished game. One that ends after a player deleted their account keeps nothing about them. */

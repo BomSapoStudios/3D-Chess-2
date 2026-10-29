@@ -8,7 +8,8 @@ using UnityEngine;
 /// The phone keeps the last answer to show offline, and queues what it earns (each earning has an
 /// id, so sending a queue twice pays once) until it can send it, in batches to spare the server's
 /// daily request allowance. Unlocking with pawns and App Store purchases go to the server straight
-/// away. The first sync from a phone that kept pawns before brings them along once.
+/// away. The first sync from a phone that kept pawns before brings them along once. Queen Blitz solve
+/// times (QueenBlitzTimes.cs) ride along on the same sync, so they cost no requests of their own.
 /// PawnBank, Store and QueenBlitz read and spend through here.
 /// </summary>
 public class Wallet : MonoBehaviour
@@ -45,6 +46,7 @@ public class Wallet : MonoBehaviour
     private const string StateKey = "Wallet.State", QueueKey = "Wallet.Queue", LocalKey = "Wallet.LocalItems", MigratedKey = "Wallet.Migrated";
     private const float BlitzFlushDelay = 8f;   // clears close together go in one request
     private const float StaleSeconds = 6 * 3600f;
+    private const int MaxStatsPerSync = 50;
 
     private static Wallet instance;
     private static State state;
@@ -91,7 +93,7 @@ public class Wallet : MonoBehaviour
 
     private void OnApplicationPause(bool paused)
     {
-        if (paused) { if (queue.events.Count > 0) StartCoroutine(Flush(null)); }
+        if (paused) { if (queue.events.Count > 0 || QueenBlitz.StatsPending) StartCoroutine(Flush(null)); }
         else SyncIfDue();
     }
 
@@ -107,7 +109,7 @@ public class Wallet : MonoBehaviour
     /// <summary>Sync on launch and on coming back, if there's something to send or the last answer is old</summary>
     private void SyncIfDue()
     {
-        if (queue.events.Count > 0 || !Migrated || Time.unscaledTime - lastSync > StaleSeconds) FlushSoon(2f);
+        if (queue.events.Count > 0 || QueenBlitz.StatsPending || !Migrated || Time.unscaledTime - lastSync > StaleSeconds) FlushSoon(2f);
     }
 
     private static void FlushSoon(float seconds)
@@ -231,7 +233,7 @@ public class Wallet : MonoBehaviour
             yield break;
         }
         flushing = true;
-        bool ok = false;
+        bool ok = false, moreStats = false;
         yield return SignIn(signedIn => ok = signedIn);
         if (ok)
         {
@@ -241,6 +243,8 @@ public class Wallet : MonoBehaviour
             bool migrate = !Migrated;
             string body = JsonUtility.ToJson(batch);
             if (migrate) body = body.Substring(0, body.Length - 1) + ",\"migrate\":" + JsonUtility.ToJson(PhoneMigration()) + "}";
+            var stats = QueenBlitz.StatsToSend(MaxStatsPerSync);
+            if (stats.Count > 0) body = body.Substring(0, body.Length - 1) + ",\"stats\":" + QueenBlitz.StatsJson(stats) + "}";
             long status = 0;
             string text = null;
             yield return OnlineClient.GetOrCreate().Request("POST", "/wallet/sync", body, (s, t) => { status = s; text = t; });
@@ -248,6 +252,8 @@ public class Wallet : MonoBehaviour
             {
                 foreach (Earning e in batch.events) queue.events.Remove(e);
                 if (migrate) PlayerPrefs.SetInt(MigratedKey, 1);
+                if (stats.Count > 0) QueenBlitz.StatsSent(stats);
+                moreStats = stats.Count >= MaxStatsPerSync;   // a long time offline: send the rest straight after
                 Apply(JsonUtility.FromJson<SyncReply>(text)?.wallet);
                 ok = true;
             }
@@ -255,7 +261,7 @@ public class Wallet : MonoBehaviour
         }
         lastFlushOk = ok;
         flushing = false;
-        if (ok && queue.events.Count > 0) FlushSoon(1f);
+        if (ok && (queue.events.Count > 0 || moreStats)) FlushSoon(1f);
         done?.Invoke(ok);
     }
 
@@ -376,6 +382,7 @@ public class Wallet : MonoBehaviour
         queue = new EarningList();
         localItems = new ItemList();
         PlayerPrefs.SetInt(MigratedKey, 1);   // this phone's old pawns went with the account
+        QueenBlitz.ForgetStats();             // and its Queen Blitz solve times
         Save();
         Changed?.Invoke();
     }

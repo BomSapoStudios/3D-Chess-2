@@ -32,6 +32,7 @@ public static partial class QueenBlitz
         public string tier;
         public PortalPair[] portals;     // see QueenBlitzRoutes
         public RampRise[] ramps;
+        public string sig;               // the layout's signature (Sig): solve times are kept per version of a puzzle
     }
 
     // ───────────────────────── Packs ─────────────────────────
@@ -324,10 +325,24 @@ public static partial class QueenBlitz
                 queen = queen.Length > 0 ? queen[0] : (BoardPosition?)null,
                 best = best.Length > 0 ? best[0] : default,
                 pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line), score = d.score, tier = d.tier,
-                portals = Portals(d.portals), ramps = Ramps(d.ramps),
+                portals = Portals(d.portals), ramps = Ramps(d.ramps), sig = Sig(d),
             });
         }
         return list.ToArray();
+    }
+
+    /// <summary>
+    /// A puzzle's layout as 8 hex digits (FNV-1a of size, queen, pawns, blocks, par, ice, portals and
+    /// ramps), so a puzzle changed in a pack gets fresh solve times. Tools/QueenBlitz/stats.py makes the same.
+    /// </summary>
+    private static string Sig(PuzzleData d)
+    {
+        string Csv(int[] a) => a == null ? "" : string.Join(",", System.Array.ConvertAll(a, v => v.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        string text = string.Join("|", d.size.ToString(System.Globalization.CultureInfo.InvariantCulture), Csv(d.queen), Csv(d.pawns), Csv(d.blocks),
+            d.par.ToString(System.Globalization.CultureInfo.InvariantCulture), d.ice ? "1" : "0", Csv(d.portals), Csv(d.ramps));
+        uint h = 2166136261;
+        foreach (char c in text) { h ^= c; h *= 16777619; }
+        return h.ToString("x8");
     }
 
     private static PortalPair[] Portals(int[] f)
@@ -582,11 +597,17 @@ public partial class QueenBlitzDirector : MonoBehaviour
         QueenBlitz.EndAttempt(); // left or restarted without a clear: the time still counts towards it
     }
 
+    // Going to the background (or being closed from there) keeps the time so far: it isn't lost if the app is killed
+    private void OnApplicationPause(bool paused) { if (paused) QueenBlitz.Bank(); }
+
+    private float nextBank;
+
     private void Update()
     {
         var state = GameStateManager.Instance != null ? GameStateManager.Instance.currentState : GameState.WaitingForConfiguration;
         // The solve clock runs from the puzzle appearing until the last pawn falls (a long frame, such as coming back from the background, adds at most half a second)
         if (laidOut && !ended && (state == GameState.PiecePlacement || state == GameState.Playing)) QueenBlitz.Elapsed += Mathf.Min(Time.unscaledDeltaTime, 0.5f);
+        if (Time.unscaledTime >= nextBank) { nextBank = Time.unscaledTime + 20f; QueenBlitz.Bank(); } // a crash loses at most 20 seconds
         if (laidOut && ChessBoard.Instance != null) TrackTaken();
         if (state != GameState.PiecePlacement && state != GameState.Playing) return;
         if (ChessBoard.Instance == null || GameObject.Find("Pieces Container") == null) return;
