@@ -15,6 +15,7 @@ ported from `server-v2` and validate every move on the server.
 | GET | `/rooms/:code` | Room summary: players, open seats |
 | GET (WebSocket) | `/rooms/:code/connect?token=…` | Join / rejoin a room |
 | GET (WebSocket) | `/matchmaking/connect?token=…` | Find Match queue |
+| GET | `/blitz/stats?pack=…` | Queen Blitz difficulty totals per puzzle (header `X-Stats-Key`: the `STATS_KEY` secret; read with `Tools/QueenBlitz/stats.py`) |
 
 ## Room messages (JSON over WebSocket)
 
@@ -50,3 +51,6 @@ npx wrangler login                    # once, approves this Mac in the browser
 npx wrangler secret put TOKEN_SECRET  # once, any long random string
 npm run deploy
 ```
+
+Queen Blitz solve-time totals need a key, once: `npx wrangler secret put STATS_KEY` (a long random string, 16+
+characters); save the same string in `~/.appstore-publisher/keys/blitz-stats-key.txt` for `Tools/QueenBlitz/stats.py`.
