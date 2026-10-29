@@ -204,9 +204,10 @@ def ui():
 
 # ---------------- Setup ----------------
 def setup():
-    # a soft lift: a quiet rounded "puh" rising a little, no click (Brandon: much more gentle)
-    x = tone(hz(7), 0.07, 0.5, f1=hz(12), glide=0.04, att=0.008, shape=0.8)
-    write("piece_pick", hp(x, 250), loud=-15, wet=0.03)
+    # the menu tap's bubble, a little lower and softer (Brandon: gentle, like a menu tap)
+    x = tone(330, 0.07, 0.6, f1=660, glide=0.03, att=0.003, shape=0.8)
+    x = at(x, 0.01, tone(990, 0.04, 0.1, "triangle"))
+    write("piece_pick", hp(x, 250), loud=-13, wet=0.02)
     x = tone(hz(12), 0.2, 0.4, "triangle")
     x = at(x, 0, thud(160, 70, 0.12, 0.5))
     write("piece_place", x, loud=-5, wet=0.08)
