@@ -75,7 +75,7 @@ public partial class NeonMenu
         hooks.disabled = () => { ShowPieceLegend(false); StopInlinePreview(); StopBackdropPreview(); PieceShapes.Showing = null; showingBackdrop = null; showingPromotion = null; };
         hooks.enabled = () => { if (previewBorder != null) { RefreshCustomize(); StartPreviewForTab(); } };
 
-        // ── Top bar: Back, title, pawns, Done! ──
+        // ── Top bar: Back, title, then Redeem code, Restore purchases and pawns at the right edge ──
         RectTransform header = NewRect("Header", root);
         header.anchorMin = new Vector2(0, 1);
         header.anchorMax = new Vector2(1, 1);
@@ -91,17 +91,14 @@ public partial class NeonMenu
         title.rectTransform.anchorMin = new Vector2(0, 0);
         title.rectTransform.anchorMax = new Vector2(1, 1);
         title.rectTransform.offsetMin = new Vector2(62, 0);
-        title.rectTransform.offsetMax = new Vector2(-490, 0);
+        title.rectTransform.offsetMax = new Vector2(-350, 0);
         title.rectTransform.localEulerAngles = new Vector3(0, 0, -1.5f);
-
-        Button done = NeonButton(header, "Done!", new Vector2(104, 42), NeonTheme.Pink, NeonTheme.Cyan, 1.5f, 19, ShowMenu);
-        Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(104, 42), new Vector2(-52, 0));
 
         // Pawn balance (pawns will buy sets in the store)
         Image chip = NewImage("Pawns", header, CardFill);
         chip.sprite = NeonTheme.Rounded;
         chip.type = Image.Type.Sliced;
-        Place(chip.rectTransform, new Vector2(1, 0.5f), new Vector2(104, 34), new Vector2(-180, 0));
+        Place(chip.rectTransform, new Vector2(1, 0.5f), new Vector2(104, 34), new Vector2(-52, 0));
         Image chipEdge = NewImage("Border", chip.transform, NeonTheme.Yellow);
         chipEdge.sprite = NeonTheme.RoundedOutline;
         chipEdge.type = Image.Type.Sliced;
@@ -117,10 +114,10 @@ public partial class NeonMenu
 #if !UNITY_WEBGL || UNITY_EDITOR
         // Restore purchases (Apple requires one): what this Apple ID bought comes back on a new phone
         Button restore = NeonButton(header, "Restore purchases", new Vector2(124, 34), NeonTheme.Lavender, NeonTheme.Pink, 0f, 12, RestorePurchases);
-        Place((RectTransform)restore.transform, new Vector2(1, 0.5f), new Vector2(124, 34), new Vector2(-312, 0));
+        Place((RectTransform)restore.transform, new Vector2(1, 0.5f), new Vector2(124, 34), new Vector2(-176, 0));
         // Offer codes from the App Store (one-time codes that unlock an item)
         Button redeem = NeonButton(header, "Redeem code", new Vector2(96, 34), NeonTheme.Cyan, NeonTheme.Pink, 0f, 12, RedeemCode);
-        Place((RectTransform)redeem.transform, new Vector2(1, 0.5f), new Vector2(96, 34), new Vector2(-434, 0));
+        Place((RectTransform)redeem.transform, new Vector2(1, 0.5f), new Vector2(96, 34), new Vector2(-296, 0));
 #endif
         Purchases.PricesLoaded += RefreshCustomize;
         Wallet.Changed += RefreshCustomize;
@@ -495,6 +492,8 @@ public partial class NeonMenu
         everythingBlurb.enableAutoSizing = true;
         everythingBlurb.fontSizeMin = 9;
         everythingBlurb.fontSizeMax = 11;
+        everythingBlurb.enableWordWrapping = false;
+        everythingBlurb.overflowMode = TextOverflowModes.Ellipsis;   // never under the price
         everythingBlurb.rectTransform.anchorMin = new Vector2(0, 0);
         everythingBlurb.rectTransform.anchorMax = new Vector2(1, 0.5f);
         everythingBlurb.rectTransform.offsetMin = new Vector2(12, 4);
@@ -522,7 +521,7 @@ public partial class NeonMenu
         everythingTitle.color = everythingBlurb.color = owned ? NeonTheme.Lime : NeonTheme.Ground;
         everythingBlurb.text = owned
             ? "Every set, backdrop, animation and puzzle pack is yours, new ones too."
-            : "Every set, backdrop, animation and puzzle pack, now and later";
+            : "Sets, backdrops, animations and packs, now and later";
         everythingPill.SetActive(!owned);
         everythingPrice.text = Purchases.Price(Store.EverythingId, Store.EverythingDollars);
     }
