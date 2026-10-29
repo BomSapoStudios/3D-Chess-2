@@ -6,6 +6,8 @@ compatibility_date = "2026-09-01"
 # deploy, and the zone's rate-limiting rule stops floods there before they reach the Worker (or its
 # daily request allowance). 3d-chess.bomsapostudios.workers.dev keeps working for older app builds.
 routes = [{ pattern = "chess-api.bomsapostudios.com", custom_domain = true }]
+# Keep the workers.dev address on: wrangler turns it off by default once there are routes
+workers_dev = true
 
 # Static files: Queen Blitz daily puzzles at /daily/YYYY-MM-DD.json (made by Tools/QueenBlitz/daily.py).
 # A request that matches a file is served without running the Worker, so it's free and doesn't count
