@@ -32,6 +32,9 @@ public static partial class QueenBlitz
         public string tier;
         public PortalPair[] portals;     // see QueenBlitzRoutes
         public RampRise[] ramps;
+        public BoardPosition[] bombs;    // bombs already on the board (see QueenBlitzBombs)
+        public int placeBombs;           // bombs the player places before the first move
+        public BoardPosition[] bestBombs; // where those go in the par solution (Auto-place uses it)
         public string sig;               // the layout's signature (Sig): solve times are kept per version of a puzzle
         public bool mirror;              // a Mirror Queen copies every move the opposite way (QueenBlitzMirror)
         public Vector3Int mirrorFlip;    // the axes she's flipped on: 1 flipped, 0 not
@@ -59,6 +62,9 @@ public static partial class QueenBlitz
         public int[] portals;  // 13 a pair: in x,y,z, its facing, out x,y,z, its facing, two-way 0/1
         public int[] ramps;    // 6 a rising direction: x,y,z, dx,0,dz (a square repeats for each way it rises)
         public int[] mirror;   // the axes the Mirror Queen flips, [1,1,1] = through the centre; left out with no mirror
+        public int[] bombs;
+        public int placeBombs;
+        public int[] bestBombs;
     }
 
     [System.Serializable]
@@ -93,6 +99,7 @@ public static partial class QueenBlitz
     private static readonly PackInfo[] Catalog =
     {
         new PackInfo { id = "starter", name = "Starter", free = true },
+        new PackInfo { id = "new-tricks", name = "New Tricks", free = true }, // portals, ramps, the Mirror Queen and bombs, gently (Tools/QueenBlitz/intro.py)
         new PackInfo { id = "blitz-5", name = "High Five", free = true },
         new PackInfo { id = "blitz-6", name = "Six Shooter", free = true },
         // Sold packs' ids have no hyphens: they're in App Store product ids (BomSapo.Chess3D.blitz.<id>)
@@ -110,6 +117,7 @@ public static partial class QueenBlitz
         new PackInfo { id = "portal-brakes", name = "Portal Brakes (test)", free = true, review = true },
         new PackInfo { id = "mirror-test", name = "Mirror (test)", free = true, review = true },
         new PackInfo { id = "mirror-mix", name = "Mirror Mix (test)", free = true, review = true },
+        new PackInfo { id = "bombs-test", name = "Bombs (test)", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
@@ -341,6 +349,7 @@ public static partial class QueenBlitz
                 portals = Portals(d.portals), ramps = Ramps(d.ramps), sig = Sig(d),
                 mirror = d.mirror != null && d.mirror.Length == 3,
                 mirrorFlip = d.mirror != null && d.mirror.Length == 3 ? new Vector3Int(d.mirror[0], d.mirror[1], d.mirror[2]) : Vector3Int.zero,
+                bombs = Cells(d.bombs), placeBombs = d.placeBombs, bestBombs = Cells(d.bestBombs),
             });
         }
         return list.ToArray();
@@ -348,7 +357,7 @@ public static partial class QueenBlitz
 
     /// <summary>
     /// A puzzle's layout as 8 hex digits (FNV-1a of size, queen, pawns, blocks, par, ice, portals and
-    /// ramps, then the mirror if there is one), so a puzzle changed in a pack gets fresh solve times.
+    /// ramps, then the mirror if there is one and bombs in bomb puzzles), so a puzzle changed in a pack gets fresh solve times.
     /// Tools/QueenBlitz/stats.py makes the same.
     /// </summary>
     private static string Sig(PuzzleData d)
@@ -357,6 +366,8 @@ public static partial class QueenBlitz
         string text = string.Join("|", d.size.ToString(System.Globalization.CultureInfo.InvariantCulture), Csv(d.queen), Csv(d.pawns), Csv(d.blocks),
             d.par.ToString(System.Globalization.CultureInfo.InvariantCulture), d.ice ? "1" : "0", Csv(d.portals), Csv(d.ramps));
         if (d.mirror != null && d.mirror.Length == 3) text += "|" + Csv(d.mirror);
+        if ((d.bombs != null && d.bombs.Length > 0) || d.placeBombs > 0)
+            text += "|" + Csv(d.bombs) + "|" + d.placeBombs.ToString(System.Globalization.CultureInfo.InvariantCulture);
         uint h = 2166136261;
         foreach (char c in text) { h ^= c; h *= 16777619; }
         return h.ToString("x8");
@@ -434,12 +445,13 @@ public static partial class QueenBlitz
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
         SetUpFeatures(Current);
         MirrorAt = null;
+        SetUpBombs(Current);
     }
 
-    /// <summary>Nothing can be placed here: a block, a portal or a ramp (or, with a Mirror Queen, her square would be one, a pawn, or the queen's own)</summary>
+    /// <summary>Nothing can be placed here: a block, a portal, a ramp or a bomb (or, with a Mirror Queen, her square would be one, a pawn, or the queen's own)</summary>
     public static bool IsBlocked(BoardPosition p) => Active && (Solid(p) || MirrorForbids(p));
 
-    private static bool Solid(BoardPosition p) => blocked.Contains(p) || portalAt.ContainsKey(p) || rampAt.ContainsKey(p);
+    private static bool Solid(BoardPosition p) => blocked.Contains(p) || portalAt.ContainsKey(p) || rampAt.ContainsKey(p) || liveBombs.Contains(p);
 
     /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
     public static int Reward(int index) => Puzzles[index].pawns.Length;
@@ -466,22 +478,38 @@ public static partial class QueenBlitz
         return (paid, best && before > 0);
     }
 
-    /// <summary>Auto-place: the queen goes on a square that can reach par, for a pawn</summary>
+    /// <summary>Auto-place: the queen (and any bombs to place) go where they can reach par, for a pawn</summary>
     public static bool CanAutoPlace => PawnBank.Total >= PawnBank.AutoPlaceCost;
 
     public static void AutoPlaceQueen()
     {
-        if (PlacementManager.Instance == null || Current.queen.HasValue || !CanAutoPlace) return;
-        PieceTray tray = PieceTray.GetTrayForColor(PlayerColor);
-        if (tray == null) return;
-        foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
+        bool bombs = Current.placeBombs > 0;
+        if (PlacementManager.Instance == null || (Current.queen.HasValue && !bombs) || !CanAutoPlace) return;
+        ChessPiece queen = null;
+        if (!Current.queen.HasValue)
         {
-            if (p.pieceType != ChessPieceType.Queen) continue;
-            if (!PawnBank.SpendAutoPlace()) return;
-            AutoPlaced = true;
-            PlacementManager.Instance.ExecuteAIPlacement(p, Current.best);
-            return;
+            PieceTray tray = PieceTray.GetTrayForColor(PlayerColor);
+            if (tray != null)
+                foreach (ChessPiece p in tray.GetComponentsInChildren<ChessPiece>(true))
+                    if (p.pieceType == ChessPieceType.Queen) { queen = p; break; }
+            // With bombs she may already be down somewhere else: the par bombs need her on the par start
+            if (queen == null && bombs) queen = PlacedQueen();
+            if (queen == null) return;
         }
+        if (!PawnBank.SpendAutoPlace()) return;
+        AutoPlaced = true;
+        if (bombs) PlaceBestBombs();
+        if (queen == null) return;
+        if (!queen.IsInTray()) PlacementManager.Instance.ReturnToTray(queen, queen.CurrentPosition);
+        PlacementManager.Instance.ExecuteAIPlacement(queen, Current.best);
+    }
+
+    /// <summary>The player's queen on the board during setup (null while she's on the bench)</summary>
+    private static ChessPiece PlacedQueen()
+    {
+        foreach (ChessPiece p in UndoManager.BoardPieces())
+            if (p.pieceType == ChessPieceType.Queen && p.pieceColor == PlayerColor) return p;
+        return null;
     }
 
 
@@ -515,6 +543,7 @@ public static partial class QueenBlitz
     {
         Route route = RouteFor(from, to);
         PendingRoute = route != null && route.special ? route : null; // the slide follows it through portals and up ramps
+        mirrorMove = null;
         if (HasMirror) MoveMirror(from, to, route); // she answers the opposite way
         if (route == null)
         {
@@ -527,6 +556,7 @@ public static partial class QueenBlitz
             BoardPosition p = route.swept[i];
             Sweep(queen, p, new BoardPosition(p.x - d.x, p.y - d.y, p.z - d.z), p);
         }
+        SetOffBombs(queen, route); // after her own sweep: a blast takes what's left around each bomb she passed
     }
 
     private static void Sweep(ChessPiece queen, BoardPosition p, BoardPosition from, BoardPosition to)
@@ -611,6 +641,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
         Instance = this;
         gameObject.AddComponent<QueenBlitzTrails>();
         if (QueenBlitz.Current.mirror) gameObject.AddComponent<QueenBlitzMirror>();
+        gameObject.AddComponent<QueenBlitzBombs>();
     }
 
     private void OnDestroy()
@@ -711,7 +742,8 @@ public partial class QueenBlitzDirector : MonoBehaviour
         if (queen == null) return;
         queenPlaced = true;
         PlacementManager.Instance.ExecuteAIPlacement(queen, QueenBlitz.Current.queen.Value);
-        StartCoroutine(ReadyNextFrame());
+        // With bombs to place the player says Ready (a resumed puzzle has its bombs back already)
+        if (QueenBlitz.Current.placeBombs == 0 || SavedGames.Resuming) StartCoroutine(ReadyNextFrame());
     }
 
     private IEnumerator ReadyNextFrame()
@@ -978,8 +1010,10 @@ public partial class QueenBlitzDirector : MonoBehaviour
             int left = QueenBlitz.MovesLeft;
             string movesLeft = $"Moves left {left}";
             if (left <= 1) movesLeft = $"<color=#{ColorUtility.ToHtmlStringRGB(NeonTheme.Pink)}>{movesLeft}</color>";
+            string place = puzzle.placeBombs == 0 ? "Place your queen"
+                : (puzzle.queen.HasValue ? "Place your " : "Place your queen and ") + (puzzle.placeBombs == 1 ? "bomb" : "bombs");
             string text = state == GameState.PiecePlacement
-                ? $"{QueenBlitz.PuzzleTitle}  ·  Place your queen  ·  {puzzle.par} moves"
+                ? $"{QueenBlitz.PuzzleTitle}  ·  {place}  ·  {puzzle.par} moves"
                 : $"{QueenBlitz.PuzzleTitle}  ·  {movesLeft}";
             // At the very top (the turn line is hidden in puzzles), between the pawn total on the
             // left and the "?" on the right with a clear gap to each; smaller text, then two lines,

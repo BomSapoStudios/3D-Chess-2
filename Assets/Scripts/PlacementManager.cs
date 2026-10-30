@@ -753,6 +753,8 @@ public class PlacementManager : MonoBehaviour
         }
         // Online: only your own pieces, until you're ready (the server is told when they move)
         if (OnlineSession.IsActive && (!OnlineSession.CanControl(piece.pieceColor) || IsPlayerReady(piece.pieceColor))) return;
+        // Queen Blitz: a queen the puzzle gives you stays put (setup stays open only for placing bombs)
+        if (QueenBlitz.Active && QueenBlitz.Current != null && QueenBlitz.Current.queen.HasValue) return;
         
         Debug.Log($"🔄 PlacementManager: Board piece clicked for repositioning - {piece.pieceColor} {piece.pieceType} at {piece.CurrentPosition}");
         
@@ -2690,6 +2692,7 @@ public class PlacementManager : MonoBehaviour
 
         int piecesInTray = playerTray.GetPieceCount();
         bool completed = piecesInTray == 0;
+        if (QueenBlitz.Active && playerColor == QueenBlitz.PlayerColor && QueenBlitz.BombsToPlace > 0) completed = false; // bombs still on the bench
 
         Debug.Log($"PlacementManager: {playerColor} placement completion check - tray instance {playerTray.GetInstanceID()}, pieces in tray: {piecesInTray}, completed: {completed}");
 

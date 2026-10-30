@@ -5,6 +5,8 @@ player places her; "best" is a start that reaches par (Auto-place uses it); "lin
 start then every square she stops on in one par solution (the in-app BlitzDemo plays it).
 "mirror" (left out when there's none) is the axes the Mirror Queen flips, [1,1,1] = through the
 centre: she starts on the queen's mirror image and her moves follow from the queen's (solver.py).
+"bombs" are bombs already on the board; "placeBombs" is how many more the player places before the
+first move, and "bestBombs" is where they go in that par solution (Auto-place uses it too).
 
 Run this file to re-solve every puzzle in every pack and check its par, best and line.
 """
@@ -65,7 +67,8 @@ def board(p):
     ramps = {}
     for i in range(0, len(r), 6):
         ramps.setdefault(tuple(r[i:i + 3]), []).append(tuple(r[i + 3:i + 6]))
-    return Board(p["size"], triples(p["pawns"]), triples(p["blocks"]), p.get("ice", False), portals, ramps, p.get("mirror") or None)
+    return Board(p["size"], triples(p["pawns"]), triples(p["blocks"]), p.get("ice", False), portals, ramps, p.get("mirror") or None,
+                 triples(p.get("bombs") or []))
 
 
 def check(path):
@@ -76,11 +79,18 @@ def check(path):
         n, ice = p["size"], p.get("ice", False)
         start = tuple(p["queen"]) if p["queen"] else None
         b = board(p)
-        par = b.solve(start, limit=8)[0]
         tag = f"{pack['id']} {i} {p['name']}"
+        placed = triples(p.get("bestBombs") or [])
+        if len(placed) != p.get("placeBombs", 0):
+            problems.append(f"{tag}: {len(placed)} bestBombs for {p.get('placeBombs', 0)} to place")
+            continue
+        if placed and (set(placed) & (set(b.pawns) | b.blockers | set(b.bombs) | set(b.portal) | set(b.ramp))):
+            problems.append(f"{tag}: a bestBombs square isn't empty")
+        par = b.solve_bombs(len(placed), start, limit=8)[0] if placed else b.solve(start, limit=8)[0]
         if par != p["par"]:
             problems.append(f"{tag}: par is {par}, file says {p['par']}")
             continue
+        b = b.with_bombs(b.bombs + placed) if placed else b
         if b.solve(tuple(p["best"]), limit=par)[0] != par:
             problems.append(f"{tag}: best start {p['best']} doesn't reach par")
         line = triples(p["line"])
@@ -99,11 +109,11 @@ def check(path):
                 problems.append(f"{tag}: {a} > {c} isn't a legal move")
                 break
             # A tap picks a square, not a route: like the app, take the biggest sweep there
-            best = max(move, key=lambda m: bin(m[1]).count("1"))
-            left &= ~best[1]
+            best = max(move, key=lambda m: bin(m[1] & left & b.pawn_mask).count("1"))
+            left = b.after(left, best[1])
             if mirror:
                 mirror = best[2]
-        if left or len(line) - 1 != par:
+        if left & b.pawn_mask or len(line) - 1 != par:
             problems.append(f"{tag}: line doesn't clear the board in par")
     return problems
 

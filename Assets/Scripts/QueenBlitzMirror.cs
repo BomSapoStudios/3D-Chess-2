@@ -94,6 +94,7 @@ public static partial class QueenBlitz
     {
         BoardPosition start = MirrorSquare(from);
         Route r = MirrorRoute(from, to, queenRoute);
+        mirrorMove = r; // bombs she passes go off along with the queen's (SetOffBombs)
         MirrorAt = r != null ? r.to : start;
         if (r == null) return; // boxed in: she stays put
         QueenBlitzMirror look = QueenBlitzMirror.Instance;

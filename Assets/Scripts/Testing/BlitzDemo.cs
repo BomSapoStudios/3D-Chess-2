@@ -12,6 +12,7 @@ using UnityEngine;
 /// puzzle picker on the pack; 94 goes puzzle > Menu > Queen Blitz > another puzzle, 93 runs out
 /// of moves then Puzzles > another puzzle, 92 Main Menu > Queen Blitz! > Start new > another puzzle;
 /// 85 checks portal and slide taps; 86 opens puzzle DebugBlitzMissPuzzle with the queen picked up; 87 jumps Walls 2 > 3, moves and Undoes (the board must come back); 88 logs every stop from every square of each puzzle (BLITZ MOVES) to check against the solver;
+/// 84 opens puzzle DebugBlitzMissPuzzle and starts placing a bomb (the dots, for a screenshot);
 /// 91 opens the in-puzzle selector, 90 the same on the next pack's chip, 89 jumps to Tricky 2's 6³ puzzle 5. `DebugBlitzPack` picks the pack (default starter) and
 /// `DebugBlitzMissPuzzle` the puzzle 97 and 96 use. Logs "BLITZ DEMO".
 /// </summary>
@@ -26,6 +27,7 @@ public class BlitzDemo : MonoBehaviour
         if (which == 0 || FindFirstObjectByType<BlitzDemo>() != null) return;
         QueenBlitz.PackId = PlayerPrefs.GetString("DebugBlitzPack", "starter");
         if (which == 95) { QueenBlitz.ReturnToPicker = true; return; } // the menu opens on the pack
+        Application.runInBackground = true; // a backgrounded Editor otherwise stalls the run
         var go = new GameObject("Blitz Demo");
         DontDestroyOnLoad(go);
         go.AddComponent<BlitzDemo>().StartCoroutine(Run(which));
@@ -67,6 +69,23 @@ public class BlitzDemo : MonoBehaviour
                 Debug.Log($"BLITZ DEMO: tap portal {through.entered[0]} ({count} moves go in) -> handled {took}, moves {movesBefore} > {QueenBlitz.Moves}, picked out {QueenBlitzTrails.Instance.LitCount}");
             }
             else Debug.Log("BLITZ DEMO: no portal reachable from the start");
+            yield break;
+        }
+        if (which == 84)
+        {
+            // Bomb placement: the Bomb button pressed, a dot on every square one can go on
+            yield return new WaitForSeconds(2f);
+            int idx = PlayerPrefs.GetInt("DebugBlitzMissPuzzle", 1) - 1;
+            QueenBlitz.Puzzle pz = QueenBlitz.Puzzles[idx];
+            var c84 = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(pz.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = idx };
+            c84.playerTypes = new System.Collections.Generic.List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            c84.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(c84);
+            while (QueenBlitzBombs.Instance == null || PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
+            yield return new WaitForSeconds(2f);
+            QueenBlitzBombs.Instance.DebugArm();
+            yield return new WaitForSeconds(1f);
+            Debug.Log($"BLITZ DEMO: placing a bomb, armed {QueenBlitzBombs.Instance.Armed}, {QueenBlitzBombs.Instance.SpotCount} spots, {QueenBlitz.BombsToPlace} to place");
             yield break;
         }
         if (which == 86)
@@ -262,9 +281,23 @@ public class BlitzDemo : MonoBehaviour
         else SceneController.Instance.LoadGameScene(config);
         yield return new WaitForSeconds(1f);
 
-        while (PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
+        float ready = 0f;
+        while ((PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) && ready < 30f) { ready += Time.unscaledDeltaTime; yield return null; }
+        if (ready >= 30f) { Debug.Log($"BLITZ DEMO: FAIL {index + 1} pieces never got ready (Editor in the background? runInBackground)"); result(false); yield break; }
         yield return new WaitForSeconds(1f);
         BoardPosition[] solution = puzzle.line; // the queen's start, then each square she stops on
+        if (puzzle.placeBombs > 0)
+        {
+            // Bombs to place: where the solver has them (Auto-place puts them there along with the queen)
+            if (autoPlace) QueenBlitz.AutoPlaceQueen();
+            else QueenBlitz.DebugPlaceBombs();
+            Debug.Log($"BLITZ DEMO: {index + 1} placed {puzzle.placeBombs - QueenBlitz.BombsToPlace} bombs, {QueenBlitz.BombsToPlace} left");
+            if (puzzle.queen.HasValue)
+            {
+                yield return new WaitForSeconds(stay ? 4f : 1f);
+                PlacementManager.Instance.SetPlayerReady(PieceColor.White, true);
+            }
+        }
         if (!puzzle.queen.HasValue)
         {
             // Place the queen where the solver starts, as a player would
@@ -272,8 +305,8 @@ public class BlitzDemo : MonoBehaviour
             foreach (ChessPiece p in PieceTray.GetTrayForColor(PieceColor.White).GetComponentsInChildren<ChessPiece>(true))
                 if (p.pieceType == ChessPieceType.Queen) queen = p;
             Debug.Log($"BLITZ DEMO: {index + 1} placing the queen at {solution[0]} (zone allows it: {PlacementManager.IsPositionInColorZone(solution[0], PieceColor.White)})");
-            if (autoPlace) QueenBlitz.AutoPlaceQueen();
-            else PlacementManager.Instance.ExecuteAIPlacement(queen, solution[0]);
+            if (autoPlace && puzzle.placeBombs == 0) QueenBlitz.AutoPlaceQueen();
+            else if (!autoPlace) PlacementManager.Instance.ExecuteAIPlacement(queen, solution[0]);
             yield return new WaitForSeconds(stay ? 4f : 1f); // leave time for a screenshot of placement
             PlacementManager.Instance.SetPlayerReady(PieceColor.White, true);
         }

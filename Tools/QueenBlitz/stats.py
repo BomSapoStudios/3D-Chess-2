@@ -28,12 +28,14 @@ KEY_FILE = os.path.expanduser("~/.appstore-publisher/keys/blitz-stats-key.txt")
 
 
 def sig(p):
-    """The app's QueenBlitz.Sig: FNV-1a over size|queen|pawns|blocks|par|ice|portals|ramps[|mirror]"""
+    """The app's QueenBlitz.Sig: FNV-1a over size|queen|pawns|blocks|par|ice|portals|ramps[|mirror][|bombs|placeBombs]"""
     csv_ = lambda a: ",".join(str(v) for v in (a or []))
     text = "|".join([str(p.get("size", 0)), csv_(p.get("queen")), csv_(p.get("pawns")), csv_(p.get("blocks")),
                      str(p.get("par", 0)), "1" if p.get("ice") else "0", csv_(p.get("portals")), csv_(p.get("ramps"))])
     if p.get("mirror") and len(p["mirror"]) == 3:
         text += "|" + csv_(p["mirror"])
+    if p.get("bombs") or p.get("placeBombs"):
+        text += f"|{csv_(p.get('bombs'))}|{p.get('placeBombs', 0)}"  # bomb puzzles only, so older sigs stay put
     h = 2166136261
     for ch in text.encode("ascii"):
         h = ((h ^ ch) * 16777619) & 0xFFFFFFFF
