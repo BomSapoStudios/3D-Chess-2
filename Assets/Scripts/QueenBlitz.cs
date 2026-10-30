@@ -119,14 +119,14 @@ public static partial class QueenBlitz
         return list;
     }
 
-    /// <summary>Brandon's playtest switch: shows the Review pack. Always on in development builds;
-    /// in other builds, tap "Your pawns" in the Queen Blitz picker five times.</summary>
+    /// <summary>Brandon's playtest switch: shows the review and test packs. Always on in development
+    /// builds and the editor; never in release builds (TestFlight and the App Store have public testers).</summary>
     public static bool Reviewer
     {
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
         get => true;
 #else
-        get => PlayerPrefs.GetInt("QueenBlitzReviewer", 0) == 1;
+        get => false;
 #endif
         set { PlayerPrefs.SetInt("QueenBlitzReviewer", value ? 1 : 0); PlayerPrefs.Save(); }
     }
