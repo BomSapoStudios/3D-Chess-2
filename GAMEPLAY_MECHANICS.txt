@@ -495,6 +495,15 @@ The free Starter pack (ten puzzles): 1–4 and 8 give the Queen; 5–7, 9 and 10
 her; blocks appear from 6 (Roadblock: one block on the corner of an L turns 2 moves into 3);
 8–10 are ice (pars 1, 2, 2, 3, 2, 3, 3, 2, 4, 5).
 
+Free 50-puzzle packs: High Five (5³) and Six Shooter (6³) teach every mechanic in turn.
+Packs for sale (4,500 pawns or $2.99 each), 50 puzzles, one board size and theme each, starting
+about where the free packs' chapter 3 is (no 2-move warm-ups), ordered by predicted solve time:
+  • Cube Run (6³): portals and ramps in every puzzle; decoy portals only in the last three.
+  • Deep Freeze (6³): every board is ice; portal brakes from chapter 4.
+  • Blockade (5³): blocks that matter in every puzzle; decoy blocks from chapter 3, icy walls late.
+  • Feast (8³): the big cube with lots of pawns.
+  Tools/QueenBlitz/paid.py builds them (place.py adds place-the-queen and decoy-block versions).
+
 Puzzle files:
   • Each pack is a JSON file in Assets/Resources/QueenBlitz (starter.json so far). Each puzzle
     lists its pawns, blocks, queen (empty = you place her), par, an Auto-place start and one
