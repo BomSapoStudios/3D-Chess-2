@@ -348,7 +348,12 @@ class Board:
         return spots
 
     def _lines(self, at):
-        """[(destination, every square passed on the way and the landing, mask swept)] (no mirror)"""
+        """[(destination, the empty squares a bomb could sit on along the way and the landing, mask
+        swept)] from a cell (no mirror)"""
+        key = ("lines", at)
+        if key in self._moves:
+            return self._moves[key]
+        free = self._bomb_free()
         out = []
         for d0 in DIRS:
             stops, cells = [], ()
@@ -361,8 +366,25 @@ class Board:
                 m = 0
                 for x in cl:
                     m |= self.bit.get(x, 0)
-                out.append((c, cl, m))
+                out.append((c, frozenset(x for x in cl if x in free), m))
+        self._moves[key] = out
         return out
+
+    def _bomb_free(self):
+        """Squares a bomb could be put on (empty at the start), and for each the mask of what's around it
+        and the squares around it a bomb could be put on"""
+        if not hasattr(self, "_free"):
+            self._free = {}
+            for c in self.cells():
+                if c in self.bit or c in self.blockers or c in self.portal or c in self.ramp:
+                    continue
+                self._free[c] = None
+            for c in self._free:
+                m = 0
+                for x in self._around(c):
+                    m |= self.bit.get(x, 0)
+                self._free[c] = (m, frozenset(x for x in self._around(c) if x in self._free))
+        return self._free
 
     def _around(self, c):
         return [(c[0] + d[0], c[1] + d[1], c[2] + d[2]) for d in DIRS]
@@ -372,17 +394,11 @@ class Board:
         moment it goes off, on any empty square the queen passes or a blast reaches. Setting a bomb
         off earlier is never worse, so this only differs from the real par by ignoring that a bomb
         can't go on the queen's start; solve_bombs uses it to cut its search short."""
-        pawn_cells = set(self.pawns)
-        fixed = set(self.bombs)
-
-        def placeable(c):
-            return (self.inside(c) and c not in pawn_cells and c not in fixed and c not in self.blockers
-                    and c not in self.portal and c not in self.ramp)
+        free = self._bomb_free()
+        near_bomb = {self.bit[b]: frozenset(x for x in self._around(b) if x in free) for b in self.bombs}
 
         def blast_at(left, c):
-            m = 0
-            for x in self._around(c):
-                m |= self.bit.get(x, 0)
+            m = free[c][0]
             hit = m & left & self.bomb_mask
             left &= ~m
             while hit:  # fixed bombs caught in it go off too
@@ -398,23 +414,22 @@ class Board:
             if k == 0:
                 return out
             # where a bomb could be put to go off this move: her path, and anywhere a blast reached
-            zone = set(cells)
-            for b in self.bombs:
-                if self.bit[b] & left & ~left1:
-                    zone.update(self._around(b))
-            stack = [(left1, k, frozenset(zone))]
+            zone = cells
+            gone = left & ~left1 & self.bomb_mask
+            while gone:
+                b = gone & -gone
+                gone ^= b
+                zone = zone | near_bomb[b]
+            stack = [(left1, k, zone)]
             while stack:
                 l, kk, z = stack.pop()
-                if kk == 0:
-                    continue
                 for c in z:
-                    if not placeable(c):
-                        continue
                     l2 = blast_at(l, c)
-                    if (l2, kk - 1) in out:
+                    if l2 == l or (l2, kk - 1) in out:
                         continue
                     out.add((l2, kk - 1))
-                    stack.append((l2, kk - 1, z | frozenset(self._around(c))))
+                    if kk > 1:
+                        stack.append((l2, kk - 1, z | free[c][1]))
             return out
 
         begin = [start] if start else self.starts()

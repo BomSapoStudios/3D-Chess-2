@@ -70,7 +70,10 @@ def grade(args):
         lower = b.bombs_lower(place, start, limit=want["par"][1])  # quick, so most candidates stop here
         if lower is None or lower < want["par"][0]:
             return None
-    par, placed, line, s, found = b.solve_bombs(place, start, limit=want["par"][1])
+    # Squares with only one pawn around them hardly ever pay: leaving them out keeps big boards quick
+    # (packs.py re-checks par against every square)
+    rich = [c for c in b.bomb_spots() if sum(1 for x in around(c, n) if x in base.bit) >= 2]
+    par, placed, line, s, found = b.solve_bombs(place, start, limit=want["par"][1], spots=rich)
     if par is None or not want["par"][0] <= par <= want["par"][1]:
         return None
     # Without any bombs (placed or given), how long does it take?
@@ -125,14 +128,13 @@ RECIPES = [
         tip="The middle of the crowd isn't always the best spot.")),
     ("Double Up", 5, False, 0, 1, False, dict(clumps=2, clump=(4, 6), loose=2, par=(3, 4), gap=2, spots=3, starts=6,
         tip="Place the bomb and the queen. Only placing them together reaches par.")),
-    ("Long Fuse", 6, True, 0, 1, False, dict(clumps=2, clump=(4, 7), loose=3, par=(4, 5), gap=2, spots=2, blocks=2,
+    ("Long Fuse", 5, True, 0, 1, False, dict(clumps=2, clump=(4, 7), loose=3, par=(4, 5), gap=2, spots=2, blocks=2,
         tip="Plan the whole route before you place anything.")),
     ("Cold Snap", 5, True, 0, 1, True, dict(clumps=2, clump=(4, 6), loose=2, par=(3, 4), gap=2, spots=2,
         tip="On ice she slides to the edge, so the bomb must sit on her slide.")),
     ("Chain Reaction", 5, True, 1, 1, False, dict(clumps=2, clump=(4, 6), loose=1, par=(2, 3), gap=2, spots=3,
         tip="A blast that reaches another bomb sets it off too.")),
-    ("Powder Keg", 5, True, 0, 2, False, dict(clumps=3, clump=(4, 6), loose=2, par=(3, 5), gap=2, spots=4,
-        tip="Two bombs, three clumps. Which one gets swept by hand?")),
+    # Two bombs to place (combinations of squares) is too slow to search for now
 ]
 
 
@@ -155,7 +157,7 @@ def build(tries=400, seed0=0):
         for res in pool.imap_unordered(grade, jobs, chunksize=2):
             if res:
                 got.append(res)
-                if len(got) >= 6:
+                if len(got) >= (6 if r[1] < 6 else 2):
                     break
         if not got:
             print(f"{r[0]}: nothing made the cut", flush=True)
