@@ -123,6 +123,7 @@ public partial class NeonMenu
         Wallet.Changed += RefreshCustomize;
         Purchases.Owned += OnPurchased;
         Purchases.Redeemed += OnRedeemed;
+        Purchases.PawnsAdded += OnPawnsAdded;
 
         // ── Body: rail | preview card | grid ──
         RectTransform body = NewRect("Body", root);
@@ -576,6 +577,9 @@ public partial class NeonMenu
 
     /// <summary>An offer code came through: say what it unlocked, wherever the menu is</summary>
     private void OnRedeemed(string id) => ShowToast($"Code redeemed: {Store.DisplayName(id)} unlocked!");
+
+    /// <summary>A pawn code came through: the pawns are on the account (the balance redraws with the wallet)</summary>
+    private void OnPawnsAdded(int pawns) => ShowToast($"Code redeemed: +{pawns} pawns!");
 
     private void RestorePurchases()
     {

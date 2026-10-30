@@ -38,6 +38,7 @@ public class Wallet : MonoBehaviour
     [Serializable] private class SyncReply { public State wallet; }
     [Serializable] private class SpendBody { public string requestId, item; }
     [Serializable] private class PurchaseBody { public string[] transactions; }
+    [Serializable] private class PurchaseReply { public State wallet; public int credited, rejected; }
     [Serializable] private class ErrorReply { public string error; }
 
     /// <summary>Pawns or owned items changed (menus redraw)</summary>
@@ -373,6 +374,31 @@ public class Wallet : MonoBehaviour
             if (status == 200) { Apply(JsonUtility.FromJson<SyncReply>(text)?.wallet); ok = true; }
         }
         done?.Invoke(ok);
+    }
+
+    /// <summary>
+    /// A pawn top-up from an offer code: the signed transaction goes to the server, which adds its pawns once.
+    /// done(true, pawns added) once the server has it (0 if it was counted before); false leaves it for next launch.
+    /// </summary>
+    public static void CreditPawns(string jws, Action<bool, int> done)
+    {
+        Load();
+        instance.StartCoroutine(CreditRoutine(jws, done));
+    }
+
+    private static IEnumerator CreditRoutine(string jws, Action<bool, int> done)
+    {
+        bool ok = false;
+        yield return SignIn(signedIn => ok = signedIn);
+        if (!ok) { done(false, 0); yield break; }
+        long status = 0;
+        string text = null;
+        yield return OnlineClient.GetOrCreate().Request("POST", "/wallet/purchase", JsonUtility.ToJson(new PurchaseBody { transactions = new[] { jws } }), (s, t) => { status = s; text = t; });
+        if (status != 200) { done(false, 0); yield break; }
+        PurchaseReply reply = JsonUtility.FromJson<PurchaseReply>(text);
+        Apply(reply?.wallet);
+        // Refused (not one of ours, or not signed by Apple): keep it unfinished rather than lose it
+        done(reply != null && reply.rejected == 0, reply?.credited ?? 0);
     }
 
     /// <summary>The account was deleted: its wallet goes too (the phone starts over)</summary>

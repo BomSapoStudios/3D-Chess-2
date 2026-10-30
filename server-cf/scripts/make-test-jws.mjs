@@ -53,6 +53,12 @@ const fixtures = {
   backdrop: jws(good, tx(2000002, 'BomSapo.Chess3D.backdrop.graveyard')),
   promotion: jws(good, tx(2000003, 'BomSapo.Chess3D.promotion.splat')),
   everything: jws(good, tx(2000008, 'BomSapo.Chess3D.bundle.everything')),
+  // Pawn top-ups given away with offer codes (Consumable)
+  pawns50: jws(good, tx(4000001, 'BomSapo.Chess3D.pawns.50', { type: 'Consumable', offerType: 3, price: 0 })),
+  pawns100: jws(good, tx(4000002, 'BomSapo.Chess3D.pawns.100', { type: 'Consumable', offerType: 3, price: 0 })),
+  pawns100b: jws(good, tx(4000003, 'BomSapo.Chess3D.pawns.100', { type: 'Consumable', offerType: 3, price: 0 })),
+  pawnsOtherRoot: jws(other, tx(4000004, 'BomSapo.Chess3D.pawns.100', { type: 'Consumable' })),
+  pawnsUnknown: jws(good, tx(4000005, 'BomSapo.Chess3D.pawns.1000000', { type: 'Consumable' })),
   // Redeemed with an App Store offer code: free, with the offer marked
   offerCode: jws(good, tx(2000009, 'BomSapo.Chess3D.backdrop.deepsea', { offerType: 3, offerIdentifier: 'TESTCODE', price: 0, currency: 'USD' })),
   e2e: Array.from({ length: 6 }, (_, i) => jws(good, tx(3000001 + i, 'BomSapo.Chess3D.set.mushroomgrove'))),

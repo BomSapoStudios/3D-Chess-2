@@ -22,6 +22,10 @@ public class Purchases : MonoBehaviour
     public static event Action<string> Owned;
     /// <summary>An item arrived without a Buy tap or a restore: an offer code redeemed (here or in the App Store)</summary>
     public static event Action<string> Redeemed;
+    /// <summary>A pawn top-up from an offer code reached the account: the pawns it added</summary>
+    public static event Action<int> PawnsAdded;
+
+    private readonly Dictionary<string, int> pawnsOfProduct = new Dictionary<string, int>();
 
     private bool restoring;
 
@@ -49,6 +53,7 @@ public class Purchases : MonoBehaviour
     private async void Awake()
     {
         foreach (string id in Store.ProductIds()) idOfProduct[Store.ProductId(id)] = id;
+        foreach (var p in Store.PawnProducts) pawnsOfProduct[Store.ProductId(p.Key)] = p.Value;
 
         // Every event first: a purchase left unfinished last time can arrive as soon as we connect
         store = UnityIAPServices.StoreController();
@@ -72,6 +77,7 @@ public class Purchases : MonoBehaviour
         connected = true;
         var products = new List<ProductDefinition>();
         foreach (string productId in idOfProduct.Keys) products.Add(new ProductDefinition(productId, ProductType.NonConsumable));
+        foreach (string productId in pawnsOfProduct.Keys) products.Add(new ProductDefinition(productId, ProductType.Consumable));
         store.FetchProducts(products);
     }
 
@@ -96,6 +102,19 @@ public class Purchases : MonoBehaviour
     private void OnPurchasePending(PendingOrder order)
     {
         string jws = order.Info?.Apple?.jwsRepresentation;
+        if (IsPawnTopUp(order))
+        {
+            // Pawns from an offer code: finished only once the server has added them (offline, it waits for next launch)
+            if (string.IsNullOrEmpty(jws)) { store.ConfirmPurchase(order); Finish(order, Outcome.Bought); return; }   // the editor's test store
+            Wallet.CreditPawns(jws, (saved, pawns) =>
+            {
+                if (!saved) return;
+                store.ConfirmPurchase(order);
+                if (pawns > 0) PawnsAdded?.Invoke(pawns);
+            });
+            Finish(order, Outcome.Bought);
+            return;
+        }
         var ids = ItemsOf(order);
         int left = ids.Count;
         bool allSaved = true;
@@ -122,6 +141,13 @@ public class Purchases : MonoBehaviour
         bool cancelled = order.FailureReason == PurchaseFailureReason.UserCancelled || order.FailureReason == PurchaseFailureReason.OrderCancelled;
         if (!cancelled) Debug.LogWarning($"Purchases: purchase failed: {order.FailureReason} {order.Details}");
         Finish(order, cancelled ? Outcome.Cancelled : Outcome.Failed);
+    }
+
+    private bool IsPawnTopUp(Order order)
+    {
+        foreach (CartItem item in order.CartOrdered.Items())
+            if (item.Product != null && pawnsOfProduct.ContainsKey(item.Product.definition.id)) return true;
+        return false;
     }
 
     /// <summary>The Store ids an order is for</summary>

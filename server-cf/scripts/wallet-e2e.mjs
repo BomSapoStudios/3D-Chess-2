@@ -71,6 +71,17 @@ check((await post('/wallet/spend', { requestId: rid(), item: 'bundle.everything'
 pu = (await post('/wallet/purchase', { transactions: [F.e2eRefund] }, b.token)).body;
 check(!pu.wallet.items.includes('set.mushroomgrove'), 'a refund takes it away');
 
+// Pawn top-ups from offer codes
+const pawnsBefore = (await get('/wallet', b.token)).body.balance;
+pu = (await post('/wallet/purchase', { transactions: [F.pawns50, F.pawnsOtherRoot, F.pawnsUnknown] }, b.token)).body;
+check(pu.credited === 50 && pu.rejected === 2 && pu.wallet.balance === pawnsBefore + 50 && !pu.wallet.items.some(i => i.startsWith('pawns')), 'a 50-pawn code adds 50 pawns; fakes and unknown top-ups are refused');
+pu = (await post('/wallet/purchase', { transactions: [F.pawns50] }, b.token)).body;
+check(pu.credited === 0 && pu.wallet.balance === pawnsBefore + 50, 'the same code sent again adds nothing');
+pu = (await post('/wallet/purchase', { transactions: [F.pawns50] }, a.token)).body;
+check(pu.credited === 0, '...nor from another account');
+pu = (await post('/wallet/purchase', { transactions: [F.pawns100, F.pawns100b] }, b.token)).body;
+check(pu.credited === 200 && pu.wallet.balance === pawnsBefore + 250, 'two 100-pawn codes add 200');
+
 // Deleting the account deletes the wallet
 check((await post('/account/delete', {}, a.token)).status === 200, 'account deleted');
 check((await get('/wallet', a.token)).status === 401, 'its wallet is gone with it');

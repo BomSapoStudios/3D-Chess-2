@@ -34,8 +34,12 @@ export function setupWalletTables(sql: SqlStorage) {
 
 /** Forget an account's wallet (deleting the account). Its App Store purchases can then be restored onto a new account. */
 export function purgeWallet(sql: SqlStorage, id: string) {
-  for (const table of ['wallets', 'wallet_items', 'wallet_cleared', 'wallet_runs', 'wallet_requests', 'apple_transactions'])
+  for (const table of ['wallets', 'wallet_items', 'wallet_cleared', 'wallet_runs', 'wallet_requests'])
     sql.exec(`DELETE FROM ${table} WHERE account_id = ?`, id);
+  // Unlock purchases go (so they can be restored onto a new account); pawn top-ups stay marked as used,
+  // unlinked from the player, so the same code can't pay twice
+  sql.exec("DELETE FROM apple_transactions WHERE account_id = ? AND original_id NOT LIKE 'pawns:%'", id);
+  sql.exec("UPDATE apple_transactions SET account_id = '' WHERE account_id = ?", id);
 }
 
 interface WalletRow { balance: number; lifetime: number; migrated: number; zombie_day: number; zombie_today: number }
@@ -174,14 +178,26 @@ export function spendPawns(sql: SqlStorage, id: string, requestId: string, rawIt
 }
 
 export interface VerifiedPurchase { originalTransactionId: string; transactionId: string; item: string; environment: string; revoked?: boolean }
+/** A verified pawn top-up (offer code): adds `pawns` once per transaction id */
+export interface VerifiedCredit { transactionId: string; product: string; pawns: number; environment: string }
 
 /**
  * App Store purchases the Worker has verified. Each original transaction unlocks its item for one
  * account: if another account had it, the item moves here (the same Apple ID restoring on a new account).
  */
-export function recordPurchases(sql: SqlStorage, id: string, purchases: VerifiedPurchase[], now = Date.now()) {
+export function recordPurchases(sql: SqlStorage, id: string, purchases: VerifiedPurchase[], now = Date.now(), credits: VerifiedCredit[] = []) {
   row(sql, id);
   const granted: string[] = [];
+  // Pawn top-ups: each transaction pays once, whichever account sends it (a replay changes nothing)
+  let credited = 0;
+  for (const c of credits) {
+    const key = 'pawns:' + c.transactionId;
+    if (sql.exec('SELECT 1 FROM apple_transactions WHERE original_id = ?', key).toArray().length) continue;
+    sql.exec('INSERT INTO apple_transactions (original_id, transaction_id, account_id, item, environment, at) VALUES (?, ?, ?, ?, ?, ?)',
+      key, c.transactionId, id, c.product, c.environment, now);
+    earn(sql, id, c.pawns);
+    credited += c.pawns;
+  }
   for (const p of purchases) {
     if (p.revoked) {
       // Refunded: the item goes from whichever account the purchase unlocked it for
@@ -201,5 +217,5 @@ export function recordPurchases(sql: SqlStorage, id: string, purchases: Verified
     if (!had) sql.exec('INSERT INTO wallet_items (account_id, item, source, at) VALUES (?, ?, ?, ?)', id, p.item, 'apple:' + p.originalTransactionId, now);
     granted.push(p.item);
   }
-  return { wallet: walletOf(sql, id, now), granted };
+  return { wallet: walletOf(sql, id, now), granted, credited };
 }

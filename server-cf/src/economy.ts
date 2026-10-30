@@ -39,6 +39,19 @@ export const CLIENT_ID = /^[A-Za-z0-9-]{8,64}$/;
 
 export const PRODUCT_PREFIX = 'bomsapo.chess3d.';
 
+/**
+ * Pawn top-ups (Consumable App Store products). They're only given away with App Store offer codes:
+ * the app never shows them for sale. Each transaction adds its pawns once; they're never owned items.
+ */
+export const PAWN_PRODUCTS: Record<string, number> = { 'pawns.50': 50, 'pawns.100': 100 };
+
+/** The pawns an App Store product adds, or null if it isn't a pawn top-up */
+export function pawnsOfProduct(productId: string): number | null {
+  const id = productId.toLowerCase();
+  if (!id.startsWith(PRODUCT_PREFIX)) return null;
+  return PAWN_PRODUCTS[id.slice(PRODUCT_PREFIX.length)] ?? null;
+}
+
 /** The pawn price, or null if pawns can't buy it (unknown items and Unlock Everything) */
 export function priceOf(item: string): number | null {
   if (!ITEM_ID.test(item)) return null;

@@ -4,7 +4,7 @@ import { describe, test, expect, beforeEach } from 'vitest';
 const { DatabaseSync } = await import('node:sqlite' as string);
 const fixtures = (await import('./fixtures/apple-jws.json' as string)).default;
 import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError } from '../wallet';
-import { ECONOMY, EVERYTHING, itemOfProduct, priceOf } from '../economy';
+import { ECONOMY, EVERYTHING, itemOfProduct, pawnsOfProduct, priceOf } from '../economy';
 import { verifyAppleTransaction } from '../appleJws';
 
 /** The Durable Object's SqlStorage, on Node's built-in SQLite */
@@ -172,6 +172,25 @@ describe('App Store purchases', () => {
     expect(recordPurchases(sql, 'b', [p('1010', EVERYTHING)]).wallet.items).toEqual([EVERYTHING]);
   });
 
+  test('a pawn top-up adds its pawns once, never an owned item', () => {
+    const c = (tx: string, pawns: number) => ({ transactionId: tx, product: `pawns.${pawns}`, pawns, environment: 'Sandbox' });
+    let r = recordPurchases(sql, 'a', [], Date.now(), [c('5001', 50)]);
+    expect(r.credited).toBe(50);
+    expect(r.wallet.balance).toBe(50);
+    expect(r.wallet.items).toEqual([]);
+    r = recordPurchases(sql, 'a', [], Date.now(), [c('5001', 50)]);   // the same transaction again
+    expect(r.credited).toBe(0);
+    expect(r.wallet.balance).toBe(50);
+    expect(recordPurchases(sql, 'b', [], Date.now(), [c('5001', 50)]).credited).toBe(0);   // or from another account
+    expect(recordPurchases(sql, 'a', [], Date.now(), [c('5002', 100)]).wallet.balance).toBe(150);
+  });
+
+  test('deleting the account keeps used top-ups used', () => {
+    recordPurchases(sql, 'a', [], Date.now(), [{ transactionId: '5003', product: 'pawns.100', pawns: 100, environment: 'Sandbox' }]);
+    purgeWallet(sql, 'a');
+    expect(recordPurchases(sql, 'c', [], Date.now(), [{ transactionId: '5003', product: 'pawns.100', pawns: 100, environment: 'Sandbox' }]).credited).toBe(0);
+  });
+
   test('a refund takes the item away', () => {
     recordPurchases(sql, 'a', [p('1004', 'promotion.splat')]);
     recordPurchases(sql, 'a', [p('1004', 'promotion.splat', true)]);
@@ -204,6 +223,14 @@ describe('economy', () => {
     expect(itemOfProduct('BomSapo.Chess3D.blitz.deepfreeze')).toBe('blitz.deepfreeze');
     expect(priceOf('blitz.feast')).toBe(ECONOMY.prices.blitz);
     expect(recordPurchases(sql, 'a', [{ originalTransactionId: '1020', transactionId: '1020', item: 'blitz.blockade', environment: 'Sandbox' }]).wallet.items).toEqual(['blitz.blockade']);
+  });
+
+  test('pawn top-ups: only the two products, by their pawns', () => {
+    expect(pawnsOfProduct('BomSapo.Chess3D.pawns.50')).toBe(50);
+    expect(pawnsOfProduct('BomSapo.Chess3D.pawns.100')).toBe(100);
+    expect(pawnsOfProduct('BomSapo.Chess3D.pawns.1000000')).toBeNull();
+    expect(pawnsOfProduct('BomSapo.Chess3D.set.abyssglow')).toBeNull();
+    expect(itemOfProduct('BomSapo.Chess3D.pawns.50')).toBeNull();   // never an owned item
   });
 
   test('Unlock Everything is an App Store product pawns can\'t buy', () => {

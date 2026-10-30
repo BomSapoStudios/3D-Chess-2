@@ -19,6 +19,12 @@ public static class Store
     public const string PromotionDollars = "$0.99";               // placeholder until Brandon confirms
     public const string EverythingDollars = "$19.99";
 
+    /// <summary>
+    /// Pawn top-ups (Consumable App Store products, id → pawns). They're only given away with App Store
+    /// offer codes (Redeem code): nothing in the game shows them for sale.
+    /// </summary>
+    public static readonly Dictionary<string, int> PawnProducts = new Dictionary<string, int> { { "pawns.50", 50 }, { "pawns.100", 100 } };
+
     /// <summary>Unlock Everything: every piece set, backdrop, promotion and Queen Blitz pack, now and later</summary>
     public const string EverythingId = "bundle.everything";
     public static bool OwnsEverything => OwnsId(EverythingId);

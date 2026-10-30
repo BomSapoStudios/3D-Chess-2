@@ -3,7 +3,7 @@ import { verifyIdToken, type Provider } from './oidc.js';
 import { verifyGameCenter } from './gamecenter.js';
 import { revokeApple } from './appleRevoke.js';
 import { verifyAppleTransaction, APPLE_ROOT_CA_G3 } from './appleJws.js';
-import { ECONOMY, itemOfProduct } from './economy.js';
+import { ECONOMY, itemOfProduct, pawnsOfProduct } from './economy.js';
 import type { GameConfig, PlayerColor } from './types/game.js';
 
 export { Room } from './room.js';
@@ -62,7 +62,8 @@ export { Accounts } from './accounts.js';
 //                                         Queen Blitz solve times (blitzstats.ts) (Bearer)
 //   POST /wallet/spend { requestId, item } → { wallet, item }   unlock for pawns (Bearer)
 //   POST /wallet/purchase { transactions: [StoreKit 2 JWS, ...] }
-//                                       → { wallet, granted, rejected }  App Store purchases (Bearer)
+//                                       → { wallet, granted, credited, rejected }  App Store purchases,
+//                                         and pawn top-ups from offer codes (credited = pawns added) (Bearer)
 //
 //   Queen Blitz difficulty (blitzstats.ts): totals per puzzle, for tuning packs; Tools/QueenBlitz/stats.py reads it
 //   GET  /blitz/stats?pack=blitz-5     → { puzzles: [...] }   header X-Stats-Key: the STATS_KEY secret
@@ -268,14 +269,22 @@ export default {
         const bundleIds = env.APPLE_AUDIENCES.split(',').map(s => s.trim()).filter(Boolean);
         const roots = [APPLE_ROOT_CA_G3, ...(env.TEST_APPLE_ROOTS ?? '').split(',').map(s => s.trim()).filter(Boolean)];
         const purchases = [];
+        const credits = [];
         let rejected = 0;
         for (const jws of list) {
           const t = await verifyAppleTransaction(String(jws), bundleIds, roots);
+          const pawns = t ? pawnsOfProduct(t.productId) : null;
+          if (t && pawns !== null) {
+            // A pawn top-up: refunded ones pay nothing
+            if (t.revocationDate) { rejected++; continue; }
+            credits.push({ transactionId: t.transactionId, product: t.productId.toLowerCase().replace(/^bomsapo\.chess3d\./, ''), pawns, environment: t.environment });
+            continue;
+          }
           const item = t ? itemOfProduct(t.productId) : null;
           if (!t || !item) { rejected++; continue; }
           purchases.push({ originalTransactionId: t.originalTransactionId, transactionId: t.transactionId, item, environment: t.environment, revoked: !!t.revocationDate });
         }
-        const { status, data } = await accounts(env, 'wallet-purchase', { ...caller(), purchases });
+        const { status, data } = await accounts(env, 'wallet-purchase', { ...caller(), purchases, credits });
         return json(status === 200 ? { ...data, rejected } : data, status);
       }
     }
