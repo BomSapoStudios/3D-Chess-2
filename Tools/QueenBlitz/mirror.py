@@ -157,6 +157,15 @@ PLAN = [
 ]
 
 
+def rate(e):
+    """Score and tier: Mirror Queen puzzles are difficult, Hard at least (Brandon, Oct 30; sized.MIRROR_FLOOR)"""
+    import sized, pipeline
+    e["tricks"], e["lured"] = ["mirror"], 1  # every one is built so the greedy player misses par
+    e["score"] = sized.score_entry(e)
+    e["tier"] = pipeline.tier(e["score"])
+    return e
+
+
 def build(seed=1):
     rng = random.Random(seed)
     out = []
@@ -173,6 +182,7 @@ def build(seed=1):
             "pawns": packs.flat(p["pawns"]), "blocks": packs.flat(p["blocks"]), "par": p["par"], "tip": tip,
             "ice": ice, "line": packs.flat(p["line"]), "mirror": list(FLIP),
         })
+        rate(out[-1])
     return {"id": "mirror-test", "name": "Mirror (test)", "free": True, "puzzles": out}
 
 
