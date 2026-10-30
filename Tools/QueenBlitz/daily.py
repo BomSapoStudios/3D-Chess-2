@@ -26,7 +26,9 @@ fails) and sized.py's difficulty weights, which come from players' solve times. 
   - never two moves (warm-ups only, Brandon Oct 26)
   - openers vary: never the same first move direction two days running, and no solution shape twice in a week
   - at most two days a week whose only trick is a 3D diagonal
-  - no portals or ramps unless --warp (builds from before Oct 27 can't show them)
+  - every week climbs: each day scores higher than the day before, Monday to Sunday
+  - portals and ramps on Saturdays, each Saturday a different kind (portal, ramp, both, brake);
+    --no-warp leaves them out
 """
 import argparse, datetime, glob, json, os, subprocess, sys, tempfile
 import packs, pipeline, sized, stats
@@ -46,16 +48,17 @@ WEEK = {
     1: [("classic", (5,), (4,), (1, 1), (0, 2), "mid")],
     2: [("classic", (6,), (4,), (1, 1), (0, 2), "mid"), ("ice", (5,), (3, 4), (0, 1), (0, 2), "easy")],
     3: [("classic", (5, 6), (4, 5), (2, 2), (1, 3), "mid")],
-    4: [("ice", (6,), (4, 5), (1, 9), (1, 3), "mid"), ("classic", (6,), (5,), (2, 9), (2, 3), "mid")],
+    4: [("ice", (6,), (4, 5), (1, 9), (1, 3), "easy"), ("classic", (6,), (5,), (2, 9), (2, 3), "easy")],
     5: [("classic", (6,), (5, 6), (2, 9), (2, 3), "hard")],
     6: [("classic", (6,), (5, 6), (2, 9), (3, 3), "hard"), ("ice", (6,), (5, 6), (1, 9), (3, 3), "hard")],
 }
-WARP_SATURDAY = ("warp", (5, 6), (4, 5), (0, 9), (1, 3), "mid")
+# Saturdays: portals and ramps (solve times put them above ice), a different kind each week
+WARP_SATURDAY = ("warp", (5, 6), (4, 5, 6), (0, 9), (1, 3), "easy")
 TIER = {0: "Easy", 1: "Easy", 2: "Medium", 3: "Medium", 4: "Hard", 5: "Hard", 6: "Devious"}
 
 
-def slot_for(day, warp=False):
-    if warp and day.weekday() == 5 and ((day - EPOCH).days // 7) % 2:
+def slot_for(day, warp=True):
+    if warp and day.weekday() == 5:
         return WARP_SATURDAY
     options = WEEK[day.weekday()]
     return options[((day - EPOCH).days // 7) % len(options)]
@@ -91,12 +94,14 @@ def opener(p):
 def generate(minutes, seed, work, warp):
     """Run the generators in turn and return every candidate (each normalised by sized.py)"""
     runs = [
-        ("ladder.py", ["gen", None, None, None, "5,6", "3,4,5"], {"ICE_SHARE": "0"}, 0.35),
-        ("ladder.py", ["gen", None, None, None, "5,6", "4,5,6"], {"ICE_SHARE": "1"}, 0.25),
-        ("engine.py", ["run", None, None, None, "5,6", "4,5,6"], {}, 0.4),
+        ("ladder.py", ["gen", None, None, None, "5,6", "3,4,5"], {"ICE_SHARE": "0"}, 0.3),
+        ("ladder.py", ["gen", None, None, None, "5,6", "4,5,6"], {"ICE_SHARE": "1"}, 0.2),
+        ("engine.py", ["run", None, None, None, "5,6", "4,5,6"], {}, 0.3),
     ]
     if warp:
-        runs.append(("portals.py", ["gen", None, None, None, "5,6", "4,5"], {}, 0.15))
+        runs.append(("portals.py", ["gen", None, None, None, "5,6", "4,5,6"], {}, 0.2))
+    else:
+        runs = [r[:3] + (r[3] / 0.8,) for r in runs]
     cands = []
     for i, (script, args, env, share) in enumerate(runs):
         out = os.path.join(work, f"cands-{seed}-{i}.json")
@@ -113,8 +118,9 @@ def generate(minutes, seed, work, warp):
 
 
 def fits(p, slot, relax):
-    mech, sizes, pars, tricks, lured, _ = slot
-    if p["mech"] != mech or p["size"] not in sizes or p["par"] < 3:
+    mech, sizes, pars, tricks, lured, pick = slot
+    # Sunday may fall back on any mechanic, as long as it's the hardest of the week
+    if (p["mech"] != mech and not (relax and pick == "hard")) or p["size"] not in sizes or p["par"] < 3:
         return False
     if p["has_decoys"] and slot[5] != "hard":
         return False  # decoy blocks only on the hardest days
@@ -130,7 +136,7 @@ def fits(p, slot, relax):
 
 
 def tip(p):
-    if p.get("ice"):
+    if p.get("ice") and p["mech"] != "warp":
         return "On ice, the blocks are your brakes." if p.get("blocks") else "Ice! Every slide runs to the edge or a block."
     return sized.tip(p, {"ice"})
 
@@ -147,10 +153,13 @@ def assign(days, pool, seen, before, warp):
         yesterday = recent[-1] if recent else None
         # 3D diagonals are in nearly every route, so at most two diagonal-only days a week
         flat = sum(q.get("tricks") == ["diagonal"] for q in last_week)
-        for relax in range(4):
+        # Every week climbs: each day scores above the day before (Monday starts again)
+        floor = day_score(yesterday) if yesterday and day.weekday() else None
+        for relax in range(5):
             ok = [p for p in pool if id(p) not in used and pipeline.layout_key(p) not in seen and fits(p, slot, relax)
                   and pipeline.shape(p) not in shapes and not (yesterday and opener(p) == opener(yesterday))
-                  and not (relax < 3 and p["tricks"] == ["diagonal"] and flat >= 2)]
+                  and not (relax < 3 and p["tricks"] == ["diagonal"] and flat >= 2)
+                  and not (floor is not None and relax < 4 and day_score(p) <= floor)]
             if ok:
                 break
         else:
@@ -161,8 +170,10 @@ def assign(days, pool, seen, before, warp):
         sign = {"easy": 1, "mid": 0, "hard": -1}[slot[5]]
         mid = sorted(sized.difficulty(p) for p in ok)[len(ok) // 2]
         y_tricks = set(yesterday.get("tricks", [])) if yesterday else set()
-        # Prefer tricks yesterday didn't have, and a mix of given and placed queens
-        best = min(ok, key=lambda p: (len(set(p["tricks"]) & y_tricks) * 3
+        last_want = next((q.get("want") for q in reversed(recent) if q.get("want")), None)
+        # Prefer tricks yesterday didn't have, a portal/ramp kind last Saturday didn't have, and a mix of
+        # given and placed queens
+        best = min(ok, key=lambda p: (len(set(p["tricks"]) & y_tricks) * 3 + (4 if last_want and p.get("want") == last_want else 0)
                                       + (2 if yesterday and bool(p.get("queen")) == bool(yesterday.get("queen")) else 0),
                                       sign * sized.difficulty(p) if sign else abs(sized.difficulty(p) - mid)))
         used.add(id(best))
@@ -170,6 +181,14 @@ def assign(days, pool, seen, before, warp):
         chosen[day] = best
         recent.append(best)
     return chosen, missing
+
+
+def day_score(q):
+    """The 1-100 score a daily shows: a written daily's own, a candidate's as it would be written.
+    None for the first year's dailies, scored on an older scale."""
+    if "mech" in q:
+        return entry_for(EPOCH, q)["score"]
+    return q["score"] if q.get("engine") else None
 
 
 def entry_for(day, p):
@@ -263,6 +282,8 @@ def check(quiet=False):
         prev = dailies.get(d - datetime.timedelta(1))
         if prev and opener(prev) == opener(p):
             problems.append(f"{d}: opens the same way as the day before")
+        if prev and prev.get("engine") and d.weekday() and prev["score"] >= p["score"]:
+            problems.append(f"{d}: not harder than the day before ({p['score']} after {prev['score']})")
         week = [dailies.get(d - datetime.timedelta(i)) for i in range(1, 7)]
         if any(q and pipeline.shape(q) == pipeline.shape(p) for q in week):
             problems.append(f"{d}: same solution shape as a day in the week before")
@@ -376,7 +397,7 @@ if __name__ == "__main__":
     ap.add_argument("--days", type=int, help=f"default: up to {AHEAD_DAYS} days ahead of today")
     ap.add_argument("--minutes", type=float, default=36)
     ap.add_argument("--seed", type=int, default=int(datetime.date.today().strftime("%Y%m")))
-    ap.add_argument("--warp", action="store_true", help="allow portal/ramp Saturdays (only once old builds are gone)")
+    ap.add_argument("--no-warp", dest="warp", action="store_false", help="no portal/ramp Saturdays")
     ap.add_argument("--summary", default=os.path.join(tempfile.gettempdir(), "daily-batch.md"))
     ap.add_argument("--pool", default=os.path.join(tempfile.gettempdir(), "daily-pool.json"), help="where candidates are kept")
     ap.add_argument("--reuse", action="store_true", help="pick from the candidates in --pool instead of making new ones")
