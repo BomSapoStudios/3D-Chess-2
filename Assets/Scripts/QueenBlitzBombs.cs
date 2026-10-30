@@ -407,18 +407,15 @@ public class QueenBlitzBombs : MonoBehaviour
     public void DebugArm() => Arm();
 #endif
 
-    // The bench button for bombs: on the bench row at the bottom, beside the queen's picture while
-    // she's still on the bench (PlacementUI.ShowOnScreenBench), clear of the hint line under it
+    // The bomb button: bottom-right corner, just above the hint line, clear of the board (which
+    // sits in the middle), the bench, and the pawn column and Ready/Auto-place on the left
     private void OnGUI()
     {
         if (!Placing) return;
         Vector2 ui = TouchGUI.Begin();
         int left = QueenBlitz.BombsToPlace;
-        const float benchSize = 58f;
-        PieceTray tray = PieceTray.GetTrayForColor(QueenBlitz.PlayerColor);
-        bool queenOnBench = tray != null && tray.GetPieceCount() > 0;
-        float x = queenOnBench ? ui.x / 2f + benchSize / 2f + 8f : ui.x / 2f - 75f;
-        Rect r = new Rect(x, ui.y - 52f - 12f - benchSize - 10f, 150f, benchSize);
+        const float width = 150f, height = 58f;
+        Rect r = new Rect(ui.x - width - 16f, ui.y - 70f - height - 8f, width, height);
         string label = left == 0 ? "Bombs placed" : armed ? "Tap a dot" : left == 1 ? "Place bomb" : $"Place bomb ×{left}";
         GUI.enabled = left > 0;
         if (TouchGUI.NeonButton(r, label, armed ? NeonTheme.Lime : FuseColor, NeonTheme.Pink, outlined: left == 0, fontSize: 15))
