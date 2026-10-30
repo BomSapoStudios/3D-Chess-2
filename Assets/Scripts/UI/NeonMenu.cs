@@ -312,12 +312,20 @@ public partial class NeonMenu : MonoBehaviour
         // Title with a hard pink drop
         RectTransform titleBox = NewRect("Title", column);
         titleBox.sizeDelta = new Vector2(420, 58);
-        TextMeshProUGUI titleShadow = NewText("Shadow", titleBox, "3D CHESS", 54, NeonTheme.Pink, TextAlignmentOptions.Left);
+        TextMeshProUGUI titleShadow = NewText("Shadow", titleBox, "3D CHESS ULTRA", 54, NeonTheme.Pink, TextAlignmentOptions.Left);
         NeonTheme.ApplyFont(titleShadow, display: true);
         Stretch(titleShadow.rectTransform, new Vector2(4, -4));
-        TextMeshProUGUI title = NewText("Text", titleBox, "3D CHESS", 54, NeonTheme.Lime, TextAlignmentOptions.Left);
+        TextMeshProUGUI title = NewText("Text", titleBox, "3D CHESS ULTRA", 54, NeonTheme.Lime, TextAlignmentOptions.Left);
         NeonTheme.ApplyFont(title, display: true);
         Stretch(title.rectTransform);
+        // The App Store name, on one line: both layers shrink alike to fit the column (narrow phones too)
+        foreach (TextMeshProUGUI t in new[] { titleShadow, title })
+        {
+            t.enableWordWrapping = false;
+            t.enableAutoSizing = true;
+            t.fontSizeMin = 30;
+            t.fontSizeMax = 54;
+        }
         titleBox.localEulerAngles = new Vector3(0, 0, -2);
 
         TextMeshProUGUI tagline = NewText("Tagline", column, "Up, down, sideways. Go wild.", 18, NeonTheme.Cyan, TextAlignmentOptions.Left);
