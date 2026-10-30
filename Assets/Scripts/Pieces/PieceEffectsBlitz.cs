@@ -25,9 +25,6 @@ public partial class PieceEffects
         Runner.StartCoroutine(Runner.KnockRoutine(copy, mover, moving, worldDirection.normalized, ice, GlowColor(victim.pieceColor)));
     }
 
-    /// <summary>A piece's look on its own, with nothing that makes it a piece (no collider or ChessPiece)</summary>
-    public static GameObject ModelCopy(ChessPiece piece) => VisualCopy(piece);
-
     private IEnumerator KnockRoutine(GameObject copy, Transform mover, System.Func<bool> moving, Vector3 dir, bool ice, Color color)
     {
         Vector3 square = copy.transform.position;

@@ -142,9 +142,14 @@ public class QueenBlitzMirror : MonoBehaviour
     {
         if (queen != null && !queen.IsInTray() && queen.CurrentPosition.IsValid() && ChessBoard.Instance.GetPieceAt(queen.CurrentPosition) == queen) return queen;
         queen = null;
+        ChessPiece placed = null; // during setup a placed piece may not be on the board's squares yet
         foreach (ChessPiece p in FindObjectsByType<ChessPiece>(FindObjectsSortMode.None))
-            if (p.pieceType == ChessPieceType.Queen && p.pieceColor == QueenBlitz.PlayerColor && !p.IsInTray() && p.CurrentPosition.IsValid()
-                && ChessBoard.Instance.GetPieceAt(p.CurrentPosition) == p) { queen = p; break; }
+        {
+            if (p.pieceType != ChessPieceType.Queen || p.pieceColor != QueenBlitz.PlayerColor || p.IsInTray() || !p.CurrentPosition.IsValid()) continue;
+            if (ChessBoard.Instance.GetPieceAt(p.CurrentPosition) == p) { queen = p; break; }
+            if (p.transform.parent != null && p.transform.parent.name == "Pieces Container") placed = p;
+        }
+        if (queen == null && GameStateManager.Instance.currentState == GameState.PiecePlacement) return placed;
         return queen;
     }
 
@@ -165,7 +170,13 @@ public class QueenBlitzMirror : MonoBehaviour
             at = QueenBlitz.MirrorAt;
         }
 
-        if (Model == null && q != null && !q.IsMoving) Build(q);
+        // Her look is the queen's, at the queen's board size: copied again if the queen was still
+        // growing from her bench size when it was taken
+        if (q != null && !q.IsMoving && !Sliding && (Model == null || (q.transform.lossyScale - builtScale).sqrMagnitude > 0.0004f * builtScale.sqrMagnitude))
+        {
+            if (Model != null) Destroy(Model);
+            Build(q);
+        }
         if (Model == null) return;
         // Undo or a restored game put her somewhere else mid-slide: stop and stand there
         if (Sliding && at != slidingTo) StopSlide();
@@ -175,15 +186,16 @@ public class QueenBlitzMirror : MonoBehaviour
     }
 
     private static readonly Color Glass = new Color(0.85f, 1f, 0.75f);
+    private Vector3 builtScale;
 
     /// <summary>A copy of the queen's look, tinted so she reads as the other queen</summary>
     private void Build(ChessPiece q)
     {
         GameObject container = GameObject.Find("Pieces Container");
         if (container == null) return;
-        Model = PieceEffects.ModelCopy(q);
-        Model.name = "Mirror Queen";
+        Model = Copy(q);
         Model.transform.SetParent(container.transform, true);
+        builtScale = q.transform.lossyScale;
         foreach (MeshRenderer r in Model.GetComponentsInChildren<MeshRenderer>())
         {
             Material[] mats = r.materials; // her own copies
@@ -199,6 +211,31 @@ public class QueenBlitzMirror : MonoBehaviour
             r.materials = mats;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
+    }
+
+    /// <summary>
+    /// The queen's meshes on their own. Unlike PieceEffects' copies this keeps meshes that are
+    /// switched off: the queen's are still hidden for a moment after she leaves the bench
+    /// </summary>
+    private static GameObject Copy(ChessPiece q)
+    {
+        var copy = new GameObject("Mirror Queen");
+        copy.transform.SetPositionAndRotation(q.transform.position, q.transform.rotation);
+        foreach (MeshRenderer r in q.GetComponentsInChildren<MeshRenderer>(true))
+        {
+            MeshFilter f = r.GetComponent<MeshFilter>();
+            if (f == null || f.sharedMesh == null) continue;
+            string n = r.gameObject.name.ToLowerInvariant();
+            if (n.Contains("glow") || n.Contains("indicator") || n.Contains("highlight")) continue; // not the selection effects
+            var part = new GameObject(r.gameObject.name);
+            part.transform.SetParent(copy.transform, false);
+            part.transform.SetPositionAndRotation(r.transform.position, r.transform.rotation);
+            Vector3 s = r.transform.lossyScale;
+            part.transform.localScale = s;
+            part.AddComponent<MeshFilter>().sharedMesh = f.sharedMesh;
+            part.AddComponent<MeshRenderer>().sharedMaterials = r.sharedMaterials;
+        }
+        return copy;
     }
 
     public void Slide(QueenBlitz.Route route)
