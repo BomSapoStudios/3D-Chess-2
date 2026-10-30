@@ -461,6 +461,13 @@ PAWNS
     purchases on a new account moves them there.
   • Updating from a build that kept pawns on the phone: the first sync brings the phone's pawns
     (up to 10,000), items and cleared puzzles to the account, once.
+  • Daily bonus: 50 pawns once a day from the badge beside the home screen tagline. The day starts
+    at the player's own midnight (the phone sends its offset from UTC, kept to real time zones);
+    each claim must fall on a later local day than the last, so changing time zone can bring one
+    claim forward but never add more. Between claims the badge counts down to midnight.
+  • Pawn codes: 50 and 100 pawn top-ups exist only as App Store offer codes (Redeem code); they're
+    never for sale in the game. Each code adds its pawns once.
+  • Pawns never move between accounts: there's no gifting or trading.
   The numbers are in server-cf/src/economy.ts (the server's) and Assets/Scripts/PawnBank.cs,
   Store.cs and QueenBlitz.cs (what the app shows); keep them the same.
 

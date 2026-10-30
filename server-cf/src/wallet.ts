@@ -30,7 +30,7 @@ export function setupWalletTables(sql: SqlStorage) {
     CREATE TABLE IF NOT EXISTS wallet_requests (account_id TEXT, request_id TEXT, at INTEGER, PRIMARY KEY (account_id, request_id));
     CREATE TABLE IF NOT EXISTS apple_transactions (original_id TEXT PRIMARY KEY, transaction_id TEXT, account_id TEXT, item TEXT, environment TEXT, at INTEGER);
   `);
-  // The UTC day the daily bonus was last claimed (-1: never)
+  // The player's local day number (days since 1970 at their midnight) the daily bonus was last claimed (-1: never)
   try { sql.exec('ALTER TABLE wallets ADD COLUMN daily_day INTEGER DEFAULT -1'); } catch { /* already there */ }
 }
 
@@ -55,7 +55,7 @@ const utcDay = (now: number) => Math.floor(now / DAY);
 
 /**
  * What the app shows: pawns, every pawn ever earned, owned items, what Zombies! can still pay today,
- * and the daily bonus (available now, or when the next one comes: the next UTC midnight, Unix ms)
+ * and the local day the daily bonus was last claimed (the app works out from its own clock whether today's is waiting)
  */
 export function walletOf(sql: SqlStorage, id: string, now = Date.now()) {
   const w = row(sql, id);
@@ -63,18 +63,27 @@ export function walletOf(sql: SqlStorage, id: string, now = Date.now()) {
   const items = sql.exec('SELECT item FROM wallet_items WHERE account_id = ? ORDER BY item', id).toArray().map(r => r.item as string);
   return {
     balance: w.balance, lifetime: w.lifetime, items, zombieLeftToday: Math.max(0, ECONOMY.zombieDailyCap - zombieToday), migrated: w.migrated === 1,
-    dailyAvailable: w.daily_day !== utcDay(now), nextDailyAt: (utcDay(now) + 1) * DAY,
+    lastDailyDay: w.daily_day ?? -1,
   };
 }
 
-/** The daily bonus: pays once per account per UTC day; a second claim pays nothing and says when the next comes */
-export function claimDaily(sql: SqlStorage, id: string, now = Date.now()) {
+/**
+ * The daily bonus: once per day, the day starting at the player's midnight (their phone's offset from UTC,
+ * kept to real time zones). Each claim's local day must be later than the last one, so changing the
+ * phone's time zone can bring one claim forward at most, never add more. A second claim the same day pays
+ * nothing and says when the next comes (Unix ms, the player's next midnight).
+ */
+export function claimDaily(sql: SqlStorage, id: string, utcOffsetMinutes: unknown, now = Date.now()) {
+  const max = ECONOMY.maxUtcOffsetMinutes;
+  const offset = typeof utcOffsetMinutes === 'number' && Number.isFinite(utcOffsetMinutes) ? Math.max(-max, Math.min(max, Math.round(utcOffsetMinutes))) : 0;
+  const shift = offset * 60_000;
+  const day = Math.floor((now + shift) / DAY);
+  const nextDailyAt = (day + 1) * DAY - shift;
   const w = row(sql, id);
-  const day = utcDay(now);
-  if (w.daily_day === day) return { claimed: false, pawns: 0, wallet: walletOf(sql, id, now) };
+  if (day <= (w.daily_day ?? -1)) return { claimed: false, pawns: 0, nextDailyAt, wallet: walletOf(sql, id, now) };
   sql.exec('UPDATE wallets SET daily_day = ? WHERE account_id = ?', day, id);
   earn(sql, id, ECONOMY.dailyClaim);
-  return { claimed: true, pawns: ECONOMY.dailyClaim, wallet: walletOf(sql, id, now) };
+  return { claimed: true, pawns: ECONOMY.dailyClaim, nextDailyAt, wallet: walletOf(sql, id, now) };
 }
 
 function earn(sql: SqlStorage, id: string, pawns: number) {

@@ -137,7 +137,7 @@ export class Accounts extends DurableObject<Env> {
       }
       case 'blitz-stats-report': return { puzzles: blitzStatsReport(this.sql, String(b.pack ?? '')) }; // the Worker checks STATS_KEY first
       case 'wallet-spend': this.account(userId); return spendPawns(this.sql, userId, String(b.requestId ?? ''), String(b.item ?? ''));
-      case 'wallet-daily': this.account(userId); return claimDaily(this.sql, userId);
+      case 'wallet-daily': this.account(userId); return claimDaily(this.sql, userId, b.utcOffsetMinutes);
       case 'wallet-purchase': this.account(userId); return recordPurchases(this.sql, userId, (b.purchases as VerifiedPurchase[]) ?? [], Date.now(), (b.credits as VerifiedCredit[]) ?? []);
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
       default: throw new HttpError(404, 'Unknown operation');

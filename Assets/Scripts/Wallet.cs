@@ -19,8 +19,7 @@ public class Wallet : MonoBehaviour
     {
         public string userId = "";
         public int balance, lifetime, zombieLeftToday;
-        public bool dailyAvailable;
-        public long nextDailyAt;   // Unix ms: the next UTC midnight after the server's answer
+        public int lastDailyDay = -1;   // the local day (days since 1970 at the player's midnight) the daily bonus was last claimed
         public string[] items = new string[0];
         public bool migrated;
         public int utcDay;   // the day zombieLeftToday is for
@@ -128,19 +127,23 @@ public class Wallet : MonoBehaviour
     private static int UtcDay => (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalDays;
     private static long UnixMs => (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds;
 
-    /// <summary>The daily bonus can be claimed (as far as the phone knows; the server decides, once per UTC day)</summary>
+    private const long DayMs = 86_400_000;
+    private static long UtcOffsetMs => (long)TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).TotalMilliseconds;
+    /// <summary>Today as a day number from the player's own midnight (the server counts claims the same way)</summary>
+    private static int LocalDay => (int)Math.Floor((UnixMs + UtcOffsetMs) / (double)DayMs);
+
+    /// <summary>The daily bonus can be claimed: a new local day since the last claim (the server decides)</summary>
     public static bool DailyAvailable
     {
         get
         {
             Load();
-            long now = UnixMs;
-            return now >= state.nextDailyAt || state.dailyAvailable;
+            return LocalDay > state.lastDailyDay;
         }
     }
 
-    /// <summary>Time until the next daily bonus (zero when one is waiting)</summary>
-    public static TimeSpan UntilDaily => DailyAvailable ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Max(0, state.nextDailyAt - UnixMs));
+    /// <summary>Time until the next daily bonus, at the player's next midnight (zero when one is waiting)</summary>
+    public static TimeSpan UntilDaily => DailyAvailable ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Max(0, (LocalDay + 1) * DayMs - UtcOffsetMs - UnixMs));
 
     /// <summary>Claim today's bonus; done(pawns added, null) or (0, a message to show)</summary>
     public static void ClaimDaily(Action<int, string> done)
@@ -159,7 +162,9 @@ public class Wallet : MonoBehaviour
         if (!ok) { done(0, offline); yield break; }
         long status = 0;
         string text = null;
-        yield return OnlineClient.GetOrCreate().Request("POST", "/wallet/daily", "{}", (s, t) => { status = s; text = t; });
+        // The phone's offset from UTC: the day starts at the player's midnight
+        string body = "{\"utcOffsetMinutes\":" + (int)Math.Round(UtcOffsetMs / 60000.0) + "}";
+        yield return OnlineClient.GetOrCreate().Request("POST", "/wallet/daily", body, (s, t) => { status = s; text = t; });
         if (status != 200) { done(0, status == 0 ? offline : "That didn't work, please try again."); yield break; }
         DailyReply reply = JsonUtility.FromJson<DailyReply>(text);
         Apply(reply?.wallet);

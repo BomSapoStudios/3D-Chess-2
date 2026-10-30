@@ -82,14 +82,16 @@ check(pu.credited === 0, '...nor from another account');
 pu = (await post('/wallet/purchase', { transactions: [F.pawns100, F.pawns100b] }, b.token)).body;
 check(pu.credited === 200 && pu.wallet.balance === pawnsBefore + 250, 'two 100-pawn codes add 200');
 
-// The daily bonus
-check((await post('/wallet/daily', {})).status === 401, 'the daily bonus needs a signed-in player');
+// The daily bonus (from the player's midnight: the phone sends its offset from UTC)
+check((await post('/wallet/daily', { utcOffsetMinutes: -420 })).status === 401, 'the daily bonus needs a signed-in player');
 w = (await get('/wallet', b.token)).body;
-check(w.dailyAvailable === true && w.nextDailyAt > Date.now(), 'the wallet says the daily bonus is waiting, and when the next one comes');
-let dc = (await post('/wallet/daily', {}, b.token)).body;
-check(dc.claimed === true && dc.pawns === 50 && dc.wallet.balance === w.balance + 50 && dc.wallet.dailyAvailable === false, 'claiming it adds 50 pawns');
-dc = (await post('/wallet/daily', {}, b.token)).body;
-check(dc.claimed === false && dc.wallet.balance === w.balance + 50 && dc.wallet.nextDailyAt === w.nextDailyAt, 'a second claim the same day adds nothing and says when the next comes');
+check(w.lastDailyDay === -1, 'the wallet says no daily bonus has been claimed');
+let dc = (await post('/wallet/daily', { utcOffsetMinutes: -420 }, b.token)).body;
+check(dc.claimed === true && dc.pawns === 50 && dc.wallet.balance === w.balance + 50 && dc.wallet.lastDailyDay >= 0 && dc.nextDailyAt > Date.now(), 'claiming it adds 50 pawns');
+dc = (await post('/wallet/daily', { utcOffsetMinutes: -420 }, b.token)).body;
+check(dc.claimed === false && dc.wallet.balance === w.balance + 50, 'a second claim the same day adds nothing');
+dc = (await post('/wallet/daily', { utcOffsetMinutes: -720 }, b.token)).body;
+check(dc.claimed === false, 'a different time zone doesn\'t make it a new day');
 
 // Deleting the account deletes the wallet
 check((await post('/account/delete', {}, a.token)).status === 200, 'account deleted');

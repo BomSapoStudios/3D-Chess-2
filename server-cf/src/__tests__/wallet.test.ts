@@ -27,32 +27,37 @@ const rid = () => `req-${String(++n).padStart(6, '0')}`;
 beforeEach(() => { sql = sqlStorage(); setupWalletTables(sql); });
 
 describe('wallet', () => {
-  test('starts empty with the full Zombies! allowance and the daily bonus waiting', () => {
-    const t = Date.UTC(2026, 9, 30, 15);
-    expect(walletOf(sql, 'a', t)).toEqual({ balance: 0, lifetime: 0, items: [], zombieLeftToday: ECONOMY.zombieDailyCap, migrated: false,
-      dailyAvailable: true, nextDailyAt: Date.UTC(2026, 9, 31) });
+  test('starts empty with the full Zombies! allowance and no daily bonus claimed', () => {
+    expect(walletOf(sql, 'a')).toEqual({ balance: 0, lifetime: 0, items: [], zombieLeftToday: ECONOMY.zombieDailyCap, migrated: false, lastDailyDay: -1 });
   });
 
-  test('the daily bonus pays once per UTC day', () => {
-    const t = Date.UTC(2026, 9, 30, 23, 50);
-    const first = claimDaily(sql, 'a', t);
-    expect(first.claimed).toBe(true);
-    expect(first.pawns).toBe(ECONOMY.dailyClaim);
-    expect(first.wallet).toMatchObject({ balance: 50, lifetime: 50, dailyAvailable: false, nextDailyAt: Date.UTC(2026, 9, 31) });
-    const again = claimDaily(sql, 'a', t + 5 * 60_000);
-    expect(again).toMatchObject({ claimed: false, pawns: 0 });
-    expect(again.wallet.balance).toBe(50);
-    const tomorrow = claimDaily(sql, 'a', Date.UTC(2026, 9, 31, 0, 1));   // just past midnight UTC
-    expect(tomorrow.claimed).toBe(true);
-    expect(tomorrow.wallet.balance).toBe(100);
-    expect(claimDaily(sql, 'b', t).claimed).toBe(true);   // per account
+  test('the daily bonus pays once a day, from the player\'s own midnight', () => {
+    const pacific = -7 * 60;                                   // UTC-7
+    const evening = Date.UTC(2026, 9, 31, 6, 50);              // 23:50 on Oct 30 in UTC-7
+    const first = claimDaily(sql, 'a', pacific, evening);
+    expect(first).toMatchObject({ claimed: true, pawns: ECONOMY.dailyClaim, nextDailyAt: Date.UTC(2026, 9, 31, 7) });
+    expect(first.wallet).toMatchObject({ balance: 50, lifetime: 50 });
+    expect(claimDaily(sql, 'a', pacific, evening + 5 * 60_000)).toMatchObject({ claimed: false, pawns: 0 });   // 23:55, same day
+    const morning = claimDaily(sql, 'a', pacific, Date.UTC(2026, 9, 31, 7, 1));   // 00:01 local: a new day
+    expect(morning.claimed).toBe(true);
+    expect(morning.wallet.balance).toBe(100);
+    expect(claimDaily(sql, 'b', pacific, evening).claimed).toBe(true);   // per account
+  });
+
+  test('changing the phone\'s time zone can\'t add claims', () => {
+    const t = Date.UTC(2026, 9, 30, 12);
+    expect(claimDaily(sql, 'a', 14 * 60, t).claimed).toBe(true);      // +14h: already Oct 31 there
+    expect(claimDaily(sql, 'a', -12 * 60, t).claimed).toBe(false);    // back to -12h (Oct 30): an earlier day
+    expect(claimDaily(sql, 'a', 14 * 60, t + 3600_000).claimed).toBe(false);
+    expect(claimDaily(sql, 'a', 9999, t).claimed).toBe(false);       // a made-up offset is kept to +14h
+    expect(walletOf(sql, 'a').balance).toBe(50);
   });
 
   test('deleting the account forgets its daily claim along with its pawns', () => {
     const t = Date.UTC(2026, 9, 30, 12);
-    claimDaily(sql, 'a', t);
+    claimDaily(sql, 'a', 0, t);
     purgeWallet(sql, 'a');
-    expect(walletOf(sql, 'a', t)).toMatchObject({ balance: 0, dailyAvailable: true });
+    expect(walletOf(sql, 'a', t)).toMatchObject({ balance: 0, lastDailyDay: -1 });
   });
 
   test('a Queen Blitz puzzle pays on its first clear only', () => {

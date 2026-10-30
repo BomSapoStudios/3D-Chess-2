@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// The home screen's daily bonus: 50 pawns once per UTC day (the server decides, Wallet.ClaimDaily). A badge
+/// The home screen's daily bonus: 50 pawns once a day from the player's own midnight (the server decides,
+/// Wallet.ClaimDaily). A badge
 /// beside the tagline is lit while it's waiting and counts down to the next one otherwise; it only
 /// talks to the server when tapped.
 /// </summary>
