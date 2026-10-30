@@ -195,10 +195,105 @@ MIX = [
 ]
 
 
+# Mirror Queen with bombs already on the board (a bomb either queen passes goes off; blasts chain).
+# (name, tip, size, ice, blocks, walk moves, pawns on paths, bombs, par range)
+BOMBS = [
+    ("Mirror Blast", "Her bombs go off too.", 5, False, 1, 3, 4, 1, (3, 4)),
+    ("Twin Fuse", "One bomb each.", 5, False, 2, 3, 4, 2, (3, 4)),
+    ("Cold Fuse", "Slide her into the bomb.", 5, True, 2, 3, 4, 1, (3, 4)),
+    ("Chain Reflection", "Let her light the chain.", 6, False, 2, 4, 5, 2, (4, 5)),
+    ("Powder Mirror", "Steer first, then boom.", 6, True, 3, 4, 5, 2, (4, 5)),
+]
+
+
+def make_bombs(rng, n, ice, nblocks, k, npawns, nbombs, par_range, tries=3000):
+    """A walk of the pair, pawns on its paths, and bombs on its paths with a few extra pawns only a
+    blast reaches. Kept when: the mirror and every bomb are needed, the mirror sets a bomb off on the
+    par line, the greedy player misses par, and no tap is ambiguous."""
+    cells = [(x, y, z) for x in range(n) for y in range(n) for z in range(n)]
+    for _ in range(tries):
+        blocks = set(rng.sample(cells, nblocks))
+        b0 = Board(n, [], blocks, ice, mirror=FLIP)
+        starts = b0.starts()
+        if not starts:
+            continue
+        start = rng.choice(starts)
+        steps = walk(b0, start, k, rng)
+        if not steps:
+            continue
+        occupied = {start, b0.reflect(start)}
+        qpath, mpath = set(), set()
+        for q, m, to, m2, d0, kk in steps:
+            qpath |= set(path_cells(b0, q, d0, kk, m, ice))
+            mpath |= set(path_cells(b0, m, b0.flip(d0), kk, to, ice))
+        qpath -= occupied
+        mpath -= occupied
+        if not mpath:
+            continue
+        # at least one bomb on the mirror's path
+        bombs = [rng.choice(sorted(mpath))]
+        rest = sorted((qpath | mpath) - set(bombs))
+        bombs += rng.sample(rest, min(len(rest), nbombs - 1))
+        lanes = (qpath | mpath) - set(bombs)
+        pawns = set(rng.sample(sorted(lanes), min(len(lanes), npawns)))
+        # pawns only a blast reaches: off every path, next to a bomb
+        for bm in bombs:
+            near = [c for c in b0._around(bm) if b0.inside(c) and c not in blocks and c not in occupied
+                    and c not in qpath and c not in mpath and c not in bombs]
+            pawns |= set(rng.sample(near, min(len(near), rng.randint(2, 3))))
+        pawns = sorted(pawns)
+        b = Board(n, pawns, blocks, ice, mirror=FLIP, bombs=bombs)
+        par, line, st = b.solve(start, limit=par_range[1])
+        if par is None or par < par_range[0]:
+            continue
+        solo = Board(n, pawns, blocks, ice, bombs=bombs).solve(start, limit=8)[0]
+        if solo is not None and solo <= par:
+            continue  # the mirror isn't needed
+        if any(b.with_bombs([x for x in bombs if x != bm]).solve(start, limit=par)[0] is not None for bm in bombs):
+            continue  # a bomb isn't needed
+        if (b.greedy(start) or 99) <= par:
+            continue
+        q, m, left, ok, mirror_fuse = start, b.reflect(start), b.full, True, False
+        for a, c in line:
+            if b.ambiguous(q, m):
+                ok = False
+                break
+            mv = max((x for x in b.pair_moves(q, m) if x[0] == c), key=lambda x: bits(x[2] & b.pawn_mask))
+            qm = next(x[1] for x in b.moves(q, m) if x[0] == c and x[2] == mv[3] and x[3] == mv[4])
+            if mv[2] & ~qm & left & b.bomb_mask:
+                mirror_fuse = True
+            left = b.after(left, mv[2])
+            q, m = mv[0], mv[1]
+        if not ok or not mirror_fuse or left & b.pawn_mask:
+            continue
+        return {"size": n, "queen": start, "best": start, "pawns": pawns, "blocks": sorted(blocks), "bombs": bombs,
+                "ice": ice, "par": par, "line": [start] + [c for _, c in line], "solo": solo}
+    return None
+
+
+def build_bombs(seed=1):
+    rng = random.Random(seed)
+    out = []
+    for name, tip, n, ice, nb, k, np_, nbm, pr in BOMBS:
+        p = None
+        while p is None:
+            p = make_bombs(rng, n, ice, nb, k, np_, nbm, pr)
+            if p is None:
+                print(f"  {name}: retrying", file=sys.stderr)
+        print(f"{name}: {n}³{' ice' if ice else ''} par {p['par']} (alone {p['solo']}), {len(p['pawns'])} pawns, "
+              f"{len(p['bombs'])} bombs", file=sys.stderr)
+        e = {"name": name, "size": n, "queen": list(p["queen"]), "best": list(p["best"]),
+             "pawns": packs.flat(p["pawns"]), "blocks": packs.flat(p["blocks"]), "bombs": packs.flat(p["bombs"]),
+             "par": p["par"], "tip": tip, "ice": ice, "line": packs.flat(p["line"]), "mirror": list(FLIP)}
+        out.append(rate(e))
+    return {"id": "mirror-bombs", "name": "Mirror Bombs (test)", "free": True, "puzzles": out}
+
+
 def rate(e):
     """Score and tier: Mirror Queen puzzles are difficult, Hard at least (Brandon, Oct 30; sized.MIRROR_FLOOR)"""
     import sized, pipeline
-    e["tricks"] = ["mirror"] + (["portal"] if e.get("portals") else []) + (["ramp"] if e.get("ramps") else [])
+    e["tricks"] = ["mirror"] + (["portal"] if e.get("portals") else []) + (["ramp"] if e.get("ramps") else []) \
+        + (["bomb"] if e.get("bombs") else [])
     e["lured"] = 1  # every one is built so the greedy player misses par
     e["score"] = sized.score_entry(e)
     e["tier"] = pipeline.tier(e["score"])
@@ -248,9 +343,9 @@ def build_mix(seed=1):
 
 
 if __name__ == "__main__":
-    mix = len(sys.argv) > 1 and sys.argv[1] == "mix"
-    args = sys.argv[2:] if mix else sys.argv[1:]
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("mix", "bombs") else None
+    args = sys.argv[2:] if kind else sys.argv[1:]
     seed = int(args[0]) if args else 1
-    path = packs.write(build_mix(seed) if mix else build(seed))
+    path = packs.write({"mix": build_mix, "bombs": build_bombs, None: build}[kind](seed))
     problems = packs.check(path)
     print(path, "OK" if not problems else "\n".join(problems))
