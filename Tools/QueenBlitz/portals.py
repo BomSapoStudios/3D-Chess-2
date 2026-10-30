@@ -194,6 +194,7 @@ def _attempt(job):
     return e
 
 
+ICE_SHARE = float(__import__("os").environ.get("ICE_SHARE", "0.25"))  # share of ice boards (brakes are always ice)
 WANTS = tuple(__import__("os").environ.get("WANTS", "portal,portal,ramp,both,brake").split(","))
 
 
@@ -206,7 +207,7 @@ def gen(seconds, seed, out, sizes, pars):
             batch = []
             for _ in range(16):
                 want = rng.choice(WANTS)
-                batch.append((rng.choice(sizes), rng.choice(pars), want, want == "brake" or rng.random() < 0.25,
+                batch.append((rng.choice(sizes), rng.choice(pars), want, want == "brake" or rng.random() < ICE_SHARE,
                               rng.randrange(1 << 30)))
             for e in pool.imap_unordered(attempt, batch):
                 tried += 1
