@@ -379,13 +379,16 @@ def verify():
     good = True
     for host in (stats.SERVER, "https://3d-chess.bomsapostudios.workers.dev"):
         for day in (new[0], new[-1]):
+            # Cloudflare's bot check refuses Python's default User-Agent (403)
+            req = urllib.request.Request(f"{host}/daily/{day}.json", headers={"User-Agent": "blitz-daily-verify"})
             try:
-                with urllib.request.urlopen(f"{host}/daily/{day}.json", timeout=15) as r:
+                with urllib.request.urlopen(req, timeout=15) as r:
                     live = json.load(r)
                 same = stats.sig(live) == stats.sig(dailies[day])
-            except Exception:
-                same = False
-            print(f"{host} {day}: {'matches' if same else 'DIFFERENT or missing'}")
+                note = "matches" if same else "DIFFERENT"
+            except Exception as e:
+                same, note = False, f"couldn't fetch ({e})"
+            print(f"{host} {day}: {note}")
             good &= same
     return good
 
