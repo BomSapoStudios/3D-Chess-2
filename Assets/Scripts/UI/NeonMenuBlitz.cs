@@ -74,8 +74,8 @@ public partial class NeonMenu
 
     private void TapPawnsLabel()
     {
-#if !(DEVELOPMENT_BUILD || UNITY_EDITOR)
-        return;   // release builds never show the review packs
+#if !(DEVELOPMENT_BUILD || UNITY_EDITOR || BLITZ_REVIEW)
+        return;   // TestFlight and App Store builds never show the review packs
 #endif
 #pragma warning disable CS0162
         secretTaps = Time.unscaledTime - secretTapTime < 0.6f ? secretTaps + 1 : 1;
