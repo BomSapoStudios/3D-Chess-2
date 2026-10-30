@@ -25,11 +25,13 @@ def bits(m):
 
 
 def walk(b, start, k, rng):
-    """k random moves of the pair from start: [(queen, mirror, queen's sweep squares, mirror's)]"""
+    """k random moves of the pair from start: [(queen, mirror, queen's sweep squares, mirror's)].
+    With portals or ramps, moves where either queen goes through one are picked about half the time."""
     q, m = start, b.reflect(start)
     steps = []
+    feature = set(b.portal) | set(b.ramp)
     for _ in range(k):
-        opts = []
+        opts, special = [], []
         for d0 in DIRS:
             stops = b._slide(q, d0, m)
             if b.ice:
@@ -37,9 +39,11 @@ def walk(b, start, k, rng):
             for to, _, kk in stops:
                 m2, _ = b.mirror_follow(m, d0, kk, to)
                 opts.append((to, m2, d0, kk))
+                if feature and feature & set(path_cells(b, q, d0, kk, m, b.ice) + path_cells(b, m, b.flip(d0), kk, to, b.ice)):
+                    special.append(opts[-1])
         if not opts:
             return None
-        to, m2, d0, kk = rng.choice(opts)
+        to, m2, d0, kk = rng.choice(special if special and rng.random() < 0.5 else opts)
         steps.append((q, m, to, m2, d0, kk))
         q, m = to, m2
     return steps
@@ -81,11 +85,27 @@ def line_stats(b, start, line):
     return by_mirror, desync, remote
 
 
-def make(rng, n, ice, nblocks, k, npawns, share=0.3, desync=True, remote=False, given=True, par_range=(3, 5)):
+def needed(n, pawns, blocks, ice, portals, ramps, start, par):
+    """Every portal pair and ramp is needed: without any one of them par can't be reached"""
+    for i in range(len(portals)):
+        got = Board(n, pawns, blocks, ice, portals[:i] + portals[i + 1:], ramps, FLIP).solve(start, limit=par)[0]
+        if got is not None:
+            return False
+    for r in ramps:
+        rest = {k: v for k, v in ramps.items() if k != r}
+        if Board(n, pawns, blocks, ice, portals, rest, FLIP).solve(start, limit=par)[0] is not None:
+            return False
+    return True
+
+
+def make(rng, n, ice, nblocks, k, npawns, share=0.3, desync=True, remote=False, given=True, par_range=(3, 5), want=None, tries=4000):
+    """want: None, or "portal", "ramp" or "both" for a puzzle mixing the mirror with portals and ramps"""
+    import portals as pt
     cells = [(x, y, z) for x in range(n) for y in range(n) for z in range(n)]
-    for _ in range(4000):
-        blocks = set(rng.sample(cells, nblocks))
-        b0 = Board(n, [], blocks, ice, mirror=FLIP)
+    for _ in range(tries):
+        portals, ramps, used = pt.random_features(n, rng, want) if want else ([], {}, set())
+        blocks = set(rng.sample([c for c in cells if c not in used], nblocks))
+        b0 = Board(n, [], blocks, ice, portals, ramps, FLIP)
         starts = b0.starts()
         if not starts:
             continue
@@ -95,7 +115,7 @@ def make(rng, n, ice, nblocks, k, npawns, share=0.3, desync=True, remote=False, 
             continue
         # pawns on the squares the moves sweep, at least one new pawn a move
         pawns = set()
-        occupied = {start, b0.reflect(start)}
+        occupied = {start, b0.reflect(start)} | used
         for q, m, to, m2, d0, kk in steps:
             qc = [c for c in path_cells(b0, q, d0, kk, m, ice) if c not in occupied]
             mc = [c for c in path_cells(b0, m, b0.flip(d0), kk, to, ice) if c not in occupied]
@@ -108,14 +128,14 @@ def make(rng, n, ice, nblocks, k, npawns, share=0.3, desync=True, remote=False, 
             pawns = sorted(pawns)[:npawns + 3]
             if len(pawns) < npawns:
                 continue
-            b = Board(n, pawns, blocks, ice, mirror=FLIP)
+            b = Board(n, pawns, blocks, ice, portals, ramps, FLIP)
             par, line, s = b.solve(start if given else None, limit=par_range[1])
             if par is None or par < par_range[0]:
                 continue
             if not given and len(b.optimal_starts(par)) > 3:
                 continue
             st = s
-            solo = Board(n, pawns, blocks, ice).solve(st, limit=8)[0]
+            solo = Board(n, pawns, blocks, ice, portals, ramps).solve(st, limit=8)[0]
             if solo is not None and solo <= par:
                 continue  # the mirror isn't needed
             if (b.greedy(st) or 99) <= par:
@@ -136,8 +156,12 @@ def make(rng, n, ice, nblocks, k, npawns, share=0.3, desync=True, remote=False, 
                 continue
             if remote and not rem:
                 continue
+            if want and not needed(n, pawns, blocks, ice, portals, ramps, st, par):
+                continue
             return {"size": n, "queen": st if given else None, "best": st, "pawns": pawns, "blocks": sorted(blocks),
                     "ice": ice, "par": par, "line": [st] + [c for _, c in line], "solo": solo,
+                    "portals": [v for a, fa, c, fc in portals for v in (*a, *fa, *c, *fc, 0)],
+                    "ramps": [v for r, ds in ramps.items() for d in ds for v in (*r, *d)],
                     "mirror_share": round(by_mirror / len(pawns), 2), "desync": ds, "remote": rem}
     return None
 
@@ -157,10 +181,25 @@ PLAN = [
 ]
 
 
+# Brandon, Oct 30: the mirror can go in multi-mechanic puzzles too. (name, tip, size, ice, blocks,
+# walk moves, pawns, want, given, par range); bombs join once that mechanic is merged.
+MIX = [
+    ("Looking Glass", "She goes through portals too.", 5, False, 1, 3, 7, "portal", True, (3, 4)),
+    ("Up and Over", "One climbs while the other dives.", 5, False, 1, 3, 7, "ramp", True, (3, 4)),
+    ("Funhouse", "Portal for you, wall for her?", 5, False, 2, 4, 8, "portal", True, (4, 5)),
+    ("Frost Gate", "Ice, a portal, and two queens.", 5, True, 2, 3, 7, "portal", True, (3, 5)),
+    ("Hill Climb", "Short steps up the ramp.", 6, False, 2, 4, 8, "ramp", True, (4, 5)),
+    ("Black Ice Ramp", "Count both slides.", 5, True, 2, 4, 8, "ramp", True, (4, 5)),
+    ("Wormhole Twins", "Every trick at once.", 6, False, 2, 4, 9, "both", True, (4, 5)),
+    ("Kaleidoscope", "Pick your square. Pick her route.", 5, False, 1, 4, 8, "portal", False, (4, 5)),
+]
+
+
 def rate(e):
     """Score and tier: Mirror Queen puzzles are difficult, Hard at least (Brandon, Oct 30; sized.MIRROR_FLOOR)"""
     import sized, pipeline
-    e["tricks"], e["lured"] = ["mirror"], 1  # every one is built so the greedy player misses par
+    e["tricks"] = ["mirror"] + (["portal"] if e.get("portals") else []) + (["ramp"] if e.get("ramps") else [])
+    e["lured"] = 1  # every one is built so the greedy player misses par
     e["score"] = sized.score_entry(e)
     e["tier"] = pipeline.tier(e["score"])
     return e
@@ -186,7 +225,32 @@ def build(seed=1):
     return {"id": "mirror-test", "name": "Mirror (test)", "free": True, "puzzles": out}
 
 
+def build_mix(seed=1):
+    rng = random.Random(seed)
+    out = []
+    for name, tip, n, ice, nb, k, np_, want, given, pr in MIX:
+        p = None
+        while p is None:
+            p = make(rng, n, ice, nb, k, np_, given=given, par_range=pr, want=want, tries=1500)
+            if p is None:
+                print(f"  {name}: retrying", file=sys.stderr)
+        print(f"{name}: {n}³{' ice' if ice else ''} {want} par {p['par']} (alone {p['solo']}), {len(p['pawns'])} pawns, "
+              f"mirror sweeps {p['mirror_share']:.0%}, out of step {p['desync']}, remote {p['remote']}", file=sys.stderr)
+        e = {"name": name, "size": n, "queen": list(p["queen"]) if p["queen"] else [], "best": list(p["best"]),
+             "pawns": packs.flat(p["pawns"]), "blocks": packs.flat(p["blocks"]), "par": p["par"], "tip": tip,
+             "ice": ice, "line": packs.flat(p["line"]), "mirror": list(FLIP)}
+        if p["portals"]:
+            e["portals"] = p["portals"]
+        if p["ramps"]:
+            e["ramps"] = p["ramps"]
+        out.append(rate(e))
+    return {"id": "mirror-mix", "name": "Mirror Mix (test)", "free": True, "puzzles": out}
+
+
 if __name__ == "__main__":
-    path = packs.write(build(int(sys.argv[1]) if len(sys.argv) > 1 else 1))
+    mix = len(sys.argv) > 1 and sys.argv[1] == "mix"
+    args = sys.argv[2:] if mix else sys.argv[1:]
+    seed = int(args[0]) if args else 1
+    path = packs.write(build_mix(seed) if mix else build(seed))
     problems = packs.check(path)
     print(path, "OK" if not problems else "\n".join(problems))
