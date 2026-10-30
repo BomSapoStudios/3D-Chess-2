@@ -27,7 +27,9 @@ def normalise(e):
         e["tricks"] = sorted({ladder.ENGINE_TAGS[t] for t in e["tags"] if t in ladder.ENGINE_TAGS})
         e["lured"], e["trick_score"] = 3, e["score"]
     e["tricks"] = ladder.effective(e) if e["tricks"] else []
-    if e.get("portals") or e.get("ramps"):
+    if e.get("mirror"):
+        e["mech"] = "mirror"  # hard only: no easy or medium slot asks for it
+    elif e.get("portals") or e.get("ramps"):
         e["mech"] = "warp"
         e.setdefault("want", "portal")
     else:
