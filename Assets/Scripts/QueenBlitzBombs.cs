@@ -333,7 +333,6 @@ public class QueenBlitzBombs : MonoBehaviour
         spotsVersion = QueenBlitz.BombVersion;
         GameObject container = GameObject.Find("Pieces Container");
         if (container == null) return;
-        float cell = ChessBoard.Instance.cellSize;
         int n = QueenBlitz.Current.size;
         Material mat = Unlit(new Color(FuseColor.r, FuseColor.g, FuseColor.b, 0.7f));
         for (int x = 0; x < n; x++)
@@ -342,8 +341,11 @@ public class QueenBlitzBombs : MonoBehaviour
         {
             var c = new BoardPosition(x, y, z);
             if (!QueenBlitz.CanPlaceBomb(c)) continue;
-            GameObject dot = Part(PrimitiveType.Sphere, container.transform, ChessBoard.Instance.BoardToLocalPosition(c) + Vector3.up * cell * 0.25f,
-                Vector3.one * cell * 0.22f, mat, keepCollider: true);
+            // The same size and tap target as the queen's placement dots (PlacementManager): a dot
+            // 0.8 across with a tap sphere twice its size (a small dot was finicky to hit)
+            GameObject dot = Part(PrimitiveType.Sphere, container.transform, ChessBoard.Instance.BoardToLocalPosition(c) + Vector3.up * 0.5f,
+                Vector3.one * 0.8f, mat, keepCollider: true);
+            ((SphereCollider)dot.GetComponent<Collider>()).radius = 1.0f;
             dot.name = $"Bomb Spot {c}";
             dot.AddComponent<QueenBlitzBombSpot>().at = c;
             spots.Add(dot);
