@@ -415,7 +415,7 @@ Moves:
     she takes herself). A blast reaching another bomb sets it off too (chains). Bombs don't stop
     her; blocks, portals and ramps survive. Puzzles can have bombs already down ("bombs") and/or
     bombs for the player to place before the first move ("placeBombs"): a Place bomb button at
-    the bottom left shows a dot on every empty square; tap a dot to place, tap a placed bomb to
+    the bottom (on the bench row, beside the queen) shows a dot on every empty square; tap a dot to place, tap a placed bomb to
     pick it up again, until Ready. Placing isn't a move. Ready waits until every bomb is down.
     Auto-place puts the queen and the bombs on a par solution ("best", "bestBombs"). Undo and
     saved games bring back bombs that went off since. A bomb the Mirror Queen passes or
