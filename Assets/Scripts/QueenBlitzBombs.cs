@@ -407,15 +407,15 @@ public class QueenBlitzBombs : MonoBehaviour
     public void DebugArm() => Arm();
 #endif
 
-    // The bomb button: bottom-right corner, just above the hint line, clear of the board (which
-    // sits in the middle), the bench, and the pawn column and Ready/Auto-place on the left
+    // The bomb button: left side, just above the hint line, under the pawn column and clear of the
+    // board in the middle (Brandon wants it off to the left on every bomb puzzle)
     private void OnGUI()
     {
         if (!Placing) return;
         Vector2 ui = TouchGUI.Begin();
         int left = QueenBlitz.BombsToPlace;
         const float width = 150f, height = 58f;
-        Rect r = new Rect(ui.x - width - 16f, ui.y - 70f - height - 8f, width, height);
+        Rect r = new Rect(16f, ui.y - 70f - height - 8f, width, height);
         string label = left == 0 ? "Bombs placed" : armed ? "Tap a dot" : left == 1 ? "Place bomb" : $"Place bomb ×{left}";
         GUI.enabled = left > 0;
         if (TouchGUI.NeonButton(r, label, armed ? NeonTheme.Lime : FuseColor, NeonTheme.Pink, outlined: left == 0, fontSize: 15))
