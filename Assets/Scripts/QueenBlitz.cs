@@ -99,6 +99,7 @@ public static partial class QueenBlitz
     private static readonly PackInfo[] Catalog =
     {
         new PackInfo { id = "starter", name = "Starter", free = true },
+        new PackInfo { id = "new-tricks", name = "New Tricks", free = true }, // portals, ramps, the Mirror Queen and bombs, gently (Tools/QueenBlitz/intro.py)
         new PackInfo { id = "blitz-5", name = "High Five", free = true },
         new PackInfo { id = "blitz-6", name = "Six Shooter", free = true },
         // Sold packs' ids have no hyphens: they're in App Store product ids (BomSapo.Chess3D.blitz.<id>)
