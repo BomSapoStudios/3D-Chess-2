@@ -27,6 +27,7 @@ public class BlitzDemo : MonoBehaviour
         if (which == 0 || FindFirstObjectByType<BlitzDemo>() != null) return;
         QueenBlitz.PackId = PlayerPrefs.GetString("DebugBlitzPack", "starter");
         if (which == 95) { QueenBlitz.ReturnToPicker = true; return; } // the menu opens on the pack
+        Application.runInBackground = true; // a backgrounded Editor otherwise stalls the run
         var go = new GameObject("Blitz Demo");
         DontDestroyOnLoad(go);
         go.AddComponent<BlitzDemo>().StartCoroutine(Run(which));
@@ -280,7 +281,9 @@ public class BlitzDemo : MonoBehaviour
         else SceneController.Instance.LoadGameScene(config);
         yield return new WaitForSeconds(1f);
 
-        while (PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) yield return null;
+        float ready = 0f;
+        while ((PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) && ready < 30f) { ready += Time.unscaledDeltaTime; yield return null; }
+        if (ready >= 30f) { Debug.Log($"BLITZ DEMO: FAIL {index + 1} pieces never got ready (Editor in the background? runInBackground)"); result(false); yield break; }
         yield return new WaitForSeconds(1f);
         BoardPosition[] solution = puzzle.line; // the queen's start, then each square she stops on
         if (puzzle.placeBombs > 0)
