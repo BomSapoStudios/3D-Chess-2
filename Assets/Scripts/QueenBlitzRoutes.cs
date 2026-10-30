@@ -70,6 +70,8 @@ public static partial class QueenBlitz
     public class Route
     {
         public BoardPosition from, to;
+        public Vector3Int dir;                                                  // the way she set off (the Mirror Queen goes the opposite way)
+        public int steps;                                                       // squares landed on to get here (a trip through a portal or up a ramp is one)
         public readonly List<BoardPosition> swept = new List<BoardPosition>();
         public readonly List<Vector3Int> sweptDir = new List<Vector3Int>();   // her heading at each swept square
         public readonly List<Vector3> points = new List<Vector3>();           // board-local, floor level
@@ -79,7 +81,7 @@ public static partial class QueenBlitz
 
         public Route Copy()
         {
-            var r = new Route { from = from, to = to, special = special };
+            var r = new Route { from = from, to = to, dir = dir, steps = steps, special = special };
             r.swept.AddRange(swept); r.sweptDir.AddRange(sweptDir); r.points.AddRange(points); r.teleport.AddRange(teleport); r.entered.AddRange(entered);
             return r;
         }
@@ -93,6 +95,7 @@ public static partial class QueenBlitz
 
     // The routes from the queen's square, worked out with her moves; the one she takes animates
     private static readonly Dictionary<(BoardPosition, BoardPosition), Route> routes = new Dictionary<(BoardPosition, BoardPosition), Route>();
+    private static BoardPosition? routesMirror; // where the Mirror Queen was when they were worked out
     public static Route PendingRoute { get; private set; }
     /// <summary>The portals the queen can go into from where she stands (lit up while she's picked up)</summary>
     public static readonly HashSet<BoardPosition> EnterablePortals = new HashSet<BoardPosition>();
@@ -101,7 +104,10 @@ public static partial class QueenBlitz
 
     private static BoardPosition Add(BoardPosition c, Vector3Int d) => new BoardPosition(c.x + d.x, c.y + d.y, c.z + d.z);
 
-    private static bool Open(BoardPosition c) => ChessBoard.Instance.IsValidPosition(c) && !blocked.Contains(c);
+    // One more square that counts as a block while routes are worked out: the other queen, with a Mirror Queen
+    private static BoardPosition? alsoBlocked;
+
+    private static bool Open(BoardPosition c) => ChessBoard.Instance.IsValidPosition(c) && !blocked.Contains(c) && c != alsoBlocked;
 
     private static Vector3 Floor(BoardPosition c) => ChessBoard.Instance.BoardToLocalPosition(c);
 
@@ -173,6 +179,8 @@ public static partial class QueenBlitz
     {
         routes.Clear();
         EnterablePortals.Clear();
+        routesMirror = HasMirror ? MirrorSquare(from) : (BoardPosition?)null;
+        alsoBlocked = routesMirror; // she can't pass the Mirror Queen
         int n = Current.size;
         for (int dx = -1; dx <= 1; dx++)
         for (int dy = -1; dy <= 1; dy++)
@@ -181,7 +189,7 @@ public static partial class QueenBlitz
             if (dx == 0 && dy == 0 && dz == 0) continue;
             var d = new Vector3Int(dx, dy, dz);
             BoardPosition c = from;
-            var route = new Route { from = from };
+            var route = new Route { from = from, dir = d };
             route.Point(Floor(from));
             Route last = null;
             for (int k = 0; k < 4 * n * n; k++)
@@ -193,10 +201,12 @@ public static partial class QueenBlitz
                 if (c == from) break; // a portal loop back to the start
                 last = route.Copy();
                 last.to = c;
+                last.steps = k + 1;
                 if (!Current.ice) Keep(last);
             }
             if (Current.ice && last != null) Keep(last);
         }
+        alsoBlocked = null;
     }
 
     /// <summary>Two ways to the same square: keep the one that sweeps more of the pawns still standing</summary>
@@ -221,8 +231,8 @@ public static partial class QueenBlitz
     /// <summary>Every move from a square, with its route (for the trails and portal taps)</summary>
     public static ICollection<Route> RoutesFrom(BoardPosition from)
     {
-        bool fresh = routes.Count > 0;
-        foreach (var key in routes.Keys) { fresh = key.Item1 == from; break; }
+        bool fresh = routes.Count > 0 && routesMirror == (HasMirror ? MirrorSquare(from) : (BoardPosition?)null);
+        foreach (var key in routes.Keys) { fresh = fresh && key.Item1 == from; break; }
         if (!fresh) FindRoutes(from);
         return routes.Values;
     }
@@ -239,6 +249,7 @@ public static partial class QueenBlitz
     /// <summary>The route for a move the queen is making (worked out again if her moves weren't asked for first)</summary>
     public static Route RouteFor(BoardPosition from, BoardPosition to)
     {
+        if (routesMirror != (HasMirror ? MirrorSquare(from) : (BoardPosition?)null)) routes.Clear(); // worked out with the Mirror Queen elsewhere
         if (!routes.TryGetValue((from, to), out Route r))
         {
             FindRoutes(from);
