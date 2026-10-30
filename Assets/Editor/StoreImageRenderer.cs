@@ -170,6 +170,7 @@ public static class StoreImageRenderer
         }
         yield return Step(GamePromos());
         if (!timingCandidates) yield return Step(EverythingImages(menu));
+        if (!timingCandidates) yield return Step(PawnTopUpImages());
 
         PieceShapes.Showing = null;
         Debug.Log("STORE IMAGES: done" + (failures.Count > 0 ? " — failed: " + string.Join(", ", failures) : ""));
@@ -364,6 +365,82 @@ public static class StoreImageRenderer
                 else { Bounds e = b.Value; e.Encapsulate(r.bounds); b = e; }
             }
         return b ?? new Bounds(Vector3.zero, Vector3.one);
+    }
+
+    // ───────── Pawn top-ups (offer codes only): a pile of pawns, and the Code redeemed message ─────────
+
+    private static IEnumerator PawnTopUpImages()
+    {
+        var topUps = Store.PawnProducts.Where(p => Wanted(p.Key)).ToList();
+        if (topUps.Count == 0) yield break;
+
+        // Review shots on the menu: Customize with the message a redeemed code shows
+        NeonMenu menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>();
+        if (menu == null)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+            float until = Time.realtimeSinceStartup + 30f;
+            while ((menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>()) == null && Time.realtimeSinceStartup < until) yield return null;
+            yield return new WaitForSecondsRealtime(3f);
+        }
+        if (menu != null)
+        {
+            Call(menu, "ShowCustomize");
+            yield return new WaitForSecondsRealtime(1f);
+            SelectTab(menu, "Pieces");
+            yield return new WaitForSecondsRealtime(2f);
+            foreach (var topUp in topUps)
+            {
+                Call(menu, "ShowToast", $"Code redeemed: +{topUp.Value} pawns!");
+                yield return new WaitForSecondsRealtime(0.6f);
+                yield return CaptureScreen(ProductId(topUp.Key) + "_review");
+                yield return new WaitForSecondsRealtime(3.5f);   // the message fades before the next
+            }
+        }
+
+        // Promo images: a heap of glowing yellow pawns on the menu's violet, bigger for the bigger top-up
+        foreach (var topUp in topUps)
+        {
+            var stage = new GameObject("Store Stage");
+            stage.transform.position = Stage;
+            Camera cam = StageCamera(stage.transform);
+            BuildBackground(stage.transform, cam);
+            int count = topUp.Value >= 100 ? 24 : 12;
+            var rng = new System.Random(topUp.Value);
+            var pieces = new List<ChessPiece>();
+            for (int i = 0; i < count; i++)
+            {
+                // A loose heap: rings outwards from the middle, the middle ones raised
+                int ring = i == 0 ? 0 : i < 7 ? 1 : i < 19 ? 2 : 3;
+                int inRing = ring == 0 ? 1 : ring * 6;
+                int k = ring == 0 ? 0 : i - (ring == 1 ? 1 : ring == 2 ? 7 : 19);
+                float angle = (k + (float)rng.NextDouble() * 0.4f) / inRing * Mathf.PI * 2f;
+                float radius = ring * 1.05f;
+                ChessPiece p = MakePiece(typeof(Pawn), PieceColor.Yellow, stage.transform);
+                p.transform.position = Stage + new Vector3(Mathf.Cos(angle) * radius, (3 - ring) * 0.35f, Mathf.Sin(angle) * radius * 0.8f);
+                p.transform.rotation = Quaternion.Euler((float)rng.NextDouble() * 10f - 5f, (float)rng.NextDouble() * 360f, (float)rng.NextDouble() * 10f - 5f);
+                pieces.Add(p);
+            }
+            yield return null;
+            yield return null;
+            Bounds b = BoundsOf(pieces);
+            Vector3 look = b.center;
+            Vector3 back = new Vector3(0f, 0.45f, -1f).normalized;
+            float dist = 20f;
+            for (int pass = 0; pass < 4; pass++)
+            {
+                cam.transform.position = look + back * dist;
+                cam.transform.LookAt(look);
+                cam.aspect = 1f;
+                dist *= ViewportSpread(cam, pieces) / 0.8f;
+            }
+            cam.transform.position = look + back * dist;
+            cam.transform.LookAt(look);
+            yield return new WaitForSecondsRealtime(0.5f);
+            SavePng(RenderCamera(cam, PromoSize, PromoSize), ProductId(topUp.Key));
+            UnityEngine.Object.Destroy(stage);
+            yield return null;
+        }
     }
 
     // ───────── Unlock Everything: a collage of what it opens, and the Customize card ─────────
