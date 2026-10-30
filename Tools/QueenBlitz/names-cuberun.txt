@@ -1,0 +1,66 @@
+# warp
+Side Door
+Express Lane
+Fire Escape
+Back Stairs
+Dumbwaiter
+Trapdoor Express
+Loop the Loop
+Rabbit Run
+Stargazer
+Time Slip
+Freight Elevator
+Shortwave
+Hyperloop
+Fold Space
+Mobius Strip
+Pocket Dimension
+Crossover
+Skylight
+Up and Over
+Air Lock
+Warp Drive
+Gateway
+Mezzanine Run
+Clockwork
+Revolving Door
+Ladder Match
+Penthouse
+Stairwell
+Chute
+Flight Path
+Wrong Exit
+Ghost Train
+Hidden Passage
+Escape Hatch
+Trick Mirror
+Echo Chamber
+Labyrinth
+Wind Tunnel
+Overdrive
+Event Loop
+Kaleidoscope
+Half Pipe
+Lighthouse
+Spin Cycle
+Undertow Gate
+Whirlpool
+Ouroboros
+Infinite Hall
+Grand Central
+Last Stop
+Terminal
+Rush Gate
+Sky Hook
+# ice
+Frozen Gate
+Ice Tunnel
+Slide Rule
+Cold Front
+Polar Express
+Snow Globe
+Toboggan
+Icefall
+# classic
+Run Home
+Free Run

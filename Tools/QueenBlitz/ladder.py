@@ -30,7 +30,7 @@ TIPS = {
     "cold": "Where you start matters more than it looks.",
     "walls": "The blocks are there for a reason.",
 }
-MAKERS = ["fork", "wander", "bait", "walls", "blocks", "plain"]
+MAKERS = __import__("os").environ.get("MAKERS", "fork,wander,bait,walls,blocks,plain").split(",")
 ICE_SHARE = float(__import__("os").environ.get("ICE_SHARE", "0"))  # share of ice-board candidates
 WANT = "any"
 

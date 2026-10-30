@@ -1,0 +1,66 @@
+# classic
+Barricade
+Brick Wall
+Roadwork
+Dead End
+Toll Booth
+Speed Bump
+Gatekeeper
+Checkpoint
+Fence Line
+Bottleneck
+Traffic Cone
+Detour Ahead
+Pillar
+Bollard
+Gridiron
+Fortress
+Battlements
+Moat
+Castle Keep
+Portcullis
+Rampart
+Bunker
+Stonewall
+Cobblestone
+Brickyard
+Quarry
+Monolith
+Stonehenge
+Obelisk
+Standoff
+Lockdown
+Blind Alley
+Choke Point
+Pinch Point
+No Through Road
+Road Closed
+Wrong Way
+One Way
+Barrier Reef
+Great Wall
+Firewall
+Maze Runner
+Tight Squeeze
+Cornered
+Boxed In
+Hemmed In
+Stalemate
+Siege
+Iron Curtain
+Bulwark
+Keystone Cop
+Last Stand
+Breakthrough
+# ice
+Ice Wall
+Frozen Gate Road
+Cold Barrier
+Snow Fort
+Igloo
+# warp
+Wall Portal
+Back Gate
+Secret Door
+Postern
+Sally Port

@@ -1,0 +1,71 @@
+# classic
+Appetizer
+Amuse-Bouche
+Smorgasbord
+Buffet
+Potluck
+Picnic
+Banquet
+Second Helpings
+All You Can Eat
+Tasting Menu
+Brunch
+Supper Club
+Midnight Snack
+Dim Sum
+Tapas
+Mezze
+Dinner Bell
+Full Plate
+Main Course
+Chef's Table
+Pot Roast
+Big Dipper
+Gobble
+Nibbles
+Crumbs
+Leftovers
+Doggy Bag
+Food Fight
+Pie Eating
+Hot Dog
+Clean Plate
+Breadbasket
+Salad Bar
+Spread
+Harvest
+Thanksgiving
+Feeding Frenzy
+Gorge
+Glutton
+Sweet Tooth
+Bottomless
+Seven Courses
+Grand Buffet
+Royal Feast
+Last Supper
+Just Desserts
+Coffee and Cake
+Doughnut
+Pizza Party
+Wedding Cake
+Room Service
+Night Market
+# ice
+Ice Cream
+Sorbet
+Frozen Yogurt
+Snow Cone
+Slushie
+Popsicle
+Cold Cuts
+Chilled Soup
+Parfait
+Sundae
+# warp
+Takeout
+Delivery
+Drive Through
+Conveyor Belt
+Dumbwaiter Dinner
+Room Service Lift
