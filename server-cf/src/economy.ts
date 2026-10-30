@@ -12,6 +12,8 @@ export const ECONOMY = {
   blitzMaxPawns: 40,
   /** Zombies!: pawns per zombie destroyed, by brain size (a run's total is rounded down) */
   zombieRates: { easy: 1, medium: 1.5, hard: 2 } as Record<string, number>,
+  /** The daily bonus: pawns each account can claim once per UTC day */
+  dailyClaim: 50,
   /** Zombies!: the most it pays per account per day (UTC) */
   zombieDailyCap: 100,
   /** Zombies!: more kills than this in one run isn't believable */

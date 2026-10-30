@@ -61,6 +61,8 @@ export { Accounts } from './accounts.js';
 //                                       → { wallet, results, statsTaken }  earnings queued by the app, plus
 //                                         Queen Blitz solve times (blitzstats.ts) (Bearer)
 //   POST /wallet/spend { requestId, item } → { wallet, item }   unlock for pawns (Bearer)
+//   POST /wallet/daily                  → { claimed, pawns, wallet }  the daily bonus, once per UTC day (Bearer);
+//                                         the wallet always says dailyAvailable and nextDailyAt (Unix ms)
 //   POST /wallet/purchase { transactions: [StoreKit 2 JWS, ...] }
 //                                       → { wallet, granted, credited, rejected }  App Store purchases,
 //                                         and pawn top-ups from offer codes (credited = pawns added) (Bearer)
@@ -264,6 +266,7 @@ export default {
       if (request.method === 'GET' && path === '/wallet') return account('wallet');
       if (request.method === 'POST' && path === '/wallet/sync') return account('wallet-sync', { migrate: body.migrate, events: body.events, stats: body.stats });
       if (request.method === 'POST' && path === '/wallet/spend') return account('wallet-spend', { requestId: body.requestId, item: body.item });
+      if (request.method === 'POST' && path === '/wallet/daily') return account('wallet-daily');
       if (request.method === 'POST' && path === '/wallet/purchase') {
         const list = Array.isArray(body.transactions) ? body.transactions.slice(0, ECONOMY.maxTransactionsPerCall) : [];
         const bundleIds = env.APPLE_AUDIENCES.split(',').map(s => s.trim()).filter(Boolean);

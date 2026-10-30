@@ -227,6 +227,7 @@ public partial class NeonMenu : MonoBehaviour
         UpdateLobbyCountdown();
         OpenTappedNotification();
         if (notifyScreen != null && notifyScreen.activeSelf) RefreshNotifyStatus();
+        UpdateDailyClaim();
     }
 
     // ───────────────────────── Canvas ─────────────────────────
@@ -330,6 +331,7 @@ public partial class NeonMenu : MonoBehaviour
 
         TextMeshProUGUI tagline = NewText("Tagline", column, "Up, down, sideways. Go wild.", 18, NeonTheme.Cyan, TextAlignmentOptions.Left);
         tagline.rectTransform.sizeDelta = new Vector2(420, 26);
+        BuildDailyClaim(tagline.rectTransform);
 
         RectTransform quickRow = NewRect("Row", column);
         quickRow.sizeDelta = new Vector2(370, 58);
@@ -1725,6 +1727,7 @@ public partial class NeonMenu : MonoBehaviour
         Purchases.Owned -= OnPurchased;
         Purchases.Redeemed -= OnRedeemed;
         Purchases.PawnsAdded -= OnPawnsAdded;
+        Wallet.Changed -= RefreshDailyClaim;
     }
 
     private void ResetFriendsCache()

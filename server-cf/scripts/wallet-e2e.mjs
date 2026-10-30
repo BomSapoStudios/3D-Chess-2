@@ -82,6 +82,15 @@ check(pu.credited === 0, '...nor from another account');
 pu = (await post('/wallet/purchase', { transactions: [F.pawns100, F.pawns100b] }, b.token)).body;
 check(pu.credited === 200 && pu.wallet.balance === pawnsBefore + 250, 'two 100-pawn codes add 200');
 
+// The daily bonus
+check((await post('/wallet/daily', {})).status === 401, 'the daily bonus needs a signed-in player');
+w = (await get('/wallet', b.token)).body;
+check(w.dailyAvailable === true && w.nextDailyAt > Date.now(), 'the wallet says the daily bonus is waiting, and when the next one comes');
+let dc = (await post('/wallet/daily', {}, b.token)).body;
+check(dc.claimed === true && dc.pawns === 50 && dc.wallet.balance === w.balance + 50 && dc.wallet.dailyAvailable === false, 'claiming it adds 50 pawns');
+dc = (await post('/wallet/daily', {}, b.token)).body;
+check(dc.claimed === false && dc.wallet.balance === w.balance + 50 && dc.wallet.nextDailyAt === w.nextDailyAt, 'a second claim the same day adds nothing and says when the next comes');
+
 // Deleting the account deletes the wallet
 check((await post('/account/delete', {}, a.token)).status === 200, 'account deleted');
 check((await get('/wallet', a.token)).status === 401, 'its wallet is gone with it');

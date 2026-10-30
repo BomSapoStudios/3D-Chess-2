@@ -4,7 +4,7 @@ import { isGeneratedName, randomName } from './names.js';
 import { sendPush, type PushKind, type PushMessage } from './push.js';
 import { cooldownUntil, leaderboard, recordGame, recordWalkout, setupTables, stats, tiersOf, type GameResult, type Mode } from './ratings.js';
 import { blitzStatsReport, purgeBlitzStats, recordBlitzStats, setupBlitzStatsTables } from './blitzstats.js';
-import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError, type Migration, type VerifiedCredit, type VerifiedPurchase } from './wallet.js';
+import { claimDaily, purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError, type Migration, type VerifiedCredit, type VerifiedPurchase } from './wallet.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accounts — one Durable Object (SQLite) holding every player account.
@@ -137,6 +137,7 @@ export class Accounts extends DurableObject<Env> {
       }
       case 'blitz-stats-report': return { puzzles: blitzStatsReport(this.sql, String(b.pack ?? '')) }; // the Worker checks STATS_KEY first
       case 'wallet-spend': this.account(userId); return spendPawns(this.sql, userId, String(b.requestId ?? ''), String(b.item ?? ''));
+      case 'wallet-daily': this.account(userId); return claimDaily(this.sql, userId);
       case 'wallet-purchase': this.account(userId); return recordPurchases(this.sql, userId, (b.purchases as VerifiedPurchase[]) ?? [], Date.now(), (b.credits as VerifiedCredit[]) ?? []);
       case 'notify': return this.notify(Array.isArray(b.userIds) ? b.userIds.map(String) : [], b.message as PushMessage);
       default: throw new HttpError(404, 'Unknown operation');

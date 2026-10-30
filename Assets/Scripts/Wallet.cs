@@ -19,6 +19,8 @@ public class Wallet : MonoBehaviour
     {
         public string userId = "";
         public int balance, lifetime, zombieLeftToday;
+        public bool dailyAvailable;
+        public long nextDailyAt;   // Unix ms: the next UTC midnight after the server's answer
         public string[] items = new string[0];
         public bool migrated;
         public int utcDay;   // the day zombieLeftToday is for
@@ -38,6 +40,7 @@ public class Wallet : MonoBehaviour
     [Serializable] private class SyncReply { public State wallet; }
     [Serializable] private class SpendBody { public string requestId, item; }
     [Serializable] private class PurchaseBody { public string[] transactions; }
+    [Serializable] private class DailyReply { public bool claimed; public int pawns; public State wallet; }
     [Serializable] private class PurchaseReply { public State wallet; public int credited, rejected; }
     [Serializable] private class ErrorReply { public string error; }
 
@@ -123,6 +126,45 @@ public class Wallet : MonoBehaviour
 
     private static bool Migrated => PlayerPrefs.GetInt(MigratedKey, 0) == 1;
     private static int UtcDay => (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalDays;
+    private static long UnixMs => (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds;
+
+    /// <summary>The daily bonus can be claimed (as far as the phone knows; the server decides, once per UTC day)</summary>
+    public static bool DailyAvailable
+    {
+        get
+        {
+            Load();
+            long now = UnixMs;
+            return now >= state.nextDailyAt || state.dailyAvailable;
+        }
+    }
+
+    /// <summary>Time until the next daily bonus (zero when one is waiting)</summary>
+    public static TimeSpan UntilDaily => DailyAvailable ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Max(0, state.nextDailyAt - UnixMs));
+
+    /// <summary>Claim today's bonus; done(pawns added, null) or (0, a message to show)</summary>
+    public static void ClaimDaily(Action<int, string> done)
+    {
+        Load();
+        instance.StartCoroutine(ClaimRoutine(done));
+    }
+
+    private static IEnumerator ClaimRoutine(Action<int, string> done)
+    {
+        const string offline = "Connect to the internet to claim your daily pawns.";
+        bool ok = false;
+        // Queued earnings go too, so the balance it shows afterwards is right
+        if (queue.events.Count > 0 || !Migrated) yield return Flush(r => ok = r);
+        else yield return SignIn(r => ok = r);
+        if (!ok) { done(0, offline); yield break; }
+        long status = 0;
+        string text = null;
+        yield return OnlineClient.GetOrCreate().Request("POST", "/wallet/daily", "{}", (s, t) => { status = s; text = t; });
+        if (status != 200) { done(0, status == 0 ? offline : "That didn't work, please try again."); yield break; }
+        DailyReply reply = JsonUtility.FromJson<DailyReply>(text);
+        Apply(reply?.wallet);
+        done(reply != null && reply.claimed ? reply.pawns : 0, reply != null && reply.claimed ? null : "Already claimed today. Come back tomorrow!");
+    }
 
     private static int Expected(Func<Earning, bool> which)
     {

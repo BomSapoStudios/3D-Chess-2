@@ -30,6 +30,8 @@ export function setupWalletTables(sql: SqlStorage) {
     CREATE TABLE IF NOT EXISTS wallet_requests (account_id TEXT, request_id TEXT, at INTEGER, PRIMARY KEY (account_id, request_id));
     CREATE TABLE IF NOT EXISTS apple_transactions (original_id TEXT PRIMARY KEY, transaction_id TEXT, account_id TEXT, item TEXT, environment TEXT, at INTEGER);
   `);
+  // The UTC day the daily bonus was last claimed (-1: never)
+  try { sql.exec('ALTER TABLE wallets ADD COLUMN daily_day INTEGER DEFAULT -1'); } catch { /* already there */ }
 }
 
 /** Forget an account's wallet (deleting the account). Its App Store purchases can then be restored onto a new account. */
@@ -42,21 +44,37 @@ export function purgeWallet(sql: SqlStorage, id: string) {
   sql.exec("UPDATE apple_transactions SET account_id = '' WHERE account_id = ?", id);
 }
 
-interface WalletRow { balance: number; lifetime: number; migrated: number; zombie_day: number; zombie_today: number }
+interface WalletRow { balance: number; lifetime: number; migrated: number; zombie_day: number; zombie_today: number; daily_day: number }
 
 function row(sql: SqlStorage, id: string): WalletRow {
   sql.exec('INSERT OR IGNORE INTO wallets (account_id) VALUES (?)', id);
-  return sql.exec('SELECT balance, lifetime, migrated, zombie_day, zombie_today FROM wallets WHERE account_id = ?', id).toArray()[0] as unknown as WalletRow;
+  return sql.exec('SELECT balance, lifetime, migrated, zombie_day, zombie_today, daily_day FROM wallets WHERE account_id = ?', id).toArray()[0] as unknown as WalletRow;
 }
 
 const utcDay = (now: number) => Math.floor(now / DAY);
 
-/** What the app shows: pawns, every pawn ever earned, owned items and what Zombies! can still pay today */
+/**
+ * What the app shows: pawns, every pawn ever earned, owned items, what Zombies! can still pay today,
+ * and the daily bonus (available now, or when the next one comes: the next UTC midnight, Unix ms)
+ */
 export function walletOf(sql: SqlStorage, id: string, now = Date.now()) {
   const w = row(sql, id);
   const zombieToday = w.zombie_day === utcDay(now) ? w.zombie_today : 0;
   const items = sql.exec('SELECT item FROM wallet_items WHERE account_id = ? ORDER BY item', id).toArray().map(r => r.item as string);
-  return { balance: w.balance, lifetime: w.lifetime, items, zombieLeftToday: Math.max(0, ECONOMY.zombieDailyCap - zombieToday), migrated: w.migrated === 1 };
+  return {
+    balance: w.balance, lifetime: w.lifetime, items, zombieLeftToday: Math.max(0, ECONOMY.zombieDailyCap - zombieToday), migrated: w.migrated === 1,
+    dailyAvailable: w.daily_day !== utcDay(now), nextDailyAt: (utcDay(now) + 1) * DAY,
+  };
+}
+
+/** The daily bonus: pays once per account per UTC day; a second claim pays nothing and says when the next comes */
+export function claimDaily(sql: SqlStorage, id: string, now = Date.now()) {
+  const w = row(sql, id);
+  const day = utcDay(now);
+  if (w.daily_day === day) return { claimed: false, pawns: 0, wallet: walletOf(sql, id, now) };
+  sql.exec('UPDATE wallets SET daily_day = ? WHERE account_id = ?', day, id);
+  earn(sql, id, ECONOMY.dailyClaim);
+  return { claimed: true, pawns: ECONOMY.dailyClaim, wallet: walletOf(sql, id, now) };
 }
 
 function earn(sql: SqlStorage, id: string, pawns: number) {

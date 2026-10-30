@@ -3,7 +3,7 @@ import { describe, test, expect, beforeEach } from 'vitest';
 // Node modules are loaded by name so the Worker typecheck (no Node types) stays clean
 const { DatabaseSync } = await import('node:sqlite' as string);
 const fixtures = (await import('./fixtures/apple-jws.json' as string)).default;
-import { purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError } from '../wallet';
+import { claimDaily, purgeWallet, recordPurchases, setupWalletTables, spendPawns, syncWallet, walletOf, WalletError } from '../wallet';
 import { ECONOMY, EVERYTHING, itemOfProduct, pawnsOfProduct, priceOf } from '../economy';
 import { verifyAppleTransaction } from '../appleJws';
 
@@ -27,8 +27,32 @@ const rid = () => `req-${String(++n).padStart(6, '0')}`;
 beforeEach(() => { sql = sqlStorage(); setupWalletTables(sql); });
 
 describe('wallet', () => {
-  test('starts empty with the full Zombies! allowance', () => {
-    expect(walletOf(sql, 'a')).toEqual({ balance: 0, lifetime: 0, items: [], zombieLeftToday: ECONOMY.zombieDailyCap, migrated: false });
+  test('starts empty with the full Zombies! allowance and the daily bonus waiting', () => {
+    const t = Date.UTC(2026, 9, 30, 15);
+    expect(walletOf(sql, 'a', t)).toEqual({ balance: 0, lifetime: 0, items: [], zombieLeftToday: ECONOMY.zombieDailyCap, migrated: false,
+      dailyAvailable: true, nextDailyAt: Date.UTC(2026, 9, 31) });
+  });
+
+  test('the daily bonus pays once per UTC day', () => {
+    const t = Date.UTC(2026, 9, 30, 23, 50);
+    const first = claimDaily(sql, 'a', t);
+    expect(first.claimed).toBe(true);
+    expect(first.pawns).toBe(ECONOMY.dailyClaim);
+    expect(first.wallet).toMatchObject({ balance: 50, lifetime: 50, dailyAvailable: false, nextDailyAt: Date.UTC(2026, 9, 31) });
+    const again = claimDaily(sql, 'a', t + 5 * 60_000);
+    expect(again).toMatchObject({ claimed: false, pawns: 0 });
+    expect(again.wallet.balance).toBe(50);
+    const tomorrow = claimDaily(sql, 'a', Date.UTC(2026, 9, 31, 0, 1));   // just past midnight UTC
+    expect(tomorrow.claimed).toBe(true);
+    expect(tomorrow.wallet.balance).toBe(100);
+    expect(claimDaily(sql, 'b', t).claimed).toBe(true);   // per account
+  });
+
+  test('deleting the account forgets its daily claim along with its pawns', () => {
+    const t = Date.UTC(2026, 9, 30, 12);
+    claimDaily(sql, 'a', t);
+    purgeWallet(sql, 'a');
+    expect(walletOf(sql, 'a', t)).toMatchObject({ balance: 0, dailyAvailable: true });
   });
 
   test('a Queen Blitz puzzle pays on its first clear only', () => {
