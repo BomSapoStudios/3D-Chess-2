@@ -62,8 +62,13 @@ def candidate(args):
     pawns = set()
     if kind in ("bomb", "place_bomb", "chain"):
         centres = []
-        for _ in range(2 if kind == "chain" else 1):
+        for k in range(2 if kind == "chain" else 1):
             c = tuple(rng.randrange(1, N - 1) for _ in range(3))
+            if k == 1:
+                # The bomb to place sits next to the given one, so its blast can set that one off
+                c = tuple(centres[0][i] + rng.choice((-1, 0, 1)) for i in range(3))
+                if not all(1 <= v < N - 1 for v in c):
+                    return None
             if c in centres or c in pawns:
                 return None
             centres.append(c)
@@ -140,6 +145,11 @@ def candidate(args):
         # Both bombs matter: the placed one alone, or the given one alone, isn't enough
         if Board(N, pawns, blocks, bombs=bombs).solve(start, limit=par)[0] is not None:
             return None
+        # A real chain: every par placement is next to the given bomb, and the par line never runs
+        # over the given bomb, so only the placed bomb's blast can set it off
+        given = bombs[0]
+        if any(max(abs(a - g) for a, g in zip(f[0], given)) != 1 for f in found):
+            return None
     entry = {
         "name": name, "size": N, "queen": list(start), "best": list(start), "pawns": packs.flat(pawns),
         "blocks": packs.flat(blocks), "par": par, "tip": tip, "ice": False,
@@ -169,6 +179,8 @@ def candidate(args):
         else:
             moves = [x for x in bb.moves(a) if x[0] == c]
         mv = max(moves, key=lambda x: bin(x[1] & left & bb.pawn_mask).count("1"))
+        if kind == "chain" and mv[1] & bb.bit[tuple(bombs[0])]:
+            return None  # she runs over the given bomb herself: no chain needed
         nxt = bb.after(left, mv[1])
         if not (left & ~nxt & bb.pawn_mask):
             return None
