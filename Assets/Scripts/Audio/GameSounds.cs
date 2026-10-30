@@ -99,6 +99,9 @@ public static class GameSounds
         Sfx.Play(ice ? "ice_slide" : "blitz_slide");
     }
 
+    /// <summary>A Queen Blitz bomb going off (each link in a chain a little higher)</summary>
+    public static void BombBlast(int link) => Sfx.Play("blitz_bomb", 1f, Harmony.RootShift + 2f * link, vary: true);
+
     /// <summary>One earned pawn arrives in the tally (they climb as they come in)</summary>
     public static void PawnBanked(int n) => Sfx.Play("pawn_ding", 0.7f, Harmony.Tone(n % 7, 0), vary: false);
 }

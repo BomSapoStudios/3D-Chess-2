@@ -25,6 +25,7 @@ public class UndoManager : MonoBehaviour
         public int zombieRounds, zombiePawns, zombiePromoted;
         public int blitzMoves;
         public BoardPosition? blitzMirror; // the Mirror Queen's square (null: her start)
+        public List<BoardPosition> blitzBombs;
     }
 
     private readonly List<Snapshot> history = new List<Snapshot>();
@@ -130,6 +131,7 @@ public class UndoManager : MonoBehaviour
             turn = TurnManager.Instance.GetCurrentPlayer(),
             zombieRounds = ZombieMode.Rounds, zombiePawns = ZombieMode.PawnsDestroyed, zombiePromoted = ZombieMode.PromotedDestroyed,
             blitzMoves = QueenBlitz.Moves, blitzMirror = QueenBlitz.MirrorAt,
+            blitzBombs = QueenBlitz.Active ? QueenBlitz.BombsSnapshot() : null,
         };
         foreach (ChessPiece p in BoardPieces())
             snap.pieces.Add(new SavedPiece { type = p.pieceType, color = p.pieceColor, at = p.CurrentPosition });
@@ -169,6 +171,7 @@ public class UndoManager : MonoBehaviour
             int pawns = 0;
             foreach (SavedPiece s in snap.pieces) if (s.color == QueenBlitz.PawnColor) pawns++;
             QueenBlitz.Swept = QueenBlitz.Current.pawns.Length - pawns; // the pawns swept up to that point
+            QueenBlitz.RestoreBombs(snap.blitzBombs); // bombs set off since then come back
         }
 
         if (GameEndDetectionManager.Instance != null) GameEndDetectionManager.Instance.ClearDrawOffer();

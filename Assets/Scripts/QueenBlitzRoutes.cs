@@ -209,7 +209,7 @@ public static partial class QueenBlitz
         alsoBlocked = null;
     }
 
-    /// <summary>Two ways to the same square: keep the one that sweeps more of the pawns still standing</summary>
+    /// <summary>Two ways to the same square: keep the one that takes more of the pawns still standing (bomb blasts included)</summary>
     private static void Keep(Route r)
     {
         var key = (r.from, r.to);
@@ -225,7 +225,7 @@ public static partial class QueenBlitz
             if (piece != null && piece.pieceColor == PawnColor) count++;
         }
         ChessPiece end = ChessBoard.Instance.GetPieceAt(r.to);
-        return count + (end != null && end.pieceColor == PawnColor ? 1 : 0);
+        return count + (end != null && end.pieceColor == PawnColor ? 1 : 0) + BlastCount(r);
     }
 
     /// <summary>Every move from a square, with its route (for the trails and portal taps)</summary>
