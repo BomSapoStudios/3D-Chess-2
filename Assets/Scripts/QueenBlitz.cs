@@ -33,6 +33,8 @@ public static partial class QueenBlitz
         public PortalPair[] portals;     // see QueenBlitzRoutes
         public RampRise[] ramps;
         public string sig;               // the layout's signature (Sig): solve times are kept per version of a puzzle
+        public bool mirror;              // a Mirror Queen copies every move the opposite way (QueenBlitzMirror)
+        public Vector3Int mirrorFlip;    // the axes she's flipped on: 1 flipped, 0 not
     }
 
     // ───────────────────────── Packs ─────────────────────────
@@ -56,6 +58,7 @@ public static partial class QueenBlitz
         public string tier;
         public int[] portals;  // 13 a pair: in x,y,z, its facing, out x,y,z, its facing, two-way 0/1
         public int[] ramps;    // 6 a rising direction: x,y,z, dx,0,dz (a square repeats for each way it rises)
+        public int[] mirror;   // the axes the Mirror Queen flips, [1,1,1] = through the centre; left out with no mirror
     }
 
     [System.Serializable]
@@ -105,6 +108,7 @@ public static partial class QueenBlitz
         new PackInfo { id = "tricky-4", name = "Tricky 4 (test)", free = true, review = true },
         new PackInfo { id = "portal-test", name = "Portals & Ramps (test)", free = true, review = true },
         new PackInfo { id = "portal-brakes", name = "Portal Brakes (test)", free = true, review = true },
+        new PackInfo { id = "mirror-test", name = "Mirror (test)", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
@@ -334,6 +338,8 @@ public static partial class QueenBlitz
                 best = best.Length > 0 ? best[0] : default,
                 pawns = Cells(d.pawns), blocks = Cells(d.blocks), line = Cells(d.line), score = d.score, tier = d.tier,
                 portals = Portals(d.portals), ramps = Ramps(d.ramps), sig = Sig(d),
+                mirror = d.mirror != null && d.mirror.Length == 3,
+                mirrorFlip = d.mirror != null && d.mirror.Length == 3 ? new Vector3Int(d.mirror[0], d.mirror[1], d.mirror[2]) : Vector3Int.zero,
             });
         }
         return list.ToArray();
@@ -341,13 +347,15 @@ public static partial class QueenBlitz
 
     /// <summary>
     /// A puzzle's layout as 8 hex digits (FNV-1a of size, queen, pawns, blocks, par, ice, portals and
-    /// ramps), so a puzzle changed in a pack gets fresh solve times. Tools/QueenBlitz/stats.py makes the same.
+    /// ramps, then the mirror if there is one), so a puzzle changed in a pack gets fresh solve times.
+    /// Tools/QueenBlitz/stats.py makes the same.
     /// </summary>
     private static string Sig(PuzzleData d)
     {
         string Csv(int[] a) => a == null ? "" : string.Join(",", System.Array.ConvertAll(a, v => v.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         string text = string.Join("|", d.size.ToString(System.Globalization.CultureInfo.InvariantCulture), Csv(d.queen), Csv(d.pawns), Csv(d.blocks),
             d.par.ToString(System.Globalization.CultureInfo.InvariantCulture), d.ice ? "1" : "0", Csv(d.portals), Csv(d.ramps));
+        if (d.mirror != null && d.mirror.Length == 3) text += "|" + Csv(d.mirror);
         uint h = 2166136261;
         foreach (char c in text) { h ^= c; h *= 16777619; }
         return h.ToString("x8");
@@ -424,10 +432,13 @@ public static partial class QueenBlitz
         blocked.Clear();
         foreach (BoardPosition b in Current.blocks) blocked.Add(b);
         SetUpFeatures(Current);
+        MirrorAt = null;
     }
 
-    /// <summary>Nothing can be placed here: a block, a portal or a ramp</summary>
-    public static bool IsBlocked(BoardPosition p) => Active && (blocked.Contains(p) || portalAt.ContainsKey(p) || rampAt.ContainsKey(p));
+    /// <summary>Nothing can be placed here: a block, a portal or a ramp (or, with a Mirror Queen, her square would be one, a pawn, or the queen's own)</summary>
+    public static bool IsBlocked(BoardPosition p) => Active && (Solid(p) || MirrorForbids(p));
+
+    private static bool Solid(BoardPosition p) => blocked.Contains(p) || portalAt.ContainsKey(p) || rampAt.ContainsKey(p);
 
     /// <summary>The pawns this puzzle pays when cleared: all of them, the first time (PawnBank sets the rule)</summary>
     public static int Reward(int index) => Puzzles[index].pawns.Length;
@@ -503,6 +514,7 @@ public static partial class QueenBlitz
     {
         Route route = RouteFor(from, to);
         PendingRoute = route != null && route.special ? route : null; // the slide follows it through portals and up ramps
+        if (HasMirror) MoveMirror(from, to, route); // she answers the opposite way
         if (route == null)
         {
             foreach (BoardPosition p in Between(from, to)) Sweep(queen, p, from, to);
@@ -597,6 +609,7 @@ public partial class QueenBlitzDirector : MonoBehaviour
     {
         Instance = this;
         gameObject.AddComponent<QueenBlitzTrails>();
+        if (QueenBlitz.Current.mirror) gameObject.AddComponent<QueenBlitzMirror>();
     }
 
     private void OnDestroy()
