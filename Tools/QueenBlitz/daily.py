@@ -9,6 +9,7 @@ The monthly workflow (a scheduled Claude task runs the first two steps and asks 
 
     python3 daily.py status                   # how far ahead the queue runs and what made it
     python3 daily.py next --days 35 --minutes 24 --from 2026-12-01   # a set window instead
+    python3 daily.py next --reuse             # pick again from the last run's candidates (after a rules fix)
 
 Files go to server-cf/public/daily/YYYY-MM-DD.json and reach players with `wrangler deploy` from
 current main (Brandon's OK needed). Cloudflare serves static files without running the Worker, so
@@ -43,7 +44,7 @@ ENGINE = "sized-2026-10"             # written into each daily this script makes
 WEEK = {
     0: [("classic", (5,), (3, 4), (1, 1), (0, 1), "easy")],
     1: [("classic", (5,), (4,), (1, 1), (0, 2), "mid")],
-    2: [("classic", (6,), (4,), (1, 1), (0, 2), "mid"), ("ice", (5,), (3, 4), (0, 2), (0, 2), "mid")],
+    2: [("classic", (6,), (4,), (1, 1), (0, 2), "mid"), ("ice", (5,), (3, 4), (0, 1), (0, 2), "easy")],
     3: [("classic", (5, 6), (4, 5), (2, 2), (1, 3), "mid")],
     4: [("ice", (6,), (4, 5), (1, 9), (1, 3), "mid"), ("classic", (6,), (5,), (2, 9), (2, 3), "mid")],
     5: [("classic", (6,), (5, 6), (2, 9), (2, 3), "hard")],
@@ -187,7 +188,7 @@ def entry_for(day, p):
     return e
 
 
-def next_batch(start, days, minutes, seed, warp, rounds=3):
+def next_batch(start, days, minutes, seed, warp, pool_path, reuse=False, rounds=3):
     today = datetime.date.today()
     dailies = load_dailies()
     made = [d for d in dailies if dailies[d].get("engine")]
@@ -203,10 +204,14 @@ def next_batch(start, days, minutes, seed, warp, rounds=3):
     seen |= {pipeline.layout_key(p) for d, p in dailies.items() if d not in window}
     before = [dailies[d] for d in sorted(dailies) if first - datetime.timedelta(7) <= d < first]
     print(f"Remaking {window[0]} to {window[-1]} ({days} days); {first - today} frozen ahead of today", flush=True)
-    pool, chosen = [], {}
+    # Candidates are kept in pool_path, so a rerun (after a fix to the rules) can skip making them again
+    pool = [sized.normalise(c) for c in json.load(open(pool_path))] if reuse and os.path.exists(pool_path) else []
+    chosen = {}
     with tempfile.TemporaryDirectory() as work:
         for r in range(rounds):
-            pool += generate(minutes if r == 0 else minutes / 3, seed + r, work, warp)
+            if r or not pool:
+                pool += generate(minutes if not pool else minutes / 3, seed + r, work, warp)
+                json.dump(pool, open(pool_path, "w"))
             chosen, missing = assign(window, pool, set(seen), before, warp)
             if not missing:
                 break
@@ -373,9 +378,11 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=int(datetime.date.today().strftime("%Y%m")))
     ap.add_argument("--warp", action="store_true", help="allow portal/ramp Saturdays (only once old builds are gone)")
     ap.add_argument("--summary", default=os.path.join(tempfile.gettempdir(), "daily-batch.md"))
+    ap.add_argument("--pool", default=os.path.join(tempfile.gettempdir(), "daily-pool.json"), help="where candidates are kept")
+    ap.add_argument("--reuse", action="store_true", help="pick from the candidates in --pool instead of making new ones")
     a = ap.parse_args()
     if a.cmd == "next":
-        window, chosen = next_batch(a.start, a.days, a.minutes, a.seed, a.warp)
+        window, chosen = next_batch(a.start, a.days, a.minutes, a.seed, a.warp, a.pool, a.reuse)
         summary(window, chosen, a.summary)
         sys.exit(1 if check() else 0)
     elif a.cmd == "check":
