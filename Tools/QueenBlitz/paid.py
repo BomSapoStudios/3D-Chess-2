@@ -81,12 +81,14 @@ THEMES = {
         C(("walls", 5), ("blocked", 3), ("ice", 2)),
     ]),
     # The 8x8x8 cube with lots of pawns: long sweeps, long routes
-    "feast": dict(name="Feast", size=8, chapters=[
-        C(("big", 6), ("classic", 4)),
-        C(("big", 6), ("classic", 4)),
-        C(("big", 6), ("classic", 2), ("ice", 2)),
-        C(("big", 5), ("classic", 2), ("ice", 3)),
-        C(("big", 5), ("ice", 3), ("any", 2)),
+    # (Oct 30: 8x8x8 candidates take minutes each to prove and almost none came out icy, so
+    # Feast is classic boards, big ones more often as it goes)
+    "feast": dict(name="Feast", size=8, bands=[(25, 50), (40, 80), (50, 100), (70, 140), (90, 200)], chapters=[
+        C(("big", 4), ("classic", 6)),
+        C(("big", 5), ("classic", 5)),
+        C(("big", 6), ("any", 4)),
+        C(("big", 6), ("any", 4)),
+        C(("big", 7), ("any", 3)),
     ]),
 }
 
@@ -116,7 +118,7 @@ def assemble(cands, theme, rng):
         pool.append(p)
     chosen, used, shapes = [], set(), set()
     for c, kinds in enumerate(theme["chapters"]):
-        lo, hi = BANDS[c]
+        lo, hi = theme.get("bands", BANDS)[c]
         picks = []
         # Spread the chapter across its band, easiest first
         targets = [lo * (hi / lo) ** (i / 9) for i in range(10)]
