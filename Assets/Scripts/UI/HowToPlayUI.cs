@@ -81,7 +81,11 @@ public class HowToPlayUI : MonoBehaviour
         "BLOCKS\n" +
         "Blocks stop the Queen. She can't pass through or stop on them, so some routes have to go the long way round.\n\n" +
         "ICE\n" +
-        "On ice the Queen can't stop partway. Every move slides to the edge or to the square before a block.";
+        "On ice the Queen can't stop partway. Every move slides to the edge or to the square before a block.\n\n" +
+        "BOMBS\n" +
+        "When the Queen passes over a bomb or stops on it, it goes off and takes every pawn in the 3×3×3 cube around it " +
+        "(the faint outline). A blast that reaches another bomb sets that one off too. Some puzzles give you bombs to place: " +
+        "tap Place bomb, then a dot. Placing isn't a move, and you can tap a bomb to move it until you're Ready.";
 
     private const string BlitzRight2 =
         "PORTALS\n" +
@@ -95,7 +99,7 @@ public class HowToPlayUI : MonoBehaviour
     private static (string title, string key, string left, string right) Guide()
     {
         if (QueenBlitz.Active) return Instance != null && Instance.page == 1
-            ? ("BLOCKS, ICE, PORTALS & RAMPS", "HowToPlaySeen.Blitz", BlitzLeft2, BlitzRight2)
+            ? ("BLOCKS, ICE, BOMBS, PORTALS & RAMPS", "HowToPlaySeen.Blitz", BlitzLeft2, BlitzRight2)
             : ("QUEEN BLITZ", "HowToPlaySeen.Blitz", BlitzLeft, BlitzRight);
         if (ZombieMode.Active) return ("ZOMBIE SURVIVAL", "HowToPlaySeen.Zombies", ZombieLeft, ZombieRight);
         return ("HOW TO PLAY", SeenKey, GuideLeft, GuideRight);
@@ -209,7 +213,7 @@ public class HowToPlayUI : MonoBehaviour
         if (QueenBlitz.Active && zoom <= 1f)
         {
             // Page 2: blocks, ice, portals and ramps
-            string label = page == 0 ? "Ice, portals & ramps >" : "< The basics";
+            string label = page == 0 ? "Ice, bombs, portals & ramps >" : "< The basics";
             float w = 190f; // clear of "Got it!" on the smallest phones
             float x = page == 0 ? panel.xMax - 16f - w : panel.x + 16f;
             if (NeonTheme.GUIButton(new Rect(x, panel.yMax - 50f, w, 38f), label, NeonTheme.Cyan, NeonTheme.Pink, true, 14)) page = 1 - page;

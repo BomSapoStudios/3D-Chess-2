@@ -250,6 +250,10 @@ public class InputManager : MonoBehaviour
         RaycastHit hit;
         bool anyHit = RaycastForInteractable(ray, out hit);
 
+        // Queen Blitz setup: placing a bomb, or picking a placed one up again (QueenBlitzBombs)
+        if (QueenBlitz.Active && QueenBlitzBombs.Instance != null && QueenBlitzBombs.Instance.OnTap(screenPosition, gameCamera))
+            return;
+
         // Queen Blitz with the queen picked up: a tap that isn't on a dot or a piece of hers may be on a
         // portal, its pad, or a square she slides past (QueenBlitzTrails)
         if (QueenBlitz.Active && QueenBlitzTrails.Instance != null

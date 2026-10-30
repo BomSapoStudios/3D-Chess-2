@@ -30,6 +30,7 @@ public class SavedGames : MonoBehaviour
         public int blitzMoves;
         public bool blitzHasMirror;    // the Mirror Queen has left her start, and is on blitzMirror
         public int[] blitzMirror;
+        public List<int> blitzBombs = new List<int>(); // bombs still on the board, x,y,z each
         public int chaosCount;
         public List<int> knockedOut = new List<int>();
         public List<int> clockColors = new List<int>();
@@ -216,7 +217,8 @@ public class SavedGames : MonoBehaviour
             if (pm.IsPlayerReady(color)) continue;
             if (QueenBlitz.Active)
             {
-                // The puzzle lays out the pawns (and a given queen); the queen goes anywhere for now
+                // The puzzle lays out the pawns (and a given queen); the queen and bombs go anywhere for now
+                if (color == QueenBlitz.PlayerColor) QueenBlitz.FillBombs();
                 if (color != QueenBlitz.PlayerColor || QueenBlitz.Current.queen.HasValue) continue;
                 PieceTray tray = PieceTray.GetTrayForColor(color);
                 if (tray == null) continue;
@@ -253,6 +255,7 @@ public class SavedGames : MonoBehaviour
             blitzMirror = QueenBlitz.MirrorAt is BoardPosition mirror ? new[] { mirror.x, mirror.y, mirror.z } : new int[0],
             chaosCount = ChaosRotationManager.Instance != null ? ChaosRotationManager.Instance.MovesSinceLastChaos : 0,
         };
+        if (QueenBlitz.Active) foreach (BoardPosition b in QueenBlitz.BombsSnapshot()) save.blitzBombs.AddRange(new[] { b.x, b.y, b.z });
         foreach (ChessPiece p in UndoManager.BoardPieces())
         {
             BoardPosition at = p.CurrentPosition;
@@ -296,6 +299,9 @@ public class SavedGames : MonoBehaviour
                 ? new BoardPosition(save.blitzMirror[0], save.blitzMirror[1], save.blitzMirror[2]) : (BoardPosition?)null;
             int pawns = save.pieces.FindAll(s => (PieceColor)s.color == QueenBlitz.PawnColor).Count;
             QueenBlitz.Swept = QueenBlitz.Current.pawns.Length - pawns; // swept before it was saved
+            var bombs = new List<BoardPosition>();
+            for (int i = 0; i + 2 < save.blitzBombs.Count; i += 3) bombs.Add(new BoardPosition(save.blitzBombs[i], save.blitzBombs[i + 1], save.blitzBombs[i + 2]));
+            if (QueenBlitz.HasBombs) QueenBlitz.RestoreBombs(bombs);
         }
         if (ChaosRotationManager.Instance != null) ChaosRotationManager.Instance.MovesSinceLastChaos = save.chaosCount;
         if (PlayerManager.Instance != null) PlayerManager.Instance.SetEliminated(save.knockedOut.ConvertAll(c => (PieceColor)c));

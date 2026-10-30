@@ -2690,6 +2690,7 @@ public class PlacementManager : MonoBehaviour
 
         int piecesInTray = playerTray.GetPieceCount();
         bool completed = piecesInTray == 0;
+        if (QueenBlitz.Active && playerColor == QueenBlitz.PlayerColor && QueenBlitz.BombsToPlace > 0) completed = false; // bombs still on the bench
 
         Debug.Log($"PlacementManager: {playerColor} placement completion check - tray instance {playerTray.GetInstanceID()}, pieces in tray: {piecesInTray}, completed: {completed}");
 

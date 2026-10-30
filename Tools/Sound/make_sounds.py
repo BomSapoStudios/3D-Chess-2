@@ -409,6 +409,14 @@ def blitz():
         x = at(x, k * 0.38, y)
     write("blitz_fail", x, loud=-3)
 
+def bomb():
+    """A Queen Blitz bomb going off: a soft low boom with a crackle, not a harsh bang"""
+    x = thud(140, 38, 0.55, 0.9)
+    x = at(x, 0, hiss(0.5, 1800, 0.35, f1=250, kind="low", att=0.002, shape=1.6))
+    for j in range(12):  # crackle
+        x = at(x, 0.03 + rng.uniform(0, 0.35), hiss(0.025, rng.uniform(1500, 4000), 0.12, q=2, att=0.001))
+    return lp(x, 2600)
+
 if __name__ == "__main__":
     ui(); setup(); chess(); zombies(); blitz()
     # the soft note on top of a move, 50 ms in; the game picks its pitch from the square
@@ -418,3 +426,4 @@ if __name__ == "__main__":
     x = tone(hz(-12), 0.45, 0.6, "triangle", att=0.008)
     x = at(x, 0, tone(hz(0), 0.3, 0.15, "triangle", att=0.008))  # an octave up, so phone speakers carry it
     write("move_bass", lp(x, 900), loud=-8, wet=0.06)
+    write("blitz_bomb", bomb(), loud=-2, wet=0.1)
