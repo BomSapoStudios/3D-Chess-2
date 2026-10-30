@@ -27,7 +27,9 @@ def normalise(e):
         e["tricks"] = sorted({ladder.ENGINE_TAGS[t] for t in e["tags"] if t in ladder.ENGINE_TAGS})
         e["lured"], e["trick_score"] = 3, e["score"]
     e["tricks"] = ladder.effective(e) if e["tricks"] else []
-    if e.get("portals") or e.get("ramps"):
+    if e.get("mirror"):
+        e["mech"] = "mirror"  # hard only: no easy or medium slot asks for it
+    elif e.get("portals") or e.get("ramps"):
         e["mech"] = "warp"
         e.setdefault("want", "portal")
     else:
@@ -39,22 +41,26 @@ def normalise(e):
 # Weights from Brandon's solve times (Oct 29, High Five): ice and portal/ramp combos took far longer
 # than their old scores said, lures (bait, greed) less, and par tracked time better than tricks
 W_TRICK, W_LURED, W_PAR, W_ICE, W_WARP, W_BOTH, W_PLACE, W_DECOY = 8, 3, 6, 16, 8, 6, 3, 5
-MECHANICS = {"portal", "ramp", "both", "brake", "ice", "decoy"}
+# Mirror Queen puzzles count as hard (Brandon, Oct 30): even a par 3 one scores in the Hard range
+W_MIRROR = 30
+MECHANICS = {"portal", "ramp", "both", "brake", "ice", "decoy", "mirror"}
 
 
 def difficulty(p):
     return len(p["tricks"]) * W_TRICK + (p["lured"] or 0) * W_LURED + p["par"] * W_PAR + (p["trick_score"] or 0) \
         + (W_ICE if p.get("ice") else 0) + (W_WARP if p["mech"] == "warp" else 0) \
-        + (W_BOTH if p.get("portals") and p.get("ramps") else 0) + (W_PLACE if not p.get("queen") else 0)
+        + (W_BOTH if p.get("portals") and p.get("ramps") else 0) + (W_PLACE if not p.get("queen") else 0) \
+        + (W_MIRROR if p.get("mirror") else 0)
 
 
 def score_entry(e):
     """The 1-100 score shown in playtest names, from a pack entry's own fields (tricks, lures, par,
     ice, portals and ramps) with the weights above"""
-    t = [x for x in e["tricks"] if x not in MECHANICS]
+    t = [x for x in e.get("tricks", []) if x not in MECHANICS]
     s = len(t) * W_TRICK + (e.get("lured") or 0) * W_LURED + e["par"] * W_PAR + (W_ICE if e.get("ice") else 0) \
         + (W_WARP if e.get("portals") or e.get("ramps") else 0) + (W_BOTH if e.get("portals") and e.get("ramps") else 0) \
-        + (W_PLACE if not e.get("queen") else 0) + (W_DECOY if "decoy" in e["tricks"] else 0)
+        + (W_PLACE if not e.get("queen") else 0) + (W_DECOY if "decoy" in e.get("tricks", []) else 0) \
+        + (W_MIRROR if e.get("mirror") else 0)
     return max(1, min(100, int(s)))
 
 
