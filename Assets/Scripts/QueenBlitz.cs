@@ -117,6 +117,7 @@ public static partial class QueenBlitz
         new PackInfo { id = "portal-brakes", name = "Portal Brakes (test)", free = true, review = true },
         new PackInfo { id = "mirror-test", name = "Mirror (test)", free = true, review = true },
         new PackInfo { id = "mirror-mix", name = "Mirror Mix (test)", free = true, review = true },
+        new PackInfo { id = "mirror-bombs", name = "Mirror Bombs (test)", free = true, review = true },
         new PackInfo { id = "bombs-test", name = "Bombs (test)", free = true, review = true },
     };
 
