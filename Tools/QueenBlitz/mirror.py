@@ -14,7 +14,7 @@ kept only if the mirror earns her place:
 Run: python3 mirror.py  (writes Assets/Resources/QueenBlitz/mirror-test.json)
 """
 import random, sys
-import packs, sized
+import packs
 from solver import Board, DIRS
 
 FLIP = (1, 1, 1)  # through the centre (Brandon's pick pending; one setting)
@@ -157,14 +157,6 @@ PLAN = [
 ]
 
 
-def rate(e):
-    """Mirror Queen puzzles are hard (Brandon, Oct 30): sized.py's score with the mirror's weight, and
-    Hard or, for the highest scores, Devious"""
-    e["score"] = sized.score_entry(e)
-    e["tier"] = "Devious" if e["score"] >= 65 else "Hard"
-    return e
-
-
 def build(seed=1):
     rng = random.Random(seed)
     out = []
@@ -176,12 +168,11 @@ def build(seed=1):
                 print(f"  {name}: retrying", file=sys.stderr)
         print(f"{name}: {n}³{' ice' if ice else ''} par {p['par']} (alone {p['solo']}), {len(p['pawns'])} pawns, "
               f"mirror sweeps {p['mirror_share']:.0%}, out of step {p['desync']}, remote {p['remote']}", file=sys.stderr)
-        e = {
+        out.append({
             "name": name, "size": n, "queen": list(p["queen"]) if p["queen"] else [], "best": list(p["best"]),
             "pawns": packs.flat(p["pawns"]), "blocks": packs.flat(p["blocks"]), "par": p["par"], "tip": tip,
             "ice": ice, "line": packs.flat(p["line"]), "mirror": list(FLIP),
-        }
-        out.append(rate(e))
+        })
     return {"id": "mirror-test", "name": "Mirror (test)", "free": True, "puzzles": out}
 
 
