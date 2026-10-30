@@ -170,6 +170,7 @@ public static class StoreImageRenderer
         }
         yield return Step(GamePromos());
         if (!timingCandidates) yield return Step(EverythingImages(menu));
+        if (!timingCandidates) yield return Step(PackImages());
 
         PieceShapes.Showing = null;
         Debug.Log("STORE IMAGES: done" + (failures.Count > 0 ? " — failed: " + string.Join(", ", failures) : ""));
@@ -364,6 +365,119 @@ public static class StoreImageRenderer
                 else { Bounds e = b.Value; e.Encapsulate(r.bounds); b = e; }
             }
         return b ?? new Bounds(Vector3.zero, Vector3.one);
+    }
+
+    // ───────── Queen Blitz packs sold: a puzzle from the pack, and its buy screen ─────────
+
+    private static List<QueenBlitz.PackInfo> SoldPacks() =>
+        QueenBlitz.PawnPacks().Select(QueenBlitz.Info).Where(p => QueenBlitz.PuzzlesOf(p.id).Length > 0 && Wanted(QueenBlitz.StoreId(p))).ToList();
+
+    /// <summary>Board sizes that show each pack best (others: any size)</summary>
+    private static readonly Dictionary<string, int> ShowcaseSize = new Dictionary<string, int> { { "cuberun", 6 }, { "deepfreeze", 6 }, { "blockade", 5 }, { "feast", 8 } };
+
+    /// <summary>The puzzle that shows a pack off: its mechanics on a full board, the queen on it, from the later chapters</summary>
+    private static int Showcase(string id)
+    {
+        QueenBlitz.Puzzle[] ps = QueenBlitz.PuzzlesOf(id);
+        bool sized = ShowcaseSize.TryGetValue(id, out int size) && ps.Any(p => p.size == size);
+        int best = 0;
+        float bestScore = float.MinValue;
+        for (int i = 0; i < ps.Length; i++)
+        {
+            QueenBlitz.Puzzle p = ps[i];
+            if (sized && p.size != size) continue;
+            float score = id == "feast"
+                ? 3 * p.pawns.Length + (p.ice ? -6 : 0) + (p.queen.HasValue ? 3 : 0)   // Feast: the fullest board
+                : p.pawns.Length + 3 * ((p.portals?.Length ?? 0) + (p.ramps?.Length ?? 0)) + (p.ice ? 4 : 0)
+                  + 1.5f * (p.blocks?.Length ?? 0) + (p.queen.HasValue ? 3 : 0) + (i >= ps.Length / 2 ? 2 : 0);
+            if (score > bestScore) { bestScore = score; best = i; }
+        }
+        return best;
+    }
+
+    private static IEnumerator PackImages()
+    {
+        List<QueenBlitz.PackInfo> packs = SoldPacks();
+        if (packs.Count == 0) yield break;
+
+        // Review shots first, on the menu: each pack's buy screen (pawn price and Buy for $2.99)
+        NeonMenu menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>();
+        if (menu == null)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+            float until = Time.realtimeSinceStartup + 30f;
+            while ((menu = UnityEngine.Object.FindFirstObjectByType<NeonMenu>()) == null && Time.realtimeSinceStartup < until) yield return null;
+            yield return new WaitForSecondsRealtime(3f);
+        }
+        if (menu != null)
+        {
+            Call(menu, "ShowBlitzPicker");
+            yield return new WaitForSecondsRealtime(1.5f);
+            foreach (QueenBlitz.PackInfo pack in packs)
+            {
+                Call(menu, "ShowBlitzBuy", pack);
+                yield return new WaitForSecondsRealtime(1.5f);
+                yield return CaptureScreen(ProductId(QueenBlitz.StoreId(pack)) + "_review");
+            }
+        }
+
+        // Promo images: a puzzle from the pack on the board, framed square by the game's own camera
+        foreach (QueenBlitz.PackInfo pack in packs)
+        {
+            QueenBlitz.PackId = pack.id;
+            int index = Showcase(pack.id);
+            QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
+            var config = new GameConfiguration { playerCount = 2, boardSize = QueenBlitz.BoardFor(puzzle.size), aiPlayerCount = 1, queenBlitz = true, blitzPuzzle = index };
+            config.playerTypes = new List<PlayerType> { PlayerType.Human, PlayerType.Computer };
+            config.ApplyToLegacyFields();
+            SceneController.Instance.LoadGameScene(config);
+            float until = Time.realtimeSinceStartup + 40f;
+            while ((PlacementManager.Instance == null || !PlacementManager.Instance.PiecesReady) && Time.realtimeSinceStartup < until) yield return null;
+            yield return new WaitForSecondsRealtime(3f);
+            Camera main = Camera.main;
+            if (main == null) { failures.Add("no camera for " + pack.id); continue; }
+            Debug.Log($"STORE IMAGES: {pack.name} shows puzzle {index + 1} {puzzle.name} ({puzzle.size}³)");
+            Camera cam = CopyCamera(main);
+            FitCubeInSquare(cam, main);
+            SavePng(RenderCamera(cam, PromoSize, PromoSize), ProductId(QueenBlitz.StoreId(pack)));
+            UnityEngine.Object.Destroy(cam.gameObject);
+            yield return null;
+        }
+    }
+
+    /// <summary>From the game camera's direction, aimed at the middle of the board's own geometry, as close as fits it in a square</summary>
+    private static void FitCubeInSquare(Camera cam, Camera main)
+    {
+        // What's actually drawn around the board: the cube's lines, floors, pieces and labels (not particles or big scenery)
+        Bounds b = new Bounds(Vector3.zero, Vector3.one * 12f);
+        bool any = false;
+        foreach (Renderer r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (!r.enabled || !r.gameObject.activeInHierarchy || r is ParticleSystemRenderer) continue;
+            if (r.bounds.size.magnitude > 60f || r.bounds.center.magnitude > 30f) continue;
+            if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+        }
+        Debug.Log($"STORE IMAGES: cube bounds {b.center} size {b.size}");
+        Vector3 dir = (main.transform.position - b.center).normalized;
+        cam.ResetProjectionMatrix();   // the game camera's own projection doesn't carry over to a square
+        cam.fieldOfView = 50f;
+        cam.aspect = 1f;
+        float dist = (main.transform.position - b.center).magnitude;
+        for (int pass = 0; pass < 5; pass++)
+        {
+            cam.transform.position = b.center + dir * dist;
+            cam.transform.LookAt(b.center);
+            float spread = 0.01f;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 v = cam.WorldToViewportPoint(corner);
+                spread = Mathf.Max(spread, Mathf.Abs(v.x - 0.5f) * 2f, Mathf.Abs(v.y - 0.5f) * 2f);
+            }
+            dist *= spread / 0.94f;
+        }
+        cam.transform.position = b.center + dir * dist;
+        cam.transform.LookAt(b.center);
     }
 
     // ───────── Unlock Everything: a collage of what it opens, and the Customize card ─────────
