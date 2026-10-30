@@ -14,23 +14,30 @@ public partial class PieceEffects
     /// The queen is sliding through this pawn: when she reaches its square it's knocked flying
     /// the way she's going (and a little up and aside), tumbling, then breaks up.
     /// </summary>
-    public static void KnockAway(ChessPiece victim, ChessPiece queen, Vector3 worldDirection, bool ice)
+    public static void KnockAway(ChessPiece victim, ChessPiece queen, Vector3 worldDirection, bool ice) =>
+        KnockAway(victim, queen != null ? queen.transform : null, () => queen != null && queen.IsMoving, worldDirection, ice);
+
+    /// <summary>The same, for something sliding that isn't a piece on the board (the Mirror Queen)</summary>
+    public static void KnockAway(ChessPiece victim, Transform mover, System.Func<bool> moving, Vector3 worldDirection, bool ice)
     {
         if (victim == null || !Enabled) return;
         GameObject copy = VisualCopy(victim);
-        Runner.StartCoroutine(Runner.KnockRoutine(copy, queen, worldDirection.normalized, ice, GlowColor(victim.pieceColor)));
+        Runner.StartCoroutine(Runner.KnockRoutine(copy, mover, moving, worldDirection.normalized, ice, GlowColor(victim.pieceColor)));
     }
 
-    private IEnumerator KnockRoutine(GameObject copy, ChessPiece queen, Vector3 dir, bool ice, Color color)
+    /// <summary>A piece's look on its own, with nothing that makes it a piece (no collider or ChessPiece)</summary>
+    public static GameObject ModelCopy(ChessPiece piece) => VisualCopy(piece);
+
+    private IEnumerator KnockRoutine(GameObject copy, Transform mover, System.Func<bool> moving, Vector3 dir, bool ice, Color color)
     {
         Vector3 square = copy.transform.position;
         // Wait for the queen to set off, then to reach this square
         float waited = 0f;
-        while (queen != null && !queen.IsMoving && waited < 0.25f) { waited += Time.deltaTime; yield return null; }
+        while (mover != null && !moving() && waited < 0.25f) { waited += Time.deltaTime; yield return null; }
         waited = 0f;
-        while (queen != null && queen.IsMoving && waited < 3f)
+        while (mover != null && moving() && waited < 3f)
         {
-            if (Vector3.Distance(queen.transform.position, square) < Cell * 0.45f) break;
+            if (Vector3.Distance(mover.position, square) < Cell * 0.45f) break;
             waited += Time.deltaTime;
             yield return null;
         }

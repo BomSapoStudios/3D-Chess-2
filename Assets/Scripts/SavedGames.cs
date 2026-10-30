@@ -28,6 +28,8 @@ public class SavedGames : MonoBehaviour
         public int moves;              // moves played, for the Resume card
         public int zombieRounds, zombiePawns, zombiePromoted;
         public int blitzMoves;
+        public bool blitzHasMirror;    // the Mirror Queen has left her start, and is on blitzMirror
+        public int[] blitzMirror;
         public int chaosCount;
         public List<int> knockedOut = new List<int>();
         public List<int> clockColors = new List<int>();
@@ -247,6 +249,8 @@ public class SavedGames : MonoBehaviour
             moves = movesBefore + turnsSeen,
             zombieRounds = ZombieMode.Rounds, zombiePawns = ZombieMode.PawnsDestroyed, zombiePromoted = ZombieMode.PromotedDestroyed,
             blitzMoves = QueenBlitz.Moves,
+            blitzHasMirror = QueenBlitz.MirrorAt.HasValue,
+            blitzMirror = QueenBlitz.MirrorAt is BoardPosition mirror ? new[] { mirror.x, mirror.y, mirror.z } : new int[0],
             chaosCount = ChaosRotationManager.Instance != null ? ChaosRotationManager.Instance.MovesSinceLastChaos : 0,
         };
         foreach (ChessPiece p in UndoManager.BoardPieces())
@@ -288,6 +292,8 @@ public class SavedGames : MonoBehaviour
         if (QueenBlitz.Active)
         {
             QueenBlitz.Moves = save.blitzMoves;
+            QueenBlitz.MirrorAt = save.blitzHasMirror && save.blitzMirror != null && save.blitzMirror.Length == 3
+                ? new BoardPosition(save.blitzMirror[0], save.blitzMirror[1], save.blitzMirror[2]) : (BoardPosition?)null;
             int pawns = save.pieces.FindAll(s => (PieceColor)s.color == QueenBlitz.PawnColor).Count;
             QueenBlitz.Swept = QueenBlitz.Current.pawns.Length - pawns; // swept before it was saved
         }

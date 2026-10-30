@@ -3,6 +3,8 @@
 Squares are flat x,y,z lists: "pawns": [1,1,1, 2,1,1] is two pawns. "queen" is empty when the
 player places her; "best" is a start that reaches par (Auto-place uses it); "line" is the queen's
 start then every square she stops on in one par solution (the in-app BlitzDemo plays it).
+"mirror" (left out when there's none) is the axes the Mirror Queen flips, [1,1,1] = through the
+centre: she starts on the queen's mirror image and her moves follow from the queen's (solver.py).
 
 Run this file to re-solve every puzzle in every pack and check its par, best and line.
 """
@@ -63,7 +65,7 @@ def board(p):
     ramps = {}
     for i in range(0, len(r), 6):
         ramps.setdefault(tuple(r[i:i + 3]), []).append(tuple(r[i + 3:i + 6]))
-    return Board(p["size"], triples(p["pawns"]), triples(p["blocks"]), p.get("ice", False), portals, ramps)
+    return Board(p["size"], triples(p["pawns"]), triples(p["blocks"]), p.get("ice", False), portals, ramps, p.get("mirror") or None)
 
 
 def check(path):
@@ -85,13 +87,22 @@ def check(path):
         if start and line[0] != start:
             problems.append(f"{tag}: line doesn't start on the queen")
         left = b.full
+        mirror = b.reflect(line[0]) if b.mirror else None
         for a, c in zip(line, line[1:]):
-            move = [m for m in b.moves(a) if m[0] == c]
+            if mirror:
+                if b.ambiguous(a, mirror):
+                    problems.append(f"{tag}: from {a} one tap could mean two moves for the mirror")
+                move = [(m[0], m[2], m[1]) for m in b.pair_moves(a, mirror) if m[0] == c]
+            else:
+                move = [m for m in b.moves(a) if m[0] == c]
             if not move:
                 problems.append(f"{tag}: {a} > {c} isn't a legal move")
                 break
             # A tap picks a square, not a route: like the app, take the biggest sweep there
-            left &= ~max(move, key=lambda m: bin(m[1]).count("1"))[1]
+            best = max(move, key=lambda m: bin(m[1]).count("1"))
+            left &= ~best[1]
+            if mirror:
+                mirror = best[2]
         if left or len(line) - 1 != par:
             problems.append(f"{tag}: line doesn't clear the board in par")
     return problems

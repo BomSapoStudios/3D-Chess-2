@@ -400,6 +400,15 @@ Moves:
     level. Every other way in (pink wall faces, diagonals, from above or below) is a wall, as
     is a ramp whose landing square is blocked, off the board, a portal or a ramp. No stopping
     on a ramp, and no riding down yet.
+  • Mirror Queen (some puzzles; "mirror" in the pack file, Mirror (test) pack): a glassy lime
+    copy of the queen starts on her mirror image through the cube's centre. Every queen move,
+    she sets off the opposite way and works out her own move: on a normal floor as many
+    squares as the queen went unless a block or the edge stops her sooner, on ice as far as she
+    can slide. She sweeps pawns too, and uses portals and ramps the same way. Each queen is a
+    block to the other (the queen moves first; the mirror can't pass where the queen stopped).
+    She can't be tapped or moved directly, so a move that sweeps nothing can just steer her.
+    The queen can't start where the mirror's square would be a block, portal, ramp, pawn or
+    the queen's own square. Undo and saved games keep her square.
   • While the queen is picked up, dotted trails show where moves end (every move on ice;
     portal and ramp moves elsewhere). Tap a portal or its floor pad to go through it, or on ice
     a square a slide passes to see where it ends. How to Play has a second Queen Blitz page for

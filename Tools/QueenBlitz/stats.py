@@ -28,10 +28,12 @@ KEY_FILE = os.path.expanduser("~/.appstore-publisher/keys/blitz-stats-key.txt")
 
 
 def sig(p):
-    """The app's QueenBlitz.Sig: FNV-1a over size|queen|pawns|blocks|par|ice|portals|ramps"""
+    """The app's QueenBlitz.Sig: FNV-1a over size|queen|pawns|blocks|par|ice|portals|ramps[|mirror]"""
     csv_ = lambda a: ",".join(str(v) for v in (a or []))
     text = "|".join([str(p.get("size", 0)), csv_(p.get("queen")), csv_(p.get("pawns")), csv_(p.get("blocks")),
                      str(p.get("par", 0)), "1" if p.get("ice") else "0", csv_(p.get("portals")), csv_(p.get("ramps"))])
+    if p.get("mirror") and len(p["mirror"]) == 3:
+        text += "|" + csv_(p["mirror"])
     h = 2166136261
     for ch in text.encode("ascii"):
         h = ((h ^ ch) * 16777619) & 0xFFFFFFFF
