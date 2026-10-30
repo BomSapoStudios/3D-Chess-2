@@ -74,6 +74,10 @@ public partial class NeonMenu
 
     private void TapPawnsLabel()
     {
+#if !(DEVELOPMENT_BUILD || UNITY_EDITOR || BLITZ_REVIEW)
+        return;   // TestFlight and App Store builds never show the review packs
+#endif
+#pragma warning disable CS0162
         secretTaps = Time.unscaledTime - secretTapTime < 0.6f ? secretTaps + 1 : 1;
         secretTapTime = Time.unscaledTime;
         if (secretTaps < 5) return;
@@ -81,6 +85,7 @@ public partial class NeonMenu
         QueenBlitz.Reviewer = !QueenBlitz.Reviewer;
         ShowToast(QueenBlitz.Reviewer ? "Review pack on" : "Review pack off");
         ShowBlitzPicker();
+#pragma warning restore CS0162
     }
 
     private void ClearBlitzContent()

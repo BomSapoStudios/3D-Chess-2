@@ -37,6 +37,18 @@ public class iOSBuildScript
     }
 
     /// <summary>
+    /// Brandon's phone builds (Builds/device-build.sh): a release build with BLITZ_REVIEW defined, so the
+    /// Queen Blitz review and test packs can be switched on (five taps on Your pawns). TestFlight and
+    /// App Store builds use BuildFromCommandLine, without it.
+    /// </summary>
+    public static void BuildDeviceFromCommandLine()
+    {
+        ConfigureiOSSettings();
+        bool ok = BuildiOS(BuildOptions.None, BUILD_PATH, new[] { "BLITZ_REVIEW" });
+        EditorApplication.Exit(ok ? 0 : 1);
+    }
+
+    /// <summary>
     /// Export an Xcode project that runs in the iOS Simulator (Builds/iOS-Simulator).
     /// </summary>
     [MenuItem("Build/Build iOS Simulator")]
@@ -104,7 +116,7 @@ public class iOSBuildScript
         Debug.Log("✅ iOS settings configured");
     }
 
-    private static bool BuildiOS(BuildOptions options, string buildPath = BUILD_PATH)
+    private static bool BuildiOS(BuildOptions options, string buildPath = BUILD_PATH, string[] extraDefines = null)
     {
         string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
         if (scenes.Length == 0)
@@ -121,7 +133,11 @@ public class iOSBuildScript
         Directory.CreateDirectory(buildPath);
 
         Debug.Log($"📦 Building {scenes.Length} scenes to: {buildPath}");
-        BuildReport report = BuildPipeline.BuildPlayer(scenes, buildPath, BuildTarget.iOS, options);
+        BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+        {
+            scenes = scenes, locationPathName = buildPath, target = BuildTarget.iOS, options = options,
+            extraScriptingDefines = extraDefines,
+        });
 
         if (report.summary.result == BuildResult.Succeeded)
         {
