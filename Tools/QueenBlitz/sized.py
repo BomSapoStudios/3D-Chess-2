@@ -39,13 +39,16 @@ def normalise(e):
 # Weights from Brandon's solve times (Oct 29, High Five): ice and portal/ramp combos took far longer
 # than their old scores said, lures (bait, greed) less, and par tracked time better than tricks
 W_TRICK, W_LURED, W_PAR, W_ICE, W_WARP, W_BOTH, W_PLACE, W_DECOY = 8, 3, 6, 16, 8, 6, 3, 5
-MECHANICS = {"portal", "ramp", "both", "brake", "ice", "decoy"}
+# Brandon, Oct 30: Mirror Queen puzzles count as difficult, at least Hard (score 61+, pipeline.TIERS)
+W_MIRROR, MIRROR_FLOOR = 20, 61
+MECHANICS = {"portal", "ramp", "both", "brake", "ice", "decoy", "mirror"}
 
 
 def difficulty(p):
     return len(p["tricks"]) * W_TRICK + (p["lured"] or 0) * W_LURED + p["par"] * W_PAR + (p["trick_score"] or 0) \
         + (W_ICE if p.get("ice") else 0) + (W_WARP if p["mech"] == "warp" else 0) \
-        + (W_BOTH if p.get("portals") and p.get("ramps") else 0) + (W_PLACE if not p.get("queen") else 0)
+        + (W_BOTH if p.get("portals") and p.get("ramps") else 0) + (W_PLACE if not p.get("queen") else 0) \
+        + (W_MIRROR if p.get("mirror") else 0)
 
 
 def score_entry(e):
@@ -54,7 +57,10 @@ def score_entry(e):
     t = [x for x in e["tricks"] if x not in MECHANICS]
     s = len(t) * W_TRICK + (e.get("lured") or 0) * W_LURED + e["par"] * W_PAR + (W_ICE if e.get("ice") else 0) \
         + (W_WARP if e.get("portals") or e.get("ramps") else 0) + (W_BOTH if e.get("portals") and e.get("ramps") else 0) \
-        + (W_PLACE if not e.get("queen") else 0) + (W_DECOY if "decoy" in e["tricks"] else 0)
+        + (W_PLACE if not e.get("queen") else 0) + (W_DECOY if "decoy" in e["tricks"] else 0) \
+        + (W_MIRROR if e.get("mirror") else 0)
+    if e.get("mirror"):
+        s = max(s, MIRROR_FLOOR)
     return max(1, min(100, int(s)))
 
 
