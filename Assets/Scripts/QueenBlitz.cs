@@ -109,6 +109,7 @@ public static partial class QueenBlitz
         new PackInfo { id = "portal-test", name = "Portals & Ramps (test)", free = true, review = true },
         new PackInfo { id = "portal-brakes", name = "Portal Brakes (test)", free = true, review = true },
         new PackInfo { id = "mirror-test", name = "Mirror (test)", free = true, review = true },
+        new PackInfo { id = "mirror-mix", name = "Mirror Mix (test)", free = true, review = true },
     };
 
     /// <summary>The packs that exist in this build, in menu order</summary>
