@@ -781,19 +781,21 @@ public class KingdomClouds : MonoBehaviour
         {
             var cloud = new GameObject("Cloud").transform;
             cloud.SetParent(transform, false);
-            float size = 1f + (float)rng.NextDouble() * 0.8f;
+            float size = 2.2f + (float)rng.NextDouble() * 1.4f;
             cloud.localScale = Vector3.one * size;
-            // A flat lavender base with a heap of white puffs on top, biggest in the middle
-            OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(0f, -1.5f, 0f), new Vector3(30f, 5f, 14f), shade);
-            int puffs = 5 + rng.Next(4);
+            // A long heap of puffs, tallest in the middle: lavender ones low down, white on top
+            int puffs = 9 + rng.Next(5);
             for (int p = 0; p < puffs; p++)
             {
-                float x = ((float)p / (puffs - 1) - 0.5f) * 26f;
-                float r = 7f + 6f * (1f - Mathf.Abs(x) / 13f) + (float)rng.NextDouble() * 3f;
-                OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(x, r * 0.25f, ((float)rng.NextDouble() - 0.5f) * 5f), new Vector3(r, r * 0.8f, r * 0.9f), white);
+                float x = ((float)p / (puffs - 1) - 0.5f) * 34f + ((float)rng.NextDouble() - 0.5f) * 3f;
+                float middle = 1f - Mathf.Abs(x) / 17f;
+                float r = 5f + 7f * middle + (float)rng.NextDouble() * 3f;
+                float z = ((float)rng.NextDouble() - 0.5f) * 10f;
+                OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(x, -1f, z), new Vector3(r * 1.1f, r * 0.45f, r), shade);
+                OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(x * 0.9f, r * 0.2f + middle * 2f, z * 0.8f), new Vector3(r, r * 0.85f, r * 0.9f), white);
             }
-            clouds.Add((cloud, 140f + (float)rng.NextDouble() * 90f, i / 9f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.4f,
-                30f + (float)rng.NextDouble() * 35f, 0.004f + (float)rng.NextDouble() * 0.004f));
+            clouds.Add((cloud, 170f + (float)rng.NextDouble() * 90f, i / 9f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.4f,
+                45f + (float)rng.NextDouble() * 40f, 0.004f + (float)rng.NextDouble() * 0.004f));
         }
     }
 
@@ -828,9 +830,9 @@ public class KingdomDragons : MonoBehaviour
     private void Start()
     {
         // Teal with pink wings, violet with lime wings, gold with cyan wings
-        dragons.Add(Make(new Color(0.1f, 0.35f, 0.3f), new Color(0.05f, 0.3f, 0.15f), new Color(0.85f, 0.25f, 0.7f), 3.2f, 105f, 18f, 7f, 0f));
-        dragons.Add(Make(new Color(0.3f, 0.12f, 0.45f), new Color(0.15f, 0.05f, 0.3f), new Color(0.55f, 1f, 0.3f), 2.6f, 135f, 32f, -5f, 2.1f));
-        dragons.Add(Make(new Color(0.55f, 0.35f, 0.1f), new Color(0.3f, 0.15f, 0.02f), new Color(0.3f, 0.9f, 1f), 2.2f, 85f, 10f, 9f, 4.2f));
+        dragons.Add(Make(new Color(0.1f, 0.35f, 0.3f), new Color(0.05f, 0.3f, 0.15f), new Color(0.85f, 0.25f, 0.7f), 4.6f, 105f, 18f, 7f, 0f));
+        dragons.Add(Make(new Color(0.3f, 0.12f, 0.45f), new Color(0.15f, 0.05f, 0.3f), new Color(0.55f, 1f, 0.3f), 3.8f, 135f, 32f, -5f, 2.1f));
+        dragons.Add(Make(new Color(0.55f, 0.35f, 0.1f), new Color(0.3f, 0.15f, 0.02f), new Color(0.3f, 0.9f, 1f), 3.2f, 85f, 10f, 9f, 4.2f));
     }
 
     private Dragon Make(Color skin, Color glow, Color wings, float scale, float radius, float height, float speed, float phase)
