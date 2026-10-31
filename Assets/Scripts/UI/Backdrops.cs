@@ -19,9 +19,22 @@ public static class Backdrops
         EarthOrbit = 6,
         DeepSea = 7,
         Graveyard = 8,
+        HangingGardens = 10,
     }
 
     public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.EarthOrbit, Kind.DeepSea, Kind.Graveyard, Kind.NeonGlow };
+
+    /// <summary>
+    /// Built but held back for a later release: not in Customize or the store. Release one by
+    /// moving it into All.
+    /// </summary>
+    public static readonly Kind[] Unreleased = { Kind.HangingGardens };
+
+    /// <summary>Set by editor tools (store images) so Customize also lists Unreleased</summary>
+    public static bool ShowUnreleased;
+
+    /// <summary>The backdrops Customize lists: All, plus Unreleased while ShowUnreleased</summary>
+    public static Kind[] Listed => ShowUnreleased ? System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(All, Unreleased)) : All;
 
     private const string PrefKey = "Backdrop";
 
@@ -31,7 +44,7 @@ public static class Backdrops
         get
         {
             var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.NeonGlow);
-            return Store.Owns(picked) ? picked : Kind.NeonGlow;
+            return Store.Owns(picked) && System.Array.IndexOf(Listed, picked) >= 0 ? picked : Kind.NeonGlow;
         }
         set
         {
@@ -52,6 +65,7 @@ public static class Backdrops
             case Kind.EarthOrbit: return "Earth Orbit";
             case Kind.DeepSea: return "Deep Sea";
             case Kind.Graveyard: return "Graveyard";
+            case Kind.HangingGardens: return "Hanging Gardens";
             default: return "Neon Glow";
         }
     }
@@ -68,6 +82,7 @@ public static class Backdrops
             case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the planets, passing comets and satellites whizzing by";
             case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
             case Kind.Graveyard: return "A moonlit cemetery with glowing tombstones, lanterns, ravens, mist, will-o'-wisps and bats";
+            case Kind.HangingGardens: return "Babylon's terraces, smothered in vines, flowers and waterfalls";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
@@ -89,13 +104,14 @@ public static class Backdrops
             case Kind.EarthOrbit: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 1957, galaxies: 1);
             case Kind.DeepSea: return () => DeepSeaSky.Generate(SkyWidth, SkyHeight, 4040);
             case Kind.Graveyard: return () => GraveyardSky.Generate(SkyWidth, SkyHeight, 1031);
+            case Kind.HangingGardens: return () => HangingGardensSky.Generate(SkyWidth, SkyHeight, 1759);
             default: return () => SpaceSky.Generate(SkyWidth, SkyHeight, 20261006);
         }
     }
 
     // Color shown while a sky is still being generated
     private static Color LoadingColor(Kind kind) =>
-        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : kind == Kind.DeepSea ? new Color32(5, 23, 38, 255) : kind == Kind.Graveyard ? new Color32(20, 12, 34, 255) : new Color32(4, 2, 14, 255);
+        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : kind == Kind.DeepSea ? new Color32(5, 23, 38, 255) : kind == Kind.Graveyard ? new Color32(20, 12, 34, 255) : kind == Kind.HangingGardens ? new Color32(60, 26, 70, 255) : new Color32(4, 2, 14, 255);
 
     /// <summary>
     /// Apply the chosen backdrop to a camera. Returns false while a sky is still being
@@ -168,6 +184,7 @@ public static class Backdrops
         else if (kind == Kind.EarthOrbit) Scenery.BuildOrbit(cam);
         else if (kind == Kind.DeepSea) Scenery.BuildDeepSea(cam);
         else if (kind == Kind.Graveyard) Scenery.BuildGraveyard(cam);
+        else if (kind == Kind.HangingGardens) Scenery.BuildHangingGardens(cam);
         else Scenery.Clear();
         Scenery.FollowReduceMotion();
 
@@ -518,6 +535,35 @@ public static class Scenery
             light.color = new Color(0.75f, 1f, 0.8f);
             light.intensity = Mathf.Min(light.intensity, 0.9f);
             light.transform.rotation = Quaternion.Euler(25f, -90f, 0f);
+        }
+    }
+
+    public static void BuildHangingGardens(Camera cam)
+    {
+        Clear();
+        fogWasOn = RenderSettings.fog;
+        savedAmbient = RenderSettings.ambientLight;
+        changed = true;
+
+        root = new GameObject("Hanging Gardens Scenery");
+        HangingGardensScenery.Build(root.transform);
+
+        // Dusk haze: the far groves soften into the rosy horizon
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = HangingGardensSky.HazeColor;
+        RenderSettings.fogStartDistance = 70f;
+        RenderSettings.fogEndDistance = 240f;
+
+        // Low rose-gold sun from the sky's sunset (ahead of White, +x), cool teal sky light as ambient
+        RenderSettings.ambientLight = new Color(0.28f, 0.34f, 0.42f);
+        foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            savedLights[light] = (light.color, light.intensity, light.transform.rotation);
+            light.color = new Color(1f, 0.76f, 0.66f);
+            light.intensity = Mathf.Max(light.intensity, 1f);
+            light.transform.rotation = Quaternion.Euler(16f, -90f, 0f);
         }
     }
 
