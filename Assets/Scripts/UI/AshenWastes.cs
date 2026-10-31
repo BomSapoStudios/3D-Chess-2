@@ -12,9 +12,12 @@ using UnityEngine;
 //    it) with lava running down its sides into the ring, and a spiked dark tower to the right.
 //    Jagged rock spires with neon crystal clusters stand all round. Ash drifts down, embers
 //    rise, the volcano spits glowing rocks now and then and lightning cracks in the plume and
-//    onto the tower's tallest spike.
+//    onto the tower's tallest spike. A horned demon face is carved into the volcano's slope,
+//    eyes burning and lava spilling from its fanged mouth.
+//  - AshenOrcs: little orcs toiling at a mine in the volcano's flank: hauling carts of glowing
+//    ore down a road to a smelter and swinging pickaxes at the rock.
 //
-// An original scene: no eyes, no rings, nothing borrowed. Everything sits well away from the
+// An original scene: no all-seeing eye, nothing borrowed. Everything sits well away from the
 // board so the board stays the focus.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ public static class AshenSky
         // out of the far one
         var far = new float[width];
         var near = new float[width];
-        const float peakTop = 0.105f, craterHalf = 0.011f;
+        const float peakTop = 0.05f, craterHalf = 0.005f;
         for (int x = 0; x < width; x++)
         {
             float u = (x + 0.5f) / width;
@@ -83,15 +86,15 @@ public static class AshenSky
                     // The fire mountain's plume: a smoke column leaning off to one side, glowing at its foot
                     float craterV = horizon - peakTop;
                     float rise = craterV - v;
-                    if (rise > -0.005f && rise < 0.42f)
+                    if (rise > -0.005f && rise < 0.3f)
                     {
                         float centre = PeakU + rise * 0.45f + 0.015f * Mathf.Sin(rise * 30f);
-                        float half = 0.008f + rise * 0.22f;
+                        float half = 0.004f + rise * 0.15f;
                         float du = Mathf.Abs(Wrap(u - centre)) / half;
                         if (du < 1.4f)
                         {
                             float puff = Mathf.PerlinNoise(u * 60f + off, v * 40f) * 0.5f + Mathf.PerlinNoise(u * 16f, v * 12f + off) * 0.5f;
-                            float dens = Mathf.Clamp01((1.1f - du) * 2f) * Mathf.Clamp01(puff * 1.6f - 0.15f) * Mathf.Clamp01(1f - rise * 2.2f);
+                            float dens = Mathf.Clamp01((1.1f - du) * 2f) * Mathf.Clamp01(puff * 1.6f - 0.15f) * Mathf.Clamp01(1f - rise * 3.2f);
                             Color smoke = Color.Lerp(new Color(1f, 0.45f, 0.12f), new Color(0.09f, 0.06f, 0.07f), Mathf.Clamp01(rise * 14f));
                             c = Color.Lerp(c, smoke, dens);
                         }
@@ -99,7 +102,7 @@ public static class AshenSky
                     // Fire glow round the crater
                     {
                         float gu = Wrap(u - PeakU) * 2f, gv = v - craterV;
-                        c += new Color(1f, 0.35f, 0.08f) * (0.6f * Mathf.Exp(-(gu * gu + gv * gv) / 0.0004f));
+                        c += new Color(1f, 0.35f, 0.08f) * (0.5f * Mathf.Exp(-(gu * gu + gv * gv) / 0.0002f));
                     }
 
                     // Far ranges: charcoal with a fiery rim; the fire mountain has lava running down
@@ -110,10 +113,10 @@ public static class AshenSky
                         c = Color.Lerp(new Color(0.16f, 0.06f, 0.07f), new Color(0.24f, 0.08f, 0.06f), Mathf.Clamp01((v - farTop) / 0.06f));
                         c = Color.Lerp(c, new Color(1f, 0.35f, 0.12f), Mathf.Clamp01(1f - depth / 2f) * 0.7f);
                         float dp = Wrap(u - PeakU);
-                        if (Mathf.Abs(dp) < 0.06f)
+                        if (Mathf.Abs(dp) < 0.03f)
                         {
-                            float streak = Mathf.Abs(Mathf.Sin(dp * 230f + Mathf.PerlinNoise(dp * 40f + off, v * 25f) * 5f));
-                            float fall = (v - farTop) / 0.06f;   // fades as it runs down
+                            float streak = Mathf.Abs(Mathf.Sin(dp * 420f + Mathf.PerlinNoise(dp * 80f + off, v * 50f) * 5f));
+                            float fall = (v - farTop) / 0.03f;   // fades as it runs down
                             if (streak > 0.94f && fall < 1f) c = Color.Lerp(c, new Color(1f, 0.55f, 0.15f), (streak - 0.94f) / 0.06f * (1f - fall));
                         }
                     }
@@ -175,6 +178,21 @@ public static class AshenScenery
         (CraterRadius + (VolcanoBase - CraterRadius) * Mathf.Pow(1f - t, 1.7f))
         * (1f + 0.08f * Mathf.Sin(a * 5f + 1f) + 0.05f * Mathf.Sin(a * 11f + 3f) + 0.04f * Mathf.Sin(a * 23f + t * 6f));
 
+    /// <summary>The demon face's eyes and mouth: AshenVolcano makes them throb</summary>
+    public static Material DemonGlow { get; private set; }
+    public static readonly List<Vector3> DemonSpots = new List<Vector3>();
+    public const float MouthT = 0.4f;   // how far up the volcano the demon's mouth is, where the big flow starts
+
+    /// <summary>The loop the ore carts run: out on one side of the haul road, back on the other</summary>
+    public static readonly List<Vector3> HaulLoop = new List<Vector3>();
+    /// <summary>Where each miner stands and the rock they hack at</summary>
+    public static readonly List<(Vector3 at, Vector3 target)> MinerSpots = new List<(Vector3, Vector3)>();
+    public static Vector3 ChimneyTop { get; private set; }
+    public static Vector3 FurnaceMouth { get; private set; }
+    private const float CampDeg = 60f;   // the mine camp's direction from the board, kept clear of spires
+
+    private static Vector3 Polar(float deg, float d) => new Vector3(Mathf.Cos(deg * Mathf.Deg2Rad), 0f, Mathf.Sin(deg * Mathf.Deg2Rad)) * d + Vector3.up * GroundY;
+
     private static List<Object> made;   // meshes and textures built here, freed with the scenery
 
     public static void Build(Transform root)
@@ -193,6 +211,10 @@ public static class AshenScenery
         Material ember = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.5f, 0.15f) };
         Material pink = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.3f, 0.7f) };
         Material cyan = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.35f, 1f, 0.95f) };
+        Material shadow = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.02f, 0.008f, 0.01f) };
+        Material bone = OrbitScenery.Lit(new Color(0.78f, 0.7f, 0.6f), new Color(0.25f, 0.08f, 0.03f), 0f, 0.4f);   // lit from below by the lava
+        Material timber = OrbitScenery.Lit(new Color(0.16f, 0.1f, 0.07f), Color.black, 0f, 0.2f);
+        Material dirt = OrbitScenery.Lit(new Color(0.2f, 0.13f, 0.1f), Color.black, 0f, 0.1f);
         Texture2D lavaTex = LavaTexture();
         made.Add(lavaTex);
         Material lava = new Material(Shader.Find("Unlit/Texture")) { mainTexture = lavaTex };
@@ -210,6 +232,7 @@ public static class AshenScenery
         // The volcano, with lava running down its sides
         float volcanoAngle = Mathf.Atan2(VolcanoDir.z, VolcanoDir.x);
         Volcano(still, rock, lava, lavaFall, rng);
+        DemonFace(still, rock, shadow, bone);
         // The biggest flow faces the board and snakes on across the plain into the ring
         float faceBoard = Mathf.Atan2(-VolcanoDir.z, -VolcanoDir.x);
         Vector3 foot = VolcanoFoot + new Vector3(Mathf.Cos(faceBoard), 0f, Mathf.Sin(faceBoard)) * VolcanoRadius(faceBoard, 0f);
@@ -227,11 +250,15 @@ public static class AshenScenery
         // The dark tower off to the right
         Tower(still, TowerDir * TowerDistance + Vector3.up * GroundY, rock, tower, ember, pink, rng);
 
+        // The orcs' mine in the volcano's flank, its haul road and smelter
+        Mine(still, rock, darkRock, tower, timber, ember, cyan, pink, shadow, dirt, rng);
+
         // Glowing cracks in the ground
         for (int i = 0; i < 26; i++)
         {
             float a = (float)rng.NextDouble() * Mathf.PI * 2f;
             float d = 40f + (float)rng.NextDouble() * 90f;
+            if (Near(a * Mathf.Rad2Deg, CampDeg, 20f) && d > 45f) continue;   // the haul road
             Vector3 p = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
             float heading = (float)rng.NextDouble() * Mathf.PI * 2f;
             var crack = new List<Vector3>();
@@ -254,6 +281,7 @@ public static class AshenScenery
             float a = deg * Mathf.Deg2Rad;
             float d = 40f + (float)rng.NextDouble() * 85f;
             if (Mathf.Abs(d - RingRadiusAt(a)) < 9f) d += 16f;
+            if (Near(deg, CampDeg, 20f)) continue;
             Vector3 at = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
             float h = 6f + (float)rng.NextDouble() * 18f;
             float r = 1.8f + (float)rng.NextDouble() * 2.8f + h * 0.08f;
@@ -275,7 +303,7 @@ public static class AshenScenery
         {
             float a = (float)rng.NextDouble() * Mathf.PI * 2f;
             float d = 38f + (float)rng.NextDouble() * 80f;
-            if (Mathf.Abs(d - RingRadiusAt(a)) < 7f) continue;
+            if (Mathf.Abs(d - RingRadiusAt(a)) < 7f || Near(a * Mathf.Rad2Deg, CampDeg, 20f)) continue;
             float s = 1.5f + (float)rng.NextDouble() * 3f;
             OrbitScenery.Part(still, PrimitiveType.Sphere, new Vector3(Mathf.Cos(a) * d, GroundY + s * 0.2f, Mathf.Sin(a) * d), new Vector3(s * 1.3f, s * 0.7f, s), darkRock,
                 Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f));
@@ -287,6 +315,7 @@ public static class AshenScenery
         root.gameObject.AddComponent<AshenVolcano>();
         root.gameObject.AddComponent<AshenAir>();
         root.gameObject.AddComponent<AshenLightning>();
+        root.gameObject.AddComponent<AshenOrcs>();
     }
 
     private static bool Near(float deg, float centre, float half) => Mathf.Abs(Mathf.DeltaAngle(deg, centre)) < half;
@@ -333,7 +362,7 @@ public static class AshenScenery
         for (int f = 0; f < flows.Count; f++)
         {
             float a0 = flows[f];
-            float start = f == 0 ? 0.98f : 0.8f + (float)rng.NextDouble() * 0.18f;
+            float start = f == 0 ? MouthT : 0.8f + (float)rng.NextDouble() * 0.18f;
             float stop = f == 0 ? 0f : (float)rng.NextDouble() * 0.35f;   // some cool and stop partway
             var pts = new List<Vector3>();
             var normals = new List<Vector3>();
@@ -349,6 +378,141 @@ public static class AshenScenery
             }
             MeshPart(parent, Ribbon(pts, normals, widths, 10f), Vector3.zero, Quaternion.identity, lavaFall);
         }
+    }
+
+    // A horned demon face carved into the volcano's slope toward the board: a scowling brow over
+    // burning eyes, slit nostrils and a fanged maw full of lava, which spills on down the slope
+    private static void DemonFace(Transform parent, Material rock, Material shadow, Material bone)
+    {
+        float a = Mathf.Atan2(-VolcanoDir.z, -VolcanoDir.x);
+        const float t = 0.5f;
+        float r = VolcanoRadius(a, t);
+        Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+        var face = new GameObject("Demon Face").transform;
+        face.SetParent(parent, false);
+        face.localPosition = VolcanoFoot + dir * (r + 0.3f) + Vector3.up * (t * VolcanoHeight);
+        face.localRotation = Quaternion.LookRotation((dir + Vector3.up * 0.8f).normalized, Vector3.up);   // lying back on the slope
+
+        // Bend points back round the cone so the edges of the face stay on the rock
+        Vector3 P(float x, float y, float z) => new Vector3(x, y, z - x * x / (2f * r));
+
+        DemonGlow = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.75f, 0.2f) };
+        DemonSpots.Clear();
+        for (int side = -1; side <= 1; side += 2)
+        {
+            float s = side;
+            Quaternion slant = Quaternion.Euler(0f, 0f, s * 20f);   // inner ends low: a scowl
+            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 5.5f, 5.2f, 1.2f), new Vector3(11f, 2.4f, 3f), rock, slant);          // brow
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 0.6f), new Vector3(7f, 3.4f, 1.6f), shadow, slant);         // socket
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 1.1f), new Vector3(5f, 1.8f, 1.4f), DemonGlow, slant);      // burning eye
+            DemonSpots.Add(face.TransformPoint(P(s * 5f, 2f, 2f)));
+            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 1.3f, -3f, 1.3f), new Vector3(0.6f, 1.8f, 0.5f), DemonGlow, Quaternion.Euler(0f, 0f, -s * 15f));   // nostril
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 7.5f, -2.5f, 0.4f), new Vector3(6f, 4f, 3f), rock);                 // cheekbone
+            // A horn sweeping up and out, its tip curling back in
+            Quaternion outward = Quaternion.Euler(0f, 0f, -s * 38f);
+            Vector3 hornFoot = P(s * 10.5f, 7.5f, 0.5f);
+            Rock(face, hornFoot, 2.4f, 1.3f, 7f, 7, 3, 0.08f, 90, bone).localRotation = outward;
+            Rock(face, hornFoot + outward * Vector3.up * 6.6f, 1.4f, 0.05f, 8f, 7, 3, 0.08f, 91, bone).localRotation = Quaternion.Euler(0f, 0f, s * 12f);
+        }
+        OrbitScenery.Part(face, PrimitiveType.Cube, P(0f, -0.5f, 1f), new Vector3(2.4f, 5f, 2f), rock);                              // nose ridge
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8f, 0.5f), new Vector3(17f, 6.5f, 2.4f), shadow);                      // the maw
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8.3f, 0.9f), new Vector3(13f, 3.6f, 2f), DemonGlow);                   // lava in its throat
+        DemonSpots.Add(face.TransformPoint(P(0f, -8f, 2.5f)));
+        for (int i = 0; i < 6; i++)   // upper fangs, the outer two longest
+            Rock(face, P((i - 2.5f) * 2.5f, -5.2f, 1.4f), 0.7f, 0.05f, i == 0 || i == 5 ? 3.6f : 2.4f, 5, 2, 0f, 100 + i, bone).localRotation = Quaternion.Euler(0f, 0f, 180f);
+        for (int i = 0; i < 5; i++)   // lower fangs
+            Rock(face, P((i - 2f) * 2.7f, -10.8f, 1.4f), 0.6f, 0.05f, i == 0 || i == 4 ? 3f : 2f, 5, 2, 0f, 110 + i, bone);
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -13.3f, 0.3f), new Vector3(12f, 4f, 3f), rock);                         // chin
+    }
+
+    // The orcs' mine: a timbered tunnel into the volcano's flank on White's left, a haul road
+    // down to a smelter nearer the board, a heap of ore beside it and an outcrop of glowing ore
+    // along the way
+    private static void Mine(Transform parent, Material rock, Material darkRock, Material stone, Material timber, Material ember, Material cyan, Material pink, Material shadow, Material dirt, System.Random rng)
+    {
+        HaulLoop.Clear();
+        MinerSpots.Clear();
+        Vector3 smelter = Polar(CampDeg + 6f, 72f);
+        Vector3 toSmelter = smelter - VolcanoFoot;
+        toSmelter.y = 0f;
+        float a = Mathf.Atan2(toSmelter.z, toSmelter.x);
+        Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+        Vector3 across = Vector3.Cross(Vector3.up, dir);
+        Quaternion facing = Quaternion.LookRotation(dir);
+
+        // The tunnel: a dark opening framed in timber, a lantern either side
+        Vector3 adit = VolcanoFoot + dir * (VolcanoRadius(a, 0f) - 3f);
+        OrbitScenery.Part(parent, PrimitiveType.Cube, adit + Vector3.up * 2.4f - dir * 0.6f, new Vector3(4.4f, 4.8f, 2.5f), shadow, facing);
+        foreach (float s in new[] { -1f, 1f })
+        {
+            OrbitScenery.Part(parent, PrimitiveType.Cube, adit + across * (s * 2.5f) + Vector3.up * 2.7f, new Vector3(0.6f, 5.4f, 0.6f), timber, facing);
+            OrbitScenery.Part(parent, PrimitiveType.Sphere, adit + across * (s * 3.4f) + Vector3.up * 3.8f + dir * 0.4f, Vector3.one * 0.7f, ember);
+            // Two orcs hacking at glowing veins in the slope beside the tunnel
+            Vector3 at = adit + dir * 3.6f + across * (s * 7f);
+            Vector3 rockFace = at - dir * 1.6f + Vector3.up * 1f;
+            MinerSpots.Add((at, rockFace));
+            for (int c = 0; c < 4; c++)
+                OrbitScenery.Part(parent, PrimitiveType.Cube, rockFace - dir * 0.6f + across * ((c - 1.5f) * 0.8f) + Vector3.up * ((c % 2) * 0.8f), new Vector3(0.35f, 1.4f, 0.35f), cyan,
+                    Quaternion.Euler(((float)rng.NextDouble() - 0.5f) * 60f, 0f, ((float)rng.NextDouble() - 0.5f) * 60f));
+        }
+        OrbitScenery.Part(parent, PrimitiveType.Cube, adit + Vector3.up * 5.4f, new Vector3(6.2f, 0.7f, 0.8f), timber, facing);
+
+        // The haul road, wandering a little; the carts go down one side and back up the other
+        Vector3 start = adit + dir * 2.5f;
+        Vector3 run = smelter - start;
+        run.y = 0f;
+        Vector3 end = smelter - run.normalized * 5.5f;
+        Vector3 sideways = Vector3.Cross(Vector3.up, run).normalized;
+        var road = new List<Vector3>();
+        for (int i = 0; i <= 18; i++)
+        {
+            float k = i / 18f;
+            road.Add(Vector3.Lerp(start, end, k) + sideways * (3f * Mathf.Sin(k * Mathf.PI * 2f)));
+        }
+        Flat(parent, road, 3.4f, 0.14f, dirt, 8f);
+        var lanes = new List<Vector3>();
+        for (int i = 0; i < road.Count; i++)
+        {
+            Vector3 along = road[Mathf.Min(i + 1, road.Count - 1)] - road[Mathf.Max(i - 1, 0)];
+            lanes.Add(Vector3.Cross(Vector3.up, along).normalized * 1.4f);
+        }
+        for (int i = 0; i < road.Count; i++) HaulLoop.Add(road[i] + lanes[i]);
+        for (int i = road.Count - 1; i >= 0; i--) HaulLoop.Add(road[i] - lanes[i]);
+
+        // The smelter: a squat stone furnace with a glowing mouth toward the road and a tall chimney
+        Vector3 toRoad = (end - smelter).normalized;
+        OrbitScenery.Part(parent, PrimitiveType.Cylinder, smelter + Vector3.up * 3.5f, new Vector3(7f, 3.5f, 7f), stone);
+        OrbitScenery.Part(parent, PrimitiveType.Cylinder, smelter + Vector3.up * 7f, new Vector3(7.3f, 0.12f, 7.3f), pink);   // neon band
+        Rock(parent, smelter + Vector3.up * 7f, 3.7f, 1.1f, 3f, 8, 2, 0.05f, 120, stone);
+        OrbitScenery.Part(parent, PrimitiveType.Cylinder, smelter + Vector3.up * 12f, new Vector3(1.6f, 5f, 1.6f), stone);
+        ChimneyTop = smelter + Vector3.up * 17f;
+        FurnaceMouth = smelter + toRoad * 3.55f + Vector3.up * 1.4f;
+        OrbitScenery.Part(parent, PrimitiveType.Cube, FurnaceMouth, new Vector3(2.4f, 2.2f, 0.3f), ember, Quaternion.LookRotation(toRoad));
+
+        // A heap of ore beside it, glittering
+        Vector3 heap = smelter + Vector3.Cross(Vector3.up, toRoad) * 7f;
+        for (int i = 0; i < 7; i++)
+        {
+            float sz = 1.5f + (float)rng.NextDouble() * 1.8f;
+            Vector3 at = heap + new Vector3(((float)rng.NextDouble() - 0.5f) * 4f, sz * 0.25f + (i == 0 ? 1f : 0f), ((float)rng.NextDouble() - 0.5f) * 4f);
+            OrbitScenery.Part(parent, PrimitiveType.Sphere, at, new Vector3(sz * 1.2f, sz * 0.7f, sz), darkRock);
+            OrbitScenery.Part(parent, PrimitiveType.Cube, at + Vector3.up * sz * 0.3f, Vector3.one * 0.45f, i % 2 == 0 ? cyan : ember, Quaternion.Euler(45f, i * 30f, 45f));
+        }
+
+        // An outcrop of ore halfway down the road, on the far side from the board
+        Vector3 mid = road[road.Count / 2];
+        Vector3 away = Vector3.Dot(sideways, new Vector3(mid.x, 0f, mid.z)) > 0f ? sideways : -sideways;
+        Vector3 outcrop = mid + away * 8f;
+        Rock(parent, outcrop, 4.5f, 1.2f, 6.5f, 7, 3, 0.25f, 130, darkRock);
+        for (int c = 0; c < 6; c++)
+        {
+            float ca = c / 6f * Mathf.PI * 2f;
+            OrbitScenery.Part(parent, PrimitiveType.Cube, outcrop + new Vector3(Mathf.Cos(ca), 0f, Mathf.Sin(ca)) * 3.6f + Vector3.up * (1f + (c % 3) * 0.8f), new Vector3(0.4f, 1.6f, 0.4f), c % 2 == 0 ? cyan : pink,
+                Quaternion.Euler(((float)rng.NextDouble() - 0.5f) * 60f, 0f, ((float)rng.NextDouble() - 0.5f) * 60f));
+        }
+        Vector3 outAcross = Vector3.Cross(Vector3.up, away);
+        foreach (float s in new[] { -1f, 1f })
+            MinerSpots.Add((outcrop - away * 5.4f + outAcross * (s * 2f), outcrop + Vector3.up * 1.6f + outAcross * (s * 1f)));
     }
 
     // A tall spiked tower of black stone on a crag: tiers stepping in, neon bands at each ledge,
@@ -512,31 +676,46 @@ public static class AshenScenery
 
     private static T Keep<T>(T thing) where T : Object { made.Add(thing); return thing; }
 
-    // Molten rock: orange with hot yellow veins between drifting plates of dark crust. Built
-    // from whole-number waves so it tiles seamlessly as it scrolls.
+    // Molten rock: orange with white-hot veins round drifting plates of dark crust. Value noise
+    // on lattices that wrap, so it tiles seamlessly as it scrolls.
     private static Texture2D LavaTexture()
     {
-        const int size = 128;
+        const int size = 256;
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, name = "Ashen Lava" };
         var px = new Color32[size * size];
-        const float tau = Mathf.PI * 2f;
         for (int y = 0; y < size; y++)
         for (int x = 0; x < size; x++)
         {
             float u = (x + 0.5f) / size, v = (y + 0.5f) / size;
-            // Warp, then layer waves into a cell-ish pattern of plates
-            float wu = u + 0.06f * Mathf.Sin(tau * (2f * v + 0.3f)), wv = v + 0.06f * Mathf.Sin(tau * (3f * u + 0.7f));
-            float n = Mathf.Sin(tau * (3f * wu + 1f * wv)) * 0.4f + Mathf.Sin(tau * (-2f * wu + 4f * wv + 0.2f)) * 0.35f
-                    + Mathf.Sin(tau * (5f * wu - 3f * wv + 0.6f)) * 0.25f;
+            float n = 0f, amp = 0.55f;
+            for (int o = 0, cells = 5; o < 4; o++, cells *= 2, amp *= 0.5f) n += amp * TileNoise(u * cells, v * cells, cells, o * 101);
             Color c;
-            if (n > 0.25f) c = Color.Lerp(new Color(0.55f, 0.12f, 0.04f), new Color(0.16f, 0.04f, 0.03f), Mathf.Clamp01((n - 0.25f) * 4f));   // crust
-            else if (n > 0.1f) c = Color.Lerp(new Color(1f, 0.45f, 0.1f), new Color(0.55f, 0.12f, 0.04f), (n - 0.1f) / 0.15f);
-            else c = Color.Lerp(new Color(1f, 0.92f, 0.45f), new Color(1f, 0.45f, 0.1f), Mathf.Clamp01((n + 0.3f) / 0.4f));       // white-hot veins
+            if (n > 0.55f) c = Color.Lerp(new Color(0.5f, 0.1f, 0.04f), new Color(0.14f, 0.035f, 0.03f), Mathf.Clamp01((n - 0.55f) * 8f));   // crust
+            else if (n > 0.47f) c = Color.Lerp(new Color(1f, 0.85f, 0.4f), new Color(0.5f, 0.1f, 0.04f), (n - 0.47f) / 0.08f);               // white-hot edges
+            else c = Color.Lerp(new Color(0.95f, 0.3f, 0.06f), new Color(1f, 0.6f, 0.15f), Mathf.Clamp01((n - 0.3f) / 0.17f));                // molten
             px[y * size + x] = c;
         }
         tex.SetPixels32(px);
         tex.Apply(true);
         return tex;
+    }
+
+    // Smooth value noise on a period x period lattice that wraps round
+    private static float TileNoise(float x, float y, int period, int seed)
+    {
+        int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+        float fx = x - x0, fy = y - y0;
+        fx = fx * fx * (3f - 2f * fx);
+        fy = fy * fy * (3f - 2f * fy);
+        float H(int i, int j)
+        {
+            i = ((i % period) + period) % period;
+            j = ((j % period) + period) % period;
+            uint h = (uint)(i * 374761393 + j * 668265263 + seed * 1442695041);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return ((h ^ (h >> 16)) & 0xffff) / 65535f;
+        }
+        return Mathf.Lerp(Mathf.Lerp(H(x0, y0), H(x0 + 1, y0), fx), Mathf.Lerp(H(x0, y0 + 1), H(x0 + 1, y0 + 1), fx), fy);
     }
 
     /// <summary>A soft round glow, for sprites and particles</summary>
@@ -592,6 +771,8 @@ public class AshenVolcano : MonoBehaviour
 {
     private Transform glow;
     private Material glowMat;
+    private readonly List<(Transform t, float size)> demon = new List<(Transform, float)>();
+    private Material demonMat;
 
     private void Start()
     {
@@ -683,6 +864,21 @@ public class AshenVolcano : MonoBehaviour
         var gr = glow.GetComponent<MeshRenderer>();
         gr.sharedMaterial = glowMat;
         gr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // A haze of fire round the demon's eyes and mouth
+        demonMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = soft, color = new Color(1f, 0.4f, 0.1f, 0.6f) };
+        for (int i = 0; i < AshenScenery.DemonSpots.Count; i++)
+        {
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
+            Destroy(q.GetComponent<Collider>());
+            q.name = "Demon Glow";
+            q.SetParent(transform, false);
+            q.position = AshenScenery.DemonSpots[i];
+            var qr = q.GetComponent<MeshRenderer>();
+            qr.sharedMaterial = demonMat;
+            qr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            demon.Add((q, i == AshenScenery.DemonSpots.Count - 1 ? 18f : 9f));   // the mouth is last
+        }
     }
 
     private void LateUpdate()
@@ -694,6 +890,17 @@ public class AshenVolcano : MonoBehaviour
         glowMat.color = new Color(1f, 0.45f, 0.12f, 0.55f * throb);
         Camera cam = Camera.main;
         if (cam != null) glow.rotation = Quaternion.LookRotation(glow.position - cam.transform.position);
+
+        // The demon's eyes smoulder, flaring up now and then
+        float flare = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(t * 0.45f)), 12f);
+        float burn = 0.75f + 0.12f * Mathf.Sin(t * 2.3f) + 0.08f * Mathf.Sin(t * 5.1f) + 0.35f * flare;
+        if (AshenScenery.DemonGlow != null) AshenScenery.DemonGlow.color = Color.Lerp(new Color(1f, 0.45f, 0.1f), new Color(1f, 0.95f, 0.55f), Mathf.Clamp01(burn - 0.6f));
+        demonMat.color = new Color(1f, 0.4f, 0.1f, 0.45f * burn);
+        foreach (var d in demon)
+        {
+            d.t.localScale = Vector3.one * d.size * (0.85f + 0.25f * burn);
+            if (cam != null) d.t.rotation = Quaternion.LookRotation(d.t.position - cam.transform.position);
+        }
     }
 }
 
@@ -840,4 +1047,189 @@ public class AshenLightning : MonoBehaviour
     }
 
     private float Rand(float half) => ((float)rng.NextDouble() * 2f - 1f) * half;
+}
+
+/// <summary>
+/// Little orcs toiling at the mine: haulers dragging carts down the road to the smelter (full
+/// of glowing ore) and back up (empty), and miners swinging pickaxes at the rock, sparks
+/// flying when they strike. Smoke rises from the smelter's chimney.
+/// </summary>
+public class AshenOrcs : MonoBehaviour
+{
+    private class Orc { public Transform body, legL, legR, armL, armR; }
+    private class Hauler { public Orc orc; public Transform cart, ore; public float offset; }
+    private class Miner { public Orc orc; public Transform spark; public float phase; }
+
+    private readonly List<Hauler> haulers = new List<Hauler>();
+    private readonly List<Miner> miners = new List<Miner>();
+    private Vector3[] loop;
+    private float[] along;
+    private float loopLength;
+    private const float Size = 1.3f, Speed = 2.2f, CartGap = 3.2f;
+
+    private void Start()
+    {
+        var rng = new System.Random(4242);
+        Material skin = OrbitScenery.Lit(new Color(0.24f, 0.33f, 0.14f), new Color(0.04f, 0.1f, 0.02f), 0f, 0.35f);
+        Material hide = OrbitScenery.Lit(new Color(0.2f, 0.11f, 0.07f), Color.black, 0f, 0.2f);
+        Material iron = OrbitScenery.Lit(new Color(0.16f, 0.15f, 0.17f), Color.black, 0.6f, 0.45f);
+        Material wood = OrbitScenery.Lit(new Color(0.18f, 0.11f, 0.07f), Color.black, 0f, 0.2f);
+        Material tusk = OrbitScenery.Lit(new Color(0.85f, 0.8f, 0.7f), new Color(0.1f, 0.05f, 0.02f), 0f, 0.4f);
+        Material eye = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.25f, 0.1f) };
+        Material oreCyan = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.35f, 1f, 0.95f) };
+        Material oreHot = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.55f, 0.15f) };
+        Material oreRock = OrbitScenery.Lit(new Color(0.1f, 0.07f, 0.08f), Color.black, 0.2f, 0.4f);
+        Material spark = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.9f, 0.5f) };
+
+        loop = AshenScenery.HaulLoop.ToArray();
+        along = new float[loop.Length + 1];
+        for (int i = 1; i <= loop.Length; i++) along[i] = along[i - 1] + (loop[i % loop.Length] - loop[i - 1]).magnitude;
+        loopLength = along[loop.Length];
+
+        // Haulers, spread round the loop
+        const int count = 5;
+        for (int i = 0; i < count; i++)
+        {
+            var h = new Hauler { orc = MakeOrc(skin, hide, eye, tusk), offset = (i + (float)rng.NextDouble() * 0.3f) / count * loopLength };
+            h.orc.armL.localRotation = h.orc.armR.localRotation = Quaternion.Euler(35f, 0f, 0f);   // reaching back for the handle
+            h.cart = new GameObject("Ore Cart").transform;
+            h.cart.SetParent(transform, false);
+            h.cart.localScale = Vector3.one * Size;
+            OrbitScenery.Part(h.cart, PrimitiveType.Cube, new Vector3(0f, 0.95f, 0f), new Vector3(1.5f, 0.9f, 2.3f), wood);
+            OrbitScenery.Part(h.cart, PrimitiveType.Cube, new Vector3(0f, 1.42f, 0f), new Vector3(1.6f, 0.1f, 2.4f), iron);   // iron rim
+            for (int w = 0; w < 4; w++)
+                OrbitScenery.Part(h.cart, PrimitiveType.Cylinder, new Vector3(w < 2 ? -0.8f : 0.8f, 0.42f, w % 2 == 0 ? -0.75f : 0.75f), new Vector3(0.84f, 0.1f, 0.84f), iron, Quaternion.Euler(0f, 0f, 90f));
+            OrbitScenery.Part(h.cart, PrimitiveType.Cube, new Vector3(0f, 1.05f, 2.05f), new Vector3(0.1f, 0.1f, 1.8f), wood, Quaternion.Euler(-8f, 0f, 0f));   // the shaft to the orc
+            h.ore = new GameObject("Ore").transform;
+            h.ore.SetParent(h.cart, false);
+            for (int k = 0; k < 6; k++)
+            {
+                Vector3 at = new Vector3(((float)rng.NextDouble() - 0.5f) * 1f, 1.5f + (float)rng.NextDouble() * 0.25f, ((float)rng.NextDouble() - 0.5f) * 1.7f);
+                Material m = k % 3 == 0 ? oreCyan : k % 3 == 1 ? oreHot : oreRock;
+                OrbitScenery.Part(h.ore, PrimitiveType.Cube, at, Vector3.one * (0.35f + (float)rng.NextDouble() * 0.2f), m, Quaternion.Euler(rng.Next(90), rng.Next(90), rng.Next(90)));
+            }
+            haulers.Add(h);
+        }
+
+        // Miners, each with a pickaxe in both hands
+        foreach (var spot in AshenScenery.MinerSpots)
+        {
+            var m = new Miner { orc = MakeOrc(skin, hide, eye, tusk), phase = (float)rng.NextDouble() };
+            Vector3 facing = spot.target - spot.at;
+            facing.y = 0f;
+            m.orc.body.position = spot.at;
+            m.orc.body.rotation = Quaternion.LookRotation(facing);
+            OrbitScenery.Part(m.orc.armR, PrimitiveType.Cube, new Vector3(-0.3f, -1.4f, 0f), new Vector3(0.09f, 1.5f, 0.09f), wood);   // haft
+            OrbitScenery.Part(m.orc.armR, PrimitiveType.Cube, new Vector3(-0.3f, -2.1f, 0.15f), new Vector3(0.12f, 0.12f, 1.1f), iron, Quaternion.Euler(-15f, 0f, 0f));   // pick head
+            m.spark = OrbitScenery.Part(transform, PrimitiveType.Sphere, spot.target, Vector3.one * 0.7f, spark);
+            m.spark.gameObject.SetActive(false);
+            miners.Add(m);
+        }
+
+        // Smoke from the smelter
+        var smoke = new GameObject("Smelter Smoke").AddComponent<ParticleSystem>();
+        smoke.transform.SetParent(transform, false);
+        smoke.transform.position = AshenScenery.ChimneyTop;
+        smoke.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+        smoke.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = smoke.main;
+        main.loop = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(6f, 9f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.5f, 2.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(1.5f, 2.5f);
+        main.maxParticles = 50;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.prewarm = true;
+        var emission = smoke.emission;
+        emission.rateOverTime = 4f;
+        var shape = smoke.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = 8f;
+        shape.radius = 0.5f;
+        var grow = smoke.sizeOverLifetime;
+        grow.enabled = true;
+        grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 3.5f));
+        var fade = smoke.colorOverLifetime;
+        fade.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(new Color(0.6f, 0.3f, 0.2f), 0f), new GradientColorKey(new Color(0.15f, 0.12f, 0.12f), 1f) },
+                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.7f, 0.1f), new GradientAlphaKey(0f, 1f) });
+        fade.color = g;
+        smoke.GetComponent<ParticleSystemRenderer>().sharedMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = AshenScenery.Soft() };
+        smoke.Play();
+    }
+
+    // A squat, hunched orc about three units tall: stubby legs, a broad back, a big head pushed
+    // forward with tusks and ember eyes, long arms. Faces +z.
+    private Orc MakeOrc(Material skin, Material hide, Material eye, Material tusk)
+    {
+        var o = new Orc { body = new GameObject("Orc").transform };
+        o.body.SetParent(transform, false);
+        o.body.localScale = Vector3.one * Size;
+        Transform Limb(Vector3 pivot, Vector3 scale, Material m)
+        {
+            var t = new GameObject("Limb").transform;
+            t.SetParent(o.body, false);
+            t.localPosition = pivot;
+            OrbitScenery.Part(t, PrimitiveType.Cube, new Vector3(0f, -scale.y * 0.5f, 0f), scale, m);
+            return t;
+        }
+        o.legL = Limb(new Vector3(-0.28f, 0.9f, 0f), new Vector3(0.34f, 0.9f, 0.4f), skin);
+        o.legR = Limb(new Vector3(0.28f, 0.9f, 0f), new Vector3(0.34f, 0.9f, 0.4f), skin);
+        OrbitScenery.Part(o.body, PrimitiveType.Cube, new Vector3(0f, 1f, 0f), new Vector3(0.95f, 0.45f, 0.7f), hide);   // loincloth
+        OrbitScenery.Part(o.body, PrimitiveType.Sphere, new Vector3(0f, 1.6f, 0.15f), new Vector3(1.15f, 1.2f, 0.95f), skin, Quaternion.Euler(25f, 0f, 0f));   // hunched back
+        OrbitScenery.Part(o.body, PrimitiveType.Sphere, new Vector3(0f, 2.15f, 0.55f), Vector3.one * 0.72f, skin);   // head
+        OrbitScenery.Part(o.body, PrimitiveType.Cube, new Vector3(0.36f, 2.3f, 0.45f), new Vector3(0.3f, 0.12f, 0.1f), skin, Quaternion.Euler(0f, 0f, 25f));    // pointed ears
+        OrbitScenery.Part(o.body, PrimitiveType.Cube, new Vector3(-0.36f, 2.3f, 0.45f), new Vector3(0.3f, 0.12f, 0.1f), skin, Quaternion.Euler(0f, 0f, -25f));
+        OrbitScenery.Part(o.body, PrimitiveType.Sphere, new Vector3(0.14f, 2.22f, 0.86f), Vector3.one * 0.12f, eye);
+        OrbitScenery.Part(o.body, PrimitiveType.Sphere, new Vector3(-0.14f, 2.22f, 0.86f), Vector3.one * 0.12f, eye);
+        OrbitScenery.Part(o.body, PrimitiveType.Cube, new Vector3(0.15f, 2f, 0.86f), new Vector3(0.07f, 0.2f, 0.07f), tusk);
+        OrbitScenery.Part(o.body, PrimitiveType.Cube, new Vector3(-0.15f, 2f, 0.86f), new Vector3(0.07f, 0.2f, 0.07f), tusk);
+        o.armL = Limb(new Vector3(-0.62f, 1.95f, 0.25f), new Vector3(0.26f, 1.05f, 0.28f), skin);
+        o.armR = Limb(new Vector3(0.62f, 1.95f, 0.25f), new Vector3(0.26f, 1.05f, 0.28f), skin);
+        return o;
+    }
+
+    // A point d along the loop (wrapping round), and the way the loop runs there
+    private Vector3 PointAt(float d)
+    {
+        d = Mathf.Repeat(d, loopLength);
+        int i = 1;
+        while (i < loop.Length && along[i] < d) i++;
+        Vector3 a = loop[i - 1], b = loop[i % loop.Length];
+        float seg = along[i] - along[i - 1];
+        return Vector3.Lerp(a, b, seg > 0f ? (d - along[i - 1]) / seg : 0f);
+    }
+
+    private void Update()
+    {
+        if (loop == null || loop.Length < 2) return;
+        float t = AccessibilityPrefs.AmbientTime;
+        foreach (Hauler h in haulers)
+        {
+            float d = h.offset + t * Speed;
+            Vector3 p = PointAt(d), ahead = PointAt(d + 0.5f) - PointAt(d - 0.5f);
+            float stride = Mathf.Sin(d * 2.4f);
+            h.orc.body.position = p + Vector3.up * (Mathf.Abs(stride) * 0.12f);
+            h.orc.body.rotation = Quaternion.LookRotation(ahead) * Quaternion.Euler(10f, 0f, stride * 3f);   // leaning into the load
+            h.orc.legL.localRotation = Quaternion.Euler(stride * 30f, 0f, 0f);
+            h.orc.legR.localRotation = Quaternion.Euler(-stride * 30f, 0f, 0f);
+            Vector3 c = PointAt(d - CartGap * Size), cAhead = PointAt(d - CartGap * Size + 0.5f) - PointAt(d - CartGap * Size - 0.5f);
+            h.cart.position = c;
+            h.cart.rotation = Quaternion.LookRotation(cAhead);
+            // Full on the way down to the smelter, empty on the way back up
+            h.ore.gameObject.SetActive(Mathf.Repeat(d - CartGap * Size, loopLength) < loopLength * 0.5f);
+        }
+        foreach (Miner m in miners)
+        {
+            // Heave the pick up slowly, bring it down fast
+            float p = Mathf.Repeat(t * 0.7f + m.phase, 1f);
+            float swing = p < 0.75f ? Mathf.SmoothStep(-20f, -160f, p / 0.75f) : Mathf.Lerp(-160f, -20f, (p - 0.75f) / 0.25f);
+            m.orc.armL.localRotation = m.orc.armR.localRotation = Quaternion.Euler(swing, 0f, 0f);
+            m.orc.body.localScale = new Vector3(Size, Size * (1f - 0.04f * Mathf.Sin(p * Mathf.PI * 2f)), Size);
+            bool strike = p < 0.08f;
+            m.spark.gameObject.SetActive(strike);
+            if (strike) m.spark.localScale = Vector3.one * (0.4f + 0.6f * Mathf.Sin(p / 0.08f * Mathf.PI));
+        }
+    }
 }
