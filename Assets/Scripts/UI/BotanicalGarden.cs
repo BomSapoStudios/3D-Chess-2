@@ -183,7 +183,33 @@ public static class BotanicalSky
                 result[(height - 1 - y) * width + x] = new Color32(B(c.r), B(c.g), B(c.b), 255); // Unity textures start at the bottom row
             }
         }
+        Soften(result, layer, width, hy);
         return result;
+    }
+
+    // Blends each skyline edge pixel with its neighbours, so silhouettes and glass ribs don't stair-step when magnified
+    private static void Soften(Color32[] result, byte[] layer, int width, int hy)
+    {
+        int height = result.Length / width;
+        var src = (Color32[])result.Clone();
+        for (int y = 1; y < hy; y++)
+            for (int x = 0; x < width; x++)
+            {
+                int xl = (x + width - 1) % width, xr = (x + 1) % width;
+                byte l = layer[y * width + x];
+                if (layer[y * width + xl] == l && layer[y * width + xr] == l && layer[(y - 1) * width + x] == l && layer[(y + 1) * width + x] == l
+                    && !(l == Dome || l == Wing)) continue;
+                int r = 0, g = 0, b = 0;
+                for (int oy = -1; oy <= 1; oy++)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        int ox = k == 0 ? xl : k == 1 ? x : xr;
+                        Color32 p = src[(height - 1 - (y + oy)) * width + ox];
+                        int w = oy == 0 && ox == x ? 4 : (oy == 0 || ox == x ? 2 : 1);
+                        r += p.r * w; g += p.g * w; b += p.b * w;
+                    }
+                result[(height - 1 - y) * width + x] = new Color32((byte)(r / 16), (byte)(g / 16), (byte)(b / 16), 255);
+            }
     }
 
     // Glowing glass with a neon iron frame: ribs and rings on the dome, arches along the wings
@@ -559,7 +585,7 @@ public static class BotanicalScenery
             batch.Add(frame, GardenShapes.Sphere, rng.NextDouble() < 0.6 ? m.Blossom : m.BlossomPale, p, Quaternion.identity, new Vector3(s, s * 0.8f, s));
         }
         // Fallen petals in a pink ring on the lawn
-        batch.Add(frame, GardenShapes.Cylinder, m.FallenPetals, new Vector3(0f, 0.06f, 0f), Quaternion.identity, new Vector3(13f, 0.01f, 13f));
+        batch.Add(frame, GardenShapes.Flat, m.FallenPetals, new Vector3(0f, 0.14f, 0f), Quaternion.identity, new Vector3(14f, 1f, 14f));
     }
 
     // ───────── Topiary on marble plinths just outside the outer walk ─────────
@@ -802,7 +828,7 @@ public class GardenMaterials
     public readonly Material Water = OrbitScenery.Lit(new Color(0.04f, 0.2f, 0.26f), new Color(0.04f, 0.2f, 0.24f), 0.2f, 0.95f);
     public readonly Material Blossom = OrbitScenery.Lit(new Color(1f, 0.55f, 0.78f), new Color(0.38f, 0.1f, 0.24f), 0f, 0.3f);
     public readonly Material BlossomPale = OrbitScenery.Lit(new Color(1f, 0.78f, 0.9f), new Color(0.32f, 0.16f, 0.24f), 0f, 0.3f);
-    public readonly Material FallenPetals = OrbitScenery.Lit(new Color(0.7f, 0.3f, 0.5f), new Color(0.16f, 0.04f, 0.1f), 0f, 0.1f);
+    public readonly Material FallenPetals = new Material(Shader.Find("Sprites/Default")) { mainTexture = GardenTextures.Soft(0.8f), color = new Color(1f, 0.5f, 0.75f, 0.55f) };
     public readonly Material NeonPink = Unlit(new Color(1f, 0.35f, 0.75f));
     public readonly Material NeonGold = Unlit(new Color(1f, 0.82f, 0.4f));
     public readonly Material NeonCyan = Unlit(new Color(0.45f, 1f, 0.92f));
@@ -826,7 +852,7 @@ public class GardenMaterials
 /// </summary>
 public static class GardenShapes
 {
-    private static Mesh cube, sphere, bud, cylinder, cone;
+    private static Mesh cube, sphere, bud, cylinder, cone, flat;
 
     public static Mesh Cube
     {
@@ -847,6 +873,8 @@ public static class GardenShapes
     public static Mesh Bud => bud != null ? bud : (bud = MakeSphere(7, 4));
     public static Mesh Cylinder => cylinder != null ? cylinder : (cylinder = MakeCylinder(10));
     public static Mesh Cone => cone != null ? cone : (cone = MakeCone(10));
+    /// <summary>A flat 1x1 square facing up, UV-mapped, for soft textured patches on the lawn</summary>
+    public static Mesh Flat => flat != null ? flat : (flat = MakeFlat());
 
     private static Mesh MakeSphere(int around, int rings)
     {
@@ -932,6 +960,17 @@ public static class GardenShapes
         return Finish("Garden Cone", verts, normals, tris);
     }
 
+    private static Mesh MakeFlat()
+    {
+        var mesh = new Mesh { name = "Garden Flat" };
+        mesh.SetVertices(new List<Vector3> { new Vector3(-0.5f, 0f, -0.5f), new Vector3(-0.5f, 0f, 0.5f), new Vector3(0.5f, 0f, 0.5f), new Vector3(0.5f, 0f, -0.5f) });
+        mesh.SetNormals(new List<Vector3> { Vector3.up, Vector3.up, Vector3.up, Vector3.up });
+        mesh.SetUVs(0, new List<Vector2> { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) });
+        mesh.SetTriangles(new List<int> { 0, 1, 2, 0, 2, 3 }, 0);
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
     private static Mesh Finish(string name, List<Vector3> verts, List<Vector3> normals, List<int> tris)
     {
         var mesh = new Mesh { name = name };
@@ -1009,6 +1048,7 @@ public class GardenGlows : MonoBehaviour
 {
     private readonly List<(Transform t, float size, float phase)> glows = new List<(Transform, float, float)>();
     private static Texture2D soft;
+    private static readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>(); // shared, so lamps batch and rebuilds don't leak
 
     public void Add(Vector3 position, float size, Color color, int seed)
     {
@@ -1019,7 +1059,9 @@ public class GardenGlows : MonoBehaviour
         q.SetParent(transform, false);
         q.position = position;
         var r = q.GetComponent<MeshRenderer>();
-        r.material = new Material(Shader.Find("Sprites/Default")) { mainTexture = soft, color = color };
+        if (!materials.TryGetValue(color, out Material mat) || mat == null)
+            materials[color] = mat = new Material(Shader.Find("Sprites/Default")) { mainTexture = soft, color = color };
+        r.sharedMaterial = mat;
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         glows.Add((q, size, (new System.Random(seed)).Next(1000) / 100f));
     }
