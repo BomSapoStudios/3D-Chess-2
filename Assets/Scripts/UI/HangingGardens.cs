@@ -124,7 +124,7 @@ public static class HangingGardensSky
 
         Color zenith = new Color(0.02f, 0.06f, 0.16f), dusk = new Color(0.1f, 0.3f, 0.45f); // blue hour: deep teal overhead
         Color rose = new Color(0.98f, 0.45f, 0.55f), gold = new Color(1f, 0.76f, 0.5f);
-        Color nearDark = new Color(0.1f, 0.07f, 0.16f); // dusk silhouettes, not black
+        Color nearDark = new Color(0.12f, 0.07f, 0.18f); // dusk silhouettes, not black
 
         for (int y = 0; y < height; y++)
         {
@@ -173,8 +173,9 @@ public static class HangingGardensSky
                     }
                     else if (l == Near)
                     {
-                        c = nearDark;
-                        if (edge || edge2) c = Color.Lerp(nearDark, new Color(1f, 0.45f, 0.7f), (edge ? 0.55f : 0.25f) * (0.35f + 0.65f * sunSide));
+                        // A shade darker than the far trees, still letting a little of the sky through
+                        c = Color.Lerp(c, nearDark, 0.78f);
+                        if (edge || edge2) c = Color.Lerp(c, new Color(1f, 0.45f, 0.7f), (edge ? 0.55f : 0.25f) * (0.35f + 0.65f * sunSide));
                         if (sparks.Contains(y * width + x)) c = new Color(1f, 0.9f, 0.45f);
                     }
                     else if (l == Zig)
