@@ -614,6 +614,9 @@ SOUND
     mode's own track if there is one, else the menu track, quieter. The
     iPhone's ringer switch mutes the game, and other apps' music keeps
     playing underneath.
+  • Music is switched off for now (SoundPrefs.MusicReady = false): the Music
+    card is hidden from Settings > Sound and no music plays. Set it to true
+    once the real songs are in to bring both back.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

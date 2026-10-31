@@ -40,8 +40,10 @@ public partial class NeonMenu
         Button done = NeonButton(header, "Done!", new Vector2(150, 50), NeonTheme.Pink, NeonTheme.Cyan, 2f, 20, ShowSettings);
         Place((RectTransform)done.transform, new Vector2(1, 0.5f), new Vector2(150, 50), new Vector2(-75, 0));
 
-        RectTransform left = Card(root, "Effects Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74));
-        RectTransform right = Card(root, "Music Card", NeonTheme.Pink, new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(8, 14), new Vector2(-24, -74));
+        // Until the songs are in (SoundPrefs.MusicReady), only the effects card shows, centred
+        RectTransform left = SoundPrefs.MusicReady
+            ? Card(root, "Effects Card", NeonTheme.Cyan, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(16, 14), new Vector2(-8, -74))
+            : Card(root, "Effects Card", NeonTheme.Cyan, new Vector2(0.25f, 0f), new Vector2(0.75f, 1f), new Vector2(0, 14), new Vector2(0, -74));
 
         SectionLabel(left, "Sound effects", NeonTheme.Cyan);
         SoundSwitch(left, "Sound Effects", () => SoundPrefs.Effects, v => SoundPrefs.Effects = v,
@@ -52,6 +54,8 @@ public partial class NeonMenu
         tip.textWrappingMode = TextWrappingModes.Normal;
         tip.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
 
+        if (!SoundPrefs.MusicReady) return;
+        RectTransform right = Card(root, "Music Card", NeonTheme.Pink, new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(8, 14), new Vector2(-24, -74));
         SectionLabel(right, "Music", NeonTheme.PinkSoft);
         SoundSwitch(right, "Music", () => SoundPrefs.Music, v => SoundPrefs.Music = v,
             "Plays in the menus", "Off: no music anywhere");

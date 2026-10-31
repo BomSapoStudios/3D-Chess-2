@@ -219,7 +219,10 @@ public partial class NeonMenu
         LargerTextLayout.Stack(notifyScreen, 74f, (RectTransform)notifyScreen.transform.Find("Permission Card"), (RectTransform)notifyScreen.transform.Find("Kinds Card"));
         LargerTextLayout.Stack(accessScreen, 74f, accessLeft, accessRight);
         LargerTextLayout.Stack(settingsScreen, 74f, settingsLeft, settingsRight);
-        LargerTextLayout.Stack(soundScreen, 74f, (RectTransform)soundScreen.transform.Find("Effects Card"), (RectTransform)soundScreen.transform.Find("Music Card"));
+        if (SoundPrefs.MusicReady)
+            LargerTextLayout.Stack(soundScreen, 74f, (RectTransform)soundScreen.transform.Find("Effects Card"), (RectTransform)soundScreen.transform.Find("Music Card"));
+        else
+            LargerTextLayout.Stack(soundScreen, 74f, (RectTransform)soundScreen.transform.Find("Effects Card"));
         LargerTextLayout.Pan(customizeScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(onlineScreen, new Vector2(844, 390));
         LargerTextLayout.Pan(friendsScreen, new Vector2(844, 390));

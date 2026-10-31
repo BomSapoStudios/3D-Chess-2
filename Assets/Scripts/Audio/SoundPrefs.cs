@@ -9,8 +9,14 @@ public static class SoundPrefs
     /// <summary>Fired after any option changes, so playing music can follow</summary>
     public static event System.Action Changed;
 
+    /// <summary>
+    /// Music switch for the whole app. False until the real songs are in: the Music card is hidden
+    /// from Settings > Sound and no music plays. Set to true to bring both back.
+    /// </summary>
+    public static readonly bool MusicReady = false; // readonly, not const, so the hidden code compiles without unreachable-code warnings
+
     public static bool Effects { get => PlayerPrefs.GetInt("Sound.Effects", 1) == 1; set => SetInt("Sound.Effects", value ? 1 : 0); }
-    public static bool Music { get => PlayerPrefs.GetInt("Sound.Music", 1) == 1; set => SetInt("Sound.Music", value ? 1 : 0); }
+    public static bool Music { get => MusicReady && PlayerPrefs.GetInt("Sound.Music", 1) == 1; set => SetInt("Sound.Music", value ? 1 : 0); }
     public static bool MusicInGames { get => PlayerPrefs.GetInt("Sound.MusicInGames", 0) == 1; set => SetInt("Sound.MusicInGames", value ? 1 : 0); }
 
     /// <summary>0 quiet, 1 medium, 2 loud</summary>
