@@ -189,6 +189,8 @@ public static class AshenScenery
     /// <summary>The demon face's eyes and mouth: AshenVolcano makes them throb</summary>
     public static Material DemonGlow { get; private set; }
     public static readonly List<Vector3> DemonSpots = new List<Vector3>();
+    /// <summary>Above the demon's brow, between its horns, where it burns</summary>
+    public static Vector3 DemonCrown { get; private set; }
     public const float MouthT = 0.36f;   // how far up the volcano the demon's mouth is, where the big flow starts
 
     /// <summary>The loop the ore carts run: out on one side of the haul road, back on the other</summary>
@@ -427,7 +429,7 @@ public static class AshenScenery
             OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 1.5f), S(5f, 1.8f, 1.4f), DemonGlow, slant);      // burning eye
             DemonSpots.Add(face.TransformPoint(P(s * 5f, 2f, 2.5f)));
             OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 1.3f, -3f, 1.6f), S(0.6f, 1.8f, 0.5f), DemonGlow, Quaternion.Euler(0f, 0f, -s * 15f));   // nostril
-            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 7.5f, -2.5f, 0.6f), S(6f, 4f, 3f), rock);                 // cheekbone
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 7.5f, -2.5f, 0.1f), S(6f, 4f, 2f), rock);                 // cheekbone
             // A horn sweeping up and out, its tip curling back in
             Quaternion outward = Quaternion.Euler(0f, 0f, -s * 38f);
             Vector3 hornFoot = P(s * 10.5f, 7.5f, 0.6f);
@@ -442,7 +444,7 @@ public static class AshenScenery
             Rock(face, P((i - 2.5f) * 2.5f, -5.2f, 1.7f), 0.7f * F, 0.05f, (i == 0 || i == 5 ? 3.6f : 2.4f) * F, 5, 2, 0f, 100 + i, bone).localRotation = Quaternion.Euler(0f, 0f, 180f);
         for (int i = 0; i < 5; i++)   // lower fangs
             Rock(face, P((i - 2f) * 2.7f, -10.8f, 1.7f), 0.6f * F, 0.05f, (i == 0 || i == 4 ? 3f : 2f) * F, 5, 2, 0f, 110 + i, bone);
-        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -13.3f, 0.5f), S(12f, 4f, 3f), rock);                                  // chin
+        DemonCrown = face.TransformPoint(P(0f, 8.5f, 1f));
     }
 
     // The orcs' mine: a timbered tunnel into the volcano's flank on White's left, a haul road
@@ -899,6 +901,39 @@ public class AshenVolcano : MonoBehaviour
             qr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             demon.Add((q, i == AshenScenery.DemonSpots.Count - 1 ? 18f : 9f));   // the mouth is last
         }
+
+        // Flames licking up off the demon's head between its horns
+        var fire = new GameObject("Demon Fire").AddComponent<ParticleSystem>();
+        fire.transform.SetParent(transform, false);
+        fire.transform.position = AshenScenery.DemonCrown;
+        fire.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+        fire.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var fm = fire.main;
+        fm.loop = true;
+        fm.startLifetime = new ParticleSystem.MinMaxCurve(0.9f, 1.6f);
+        fm.startSpeed = new ParticleSystem.MinMaxCurve(4f, 7f);
+        fm.startSize = new ParticleSystem.MinMaxCurve(2.5f, 4.5f);
+        fm.maxParticles = 80;
+        fm.simulationSpace = ParticleSystemSimulationSpace.World;
+        fm.prewarm = true;
+        var fe = fire.emission;
+        fe.rateOverTime = 30f;
+        var fs = fire.shape;
+        fs.shapeType = ParticleSystemShapeType.Cone;
+        fs.angle = 10f;
+        fs.radius = 8f;
+        fs.radiusThickness = 1f;
+        var shrink = fire.sizeOverLifetime;
+        shrink.enabled = true;
+        shrink.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
+        var flame = fire.colorOverLifetime;
+        flame.enabled = true;
+        var fg = new Gradient();
+        fg.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.9f, 0.45f), 0f), new GradientColorKey(new Color(1f, 0.45f, 0.1f), 0.4f), new GradientColorKey(new Color(0.8f, 0.12f, 0.08f), 1f) },
+                   new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.9f, 0.15f), new GradientAlphaKey(0f, 1f) });
+        flame.color = fg;
+        fire.GetComponent<ParticleSystemRenderer>().sharedMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = soft };
+        fire.Play();
     }
 
     private void LateUpdate()
