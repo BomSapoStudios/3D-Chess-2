@@ -203,8 +203,8 @@ public static class KingdomScenery
                 new Vector3(5f, 0.1f, RoadRadius * Mathf.PI * 2f / segments + 0.3f), road, Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a))));
         }
 
-        // The castle ahead of White, facing the board
-        Castle(still, new Vector3(108f, GroundY, -14f), stone, darkStone, roofs, gold, window, pink, cyan, shadow);
+        // The castle ahead of White and a little to the left, so the board doesn't hide it
+        Castle(still, new Vector3(95f, GroundY, 50f), stone, darkStone, roofs, gold, window, pink, cyan, shadow);
 
         // The windmill ahead of Black (not batched: its sails turn)
         var mill = Windmill(root, new Vector3(-82f, GroundY, 18f), plaster, timber, roofs[0], cyan, window);
@@ -239,7 +239,7 @@ public static class KingdomScenery
         for (int tries = 0; tries < 200 && placed < 34; tries++)
         {
             float deg = (float)rng.NextDouble() * 360f;
-            if (Near(deg, -7f, 30f) || Near(deg, 167f, 18f) || Near(deg, 90f, 22f) || Near(deg, 270f, 22f)) continue;
+            if (Near(deg, 28f, 30f) || Near(deg, 167f, 18f) || Near(deg, 90f, 22f) || Near(deg, 270f, 22f)) continue;
             float a = deg * Mathf.Deg2Rad;
             float d = (rng.NextDouble() < 0.5 ? 54f : 74f) + (float)rng.NextDouble() * 8f;
             Cottage(still, new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d), plaster, timber, roofs[rng.Next(roofs.Length)], rng.NextDouble() < 0.5 ? pink : cyan, window, shadow, rng);
@@ -250,7 +250,7 @@ public static class KingdomScenery
         for (int i = 0; i < 26; i++)
         {
             float deg = (float)rng.NextDouble() * 360f;
-            if (Near(deg, -7f, 22f)) continue;
+            if (Near(deg, 28f, 22f)) continue;
             float a = deg * Mathf.Deg2Rad;
             float d = 38f + (float)rng.NextDouble() * 55f;
             if (Mathf.Abs(d - RoadRadius) < 4f) d += 8f;
