@@ -31,7 +31,7 @@ fails) and sized.py's difficulty weights, which come from players' solve times. 
     --no-warp leaves them out
 """
 import argparse, datetime, glob, json, os, subprocess, sys, tempfile
-import packs, pipeline, sized, stats
+import backtrack, packs, pipeline, sized, stats
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
@@ -173,9 +173,12 @@ def assign(days, pool, seen, before, warp):
         last_want = next((q.get("want") for q in reversed(recent) if q.get("want")), None)
         # Prefer tricks yesterday didn't have, a portal/ramp kind last Saturday didn't have, and a mix of
         # given and placed queens
-        best = min(ok, key=lambda p: (len(set(p["tricks"]) & y_tricks) * 3 + (4 if last_want and p.get("want") == last_want else 0)
-                                      + (2 if yesterday and bool(p.get("queen")) == bool(yesterday.get("queen")) else 0),
-                                      sign * sized.difficulty(p) if sign else abs(sized.difficulty(p) - mid)))
+        ranked = sorted(ok, key=lambda p: (len(set(p["tricks"]) & y_tricks) * 3 + (4 if last_want and p.get("want") == last_want else 0)
+                                           + (2 if yesterday and bool(p.get("queen")) == bool(yesterday.get("queen")) else 0),
+                                           sign * sized.difficulty(p) if sign else abs(sized.difficulty(p) - mid)))
+        # Forced doubling back: never Monday-Thursday, at most once a week (backtrack.py)
+        this_week = recent[-day.weekday():] if day.weekday() else []
+        best = backtrack.first_ok(ranked, 2 if day.weekday() >= 4 else 0, this_week, f"{day}")
         used.add(id(best))
         seen.add(pipeline.layout_key(best))
         chosen[day] = best
@@ -284,6 +287,12 @@ def check(quiet=False):
             problems.append(f"{d}: opens the same way as the day before")
         if prev and prev.get("engine") and d.weekday() and prev["score"] >= p["score"]:
             problems.append(f"{d}: not harder than the day before ({p['score']} after {prev['score']})")
+        if backtrack.forced(p):
+            mon = d - datetime.timedelta(d.weekday())
+            if d.weekday() < 4:
+                problems.append(f"{d}: every par route doubles back (Fri-Sun only)")
+            elif any(backtrack.forced(dailies[x]) for x in new if mon <= x < d):
+                problems.append(f"{d}: a second doubling-back daily this week")
         week = [dailies.get(d - datetime.timedelta(i)) for i in range(1, 7)]
         if any(q and pipeline.shape(q) == pipeline.shape(p) for q in week):
             problems.append(f"{d}: same solution shape as a day in the week before")

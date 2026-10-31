@@ -13,7 +13,7 @@ Candidates come from ladder.py (one-trick and graded open boards, ice), engine.p
 fails) and portals.py (portals, ramps, brakes).
 """
 import json, random, sys
-import engine, ladder, packs, pipeline, players, portals
+import backtrack, engine, ladder, packs, pipeline, players, portals
 
 TIERS = ["Easy", "Medium", "Hard", "Hard", "Devious"]
 
@@ -151,10 +151,11 @@ def assemble(cands, n):
             how = s["pick"] or ("easy" if c < 2 else "hard")
             sign = {"easy": 1, "mid": 0, "hard": -1}[how]
             mid = sorted(difficulty(p) for p in ok)[len(ok) // 2]
-            best = min(ok, key=lambda p: (sum(have.count(t) for t in p["tricks"] + [p.get("want")]) * 3
-                                          + (4 if pipeline.shape(p) in shapes else 0)
-                                          + (2 if not p.get("queen") and places >= 3 else 0),
-                                          sign * difficulty(p) if sign else abs(difficulty(p) - mid)))
+            ranked = sorted(ok, key=lambda p: (sum(have.count(t) for t in p["tricks"] + [p.get("want")]) * 3
+                                               + (4 if pipeline.shape(p) in shapes else 0)
+                                               + (2 if not p.get("queen") and places >= 3 else 0),
+                                               sign * difficulty(p) if sign else abs(difficulty(p) - mid)))
+            best = backtrack.first_ok(ranked, c, picks, f"{n}³ chapter {c + 1} slot {i + 1}")
             used.add(id(best))
             picks.append(best)
         warm = picks[:2] if c == 0 else []

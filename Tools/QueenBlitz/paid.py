@@ -15,7 +15,7 @@ What the free packs taught (solve times from Brandon's phone, Oct 28-29, and his
     python3 paid.py PACK OUT.json NAMES.txt CANDIDATES.json...     # PACK: cuberun, deepfreeze, blockade, feast
 """
 import json, math, random, sys
-import packs, pipeline, portals, sized
+import backtrack, packs, pipeline, portals, sized
 
 # log(seconds) fitted to Brandon's 55 first clears (R² 0.59, rank correlation 0.73)
 FIT = dict(base=0.84, par=0.61, ice=0.35, warp=0.42, place=0.73)
@@ -147,7 +147,7 @@ def assemble(cands, theme, rng):
                 print(f"  ch{c + 1} slot {i + 1} ({kind}): repeats a shape", file=sys.stderr)
             if not ok:
                 raise SystemExit(f"{theme['name']} chapter {c + 1} slot {i + 1}: no {kind} candidate left")
-            best = min(ok, key=cost)
+            best = backtrack.first_ok(sorted(ok, key=cost), c, list(slot.values()), f"{theme['name']} ch{c + 1} slot {i + 1}")
             used.add(best["key"])
             shapes.add(pipeline.shape(best))
             slot[i] = best

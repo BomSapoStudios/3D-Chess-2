@@ -118,7 +118,7 @@ def clean_line(b, starts, par):
         return None
 
 
-def analyse(p):
+def analyse(p, count_starts=True):
     b = board(p)
     placed = triples(p.get("bestBombs") or [])
     if placed:
@@ -128,11 +128,46 @@ def analyse(p):
     again, rev = doubles(moves)
     if p["queen"]:
         starts = [tuple(p["queen"])]
+    elif not again and not count_starts:
+        starts = []
     else:
         starts = [s for s in b.starts() if b.solve_from(b._begin(s), b.full, par) == par]
     clean = clean_line(b, starts, par) if again else True
     return {"shown": again > 0, "edges": again, "reverse": rev, "forced": clean is False, "unknown": clean is None,
             "par": par, "clean": clean if isinstance(clean, list) else None, "par_starts": len(starts)}
+
+
+_FORCED = {}
+
+
+def forced(p):
+    """Every app-playable par route of this puzzle rides back over its own line (cached per layout)"""
+    key = json.dumps({k: p.get(k) for k in ("size", "queen", "pawns", "blocks", "ice", "portals", "ramps", "mirror",
+                                            "bombs", "bestBombs", "par", "line")}, sort_keys=True)
+    if key not in _FORCED:
+        _FORCED[key] = analyse(p, count_starts=False)["forced"]
+    return _FORCED[key]
+
+
+# Brandon, Oct 31: forced doubling back stays rare. None in a pack's first two chapters or on a
+# Monday-Thursday daily; at most one per later chapter and one per week of dailies.
+EASY_CHAPTERS = 2
+
+
+def cap_ok(p, chapter, picks):
+    """May puzzle p join this chapter (0-based) next to the puzzles already picked for it?"""
+    if not forced(p):
+        return True
+    return chapter >= EASY_CHAPTERS and not any(forced(q) for q in picks)
+
+
+def first_ok(ranked, chapter, picks, where=""):
+    """The best-ranked candidate the cap allows (the best one, with a warning, if none is)"""
+    for p in ranked:
+        if cap_ok(p, chapter, picks):
+            return p
+    print(f"  {where}: every candidate left doubles back; cap broken", file=sys.stderr)
+    return ranked[0]
 
 
 def report(label, puzzles):
