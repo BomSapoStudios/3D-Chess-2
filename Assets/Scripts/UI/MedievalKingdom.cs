@@ -2,30 +2,29 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Medieval Kingdom backdrop: a neon storybook kingdom at dusk, far below the board.
+// Medieval Kingdom backdrop: a neon storybook kingdom at midday, far below the board.
 // Made to go with the Castle Calamity piece set.
 //
-//  - KingdomSky: the 360° sky. Indigo overhead fading through magenta to a hot amber
-//    sunset, a big low sun, streaky pink clouds, purple mountains and a hilltop castle
-//    with lit windows on the far side.
+//  - KingdomSky: the 360° sky. Bright midday blue, a high sun, puffy white clouds, blue
+//    mountains with snowcaps and a hilltop castle on the far side.
 //  - KingdomScenery: grassy ground with a torch-lit cobbled road round the board, a castle
 //    with towers, cone roofs and waving pennants ahead of White, a river winding right across
 //    the kingdom with a drawbridge on the castle road, a village of glowing cottages, lollipop
-//    trees, a windmill ahead of Black and striped tournament tents to the sides. Fireflies
-//    drift about and three dragons loop round the sky.
+//    trees, a windmill ahead of Black and striped tournament tents to the sides. Pollen
+//    floats about, big clouds drift round the sky and three dragons loop round it.
 //
 // Everything sits well away from the board so the board stays the focus.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// <summary>Procedural sunset sky over the kingdom. Pure C# so it can run on a worker thread.</summary>
+/// <summary>Procedural midday sky over the kingdom. Pure C# so it can run on a worker thread.</summary>
 public static class KingdomSky
 {
-    // Matches the fog so the far hills melt into the dusk
-    public static readonly Color HazeColor = new Color(0.2f, 0.09f, 0.2f);
+    // Matches the fog so the far hills melt into the summer haze
+    public static readonly Color HazeColor = new Color(0.62f, 0.78f, 0.92f);
 
-    public const float SunU = 0.27f;            // ahead of the default White view (+x), behind the castle
-    private const float SunV = 0.455f;
-    private const float SunR = 0.055f;
+    public const float SunU = 0.27f;            // ahead of the default White view (+x), high above the castle
+    private const float SunV = 0.13f;
+    private const float SunR = 0.035f;
     private const float CastleU = 0.77f;        // the hilltop castle, ahead of Black
 
     public static Color32[] Generate(int width, int height, int seed)
@@ -78,7 +77,7 @@ public static class KingdomSky
             }
             if (h > 0f) castle[x] = baseH + h;
         }
-        // Lit windows: small warm dots inside the towers and walls
+        // Windows: small dark slots in the towers and walls
         foreach (var t in towers)
             for (int k = 0; k < 3; k++)
             {
@@ -90,9 +89,6 @@ public static class KingdomSky
                         windows.Add((wy + dy) * width + ((wx + dx) % width + width) % width);
             }
 
-        var stars = new HashSet<int>();
-        for (int k = 0; k < 1100; k++) stars.Add(rng.Next((int)(height * 0.35f)) * width + rng.Next(width));
-
         for (int y = 0; y < height; y++)
         {
             float v = (y + 0.5f) / height;
@@ -103,51 +99,54 @@ public static class KingdomSky
                 if (v < horizon)
                 {
                     float t = v / horizon;
-                    // Indigo overhead, magenta in the middle, hot amber at the horizon
-                    Color top = new Color(0.04f, 0.02f, 0.13f), mid = new Color(0.42f, 0.08f, 0.42f), low = new Color(1f, 0.48f, 0.26f);
-                    c = t < 0.7f ? Color.Lerp(top, mid, Mathf.Pow(t / 0.7f, 1.4f)) : Color.Lerp(mid, low, Mathf.Pow((t - 0.7f) / 0.3f, 1.3f));
-                    // The sunset is strongest on the sun's side of the sky
-                    float sunSide = 0.5f + 0.5f * Mathf.Cos(Wrap(u - SunU) * Mathf.PI * 2f);
-                    c = Color.Lerp(c * new Color(0.75f, 0.7f, 0.95f), c, 0.45f + 0.55f * sunSide);
-                    if (stars.Contains(y * width + x)) c += Color.white * (0.5f * Mathf.Clamp01(1f - t * 1.6f));
+                    // Deep saturated blue overhead, pale cyan at the horizon
+                    c = Color.Lerp(new Color(0.12f, 0.36f, 0.9f), new Color(0.62f, 0.86f, 1f), Mathf.Pow(t, 1.8f));
 
-                    // The sun: big, low and glowing, with a wide warm halo
+                    // The sun: high, small and white hot, with a wide soft glow
                     float du = Wrap(u - SunU) * 2f, dv = v - SunV;
                     float d = Mathf.Sqrt(du * du + dv * dv);
-                    c += new Color(1f, 0.45f, 0.35f) * (0.55f * Mathf.Exp(-d * d / (SunR * SunR * 6f)));
-                    if (d < SunR)
+                    c += new Color(1f, 0.95f, 0.75f) * (0.5f * Mathf.Exp(-d * d / (SunR * SunR * 14f)));
+                    if (d < SunR) c = Color.Lerp(c, new Color(1f, 1f, 0.9f), Mathf.Clamp01((SunR - d) / 0.002f));
+
+                    // Puffy fair-weather clouds: white tops, lavender undersides
+                    float squash = (v - 0.2f) / 0.26f;
+                    if (squash > 0f && squash < 1f)
                     {
-                        Color sun = Color.Lerp(new Color(1f, 0.95f, 0.6f), new Color(1f, 0.45f, 0.5f), Mathf.Clamp01((v - (SunV - SunR)) / (SunR * 2f)));
-                        c = Color.Lerp(c, sun, Mathf.Clamp01((SunR - d) / 0.002f));
+                        float n = Mathf.PerlinNoise(u * 22f, v * 34f) * 0.6f + Mathf.PerlinNoise(u * 55f + 5f, v * 80f + 3f) * 0.3f + Mathf.PerlinNoise(u * 7f + 9f, 2f) * 0.5f;
+                        float shape = n - 0.62f - 0.25f * Mathf.Abs(squash - 0.5f);
+                        if (shape > 0f)
+                        {
+                            float under = Mathf.Clamp01((Mathf.PerlinNoise(u * 22f, (v + 0.01f) * 34f) - Mathf.PerlinNoise(u * 22f, v * 34f)) * 12f + 0.3f);
+                            Color cloud = Color.Lerp(new Color(1f, 1f, 1f), new Color(0.78f, 0.74f, 0.95f), under);
+                            c = Color.Lerp(c, cloud, Mathf.Clamp01(shape * 14f) * Mathf.Lerp(0.6f, 1f, 1f - t));
+                        }
                     }
 
-                    // Long streaky clouds low in the sky, lit pink underneath
-                    float cloud = Mathf.PerlinNoise(u * 18f, v * 70f + 4f) * Mathf.PerlinNoise(u * 4f + 11f, v * 12f);
-                    float band = Mathf.Exp(-Mathf.Pow((v - 0.4f) / 0.045f, 2f));
-                    c = Color.Lerp(c, Color.Lerp(new Color(0.55f, 0.15f, 0.45f), new Color(1f, 0.55f, 0.6f), sunSide), Mathf.Clamp01((cloud - 0.2f) * 4f) * band * 0.8f);
-
-                    // Far mountains: hazy purple, a soft pink rim on top
+                    // Far mountains: hazy blue-violet with snowy pink-lit tips
                     float farTop = horizon - far[x];
                     if (v > farTop)
                     {
-                        float rim = Mathf.Clamp01(1f - (v - farTop) * height / 2f);
-                        c = Color.Lerp(Color.Lerp(new Color(0.3f, 0.1f, 0.35f), new Color(0.45f, 0.18f, 0.4f), (v - farTop) / Mathf.Max(0.001f, far[x])), new Color(1f, 0.45f, 0.75f), rim * 0.4f);
+                        float depth = (v - farTop) / Mathf.Max(0.001f, far[x]);
+                        c = Color.Lerp(new Color(0.42f, 0.48f, 0.8f), new Color(0.55f, 0.66f, 0.88f), depth);
+                        if (v - farTop < 0.006f && far[x] > 0.05f) c = Color.Lerp(c, new Color(1f, 0.92f, 1f), 0.8f);   // snowcaps on the tall peaks
                     }
-                    // Near hills and the castle: dark violet with a neon rim (cyan hills, gold castle)
+                    // Near hills (green, lime rim) and the castle (stone, gold rim)
                     float nearTop = horizon - Mathf.Max(near[x], castle[x]);
                     if (v > nearTop)
                     {
                         float rim = Mathf.Clamp01(1f - (v - nearTop) * height / 2f);
-                        Color rimColor = castle[x] > near[x] ? new Color(1f, 0.8f, 0.3f) : new Color(0.3f, 1f, 0.95f);
-                        c = Color.Lerp(new Color(0.06f, 0.02f, 0.09f), rimColor, rim * 0.55f);
-                        if (windows.Contains(y * width + x)) c = new Color(1f, 0.82f, 0.35f);
+                        bool isCastle = castle[x] > near[x] && v < horizon - near[x];
+                        Color body = isCastle ? new Color(0.48f, 0.45f, 0.58f) : new Color(0.18f, 0.42f, 0.24f);
+                        Color rimColor = isCastle ? new Color(1f, 0.85f, 0.35f) : new Color(0.6f, 1f, 0.4f);
+                        c = Color.Lerp(body, rimColor, rim * 0.6f);
+                        if (windows.Contains(y * width + x)) c = new Color(0.15f, 0.1f, 0.25f);
                     }
                 }
                 else
                 {
-                    // Below the horizon: dusky haze over dark fields
+                    // Below the horizon: summer haze over green fields
                     float below = v - horizon;
-                    c = Color.Lerp(HazeColor * 1.4f, new Color(0.03f, 0.03f, 0.04f), Mathf.Clamp01(below * 5f));
+                    c = Color.Lerp(HazeColor, new Color(0.14f, 0.3f, 0.14f), Mathf.Clamp01(below * 5f));
                 }
                 result[(height - 1 - y) * width + x] = new Color32(B(c.r), B(c.g), B(c.b), 255); // Unity textures start at the bottom row
             }
@@ -163,6 +162,11 @@ public static class KingdomScenery
 {
     public const float GroundY = -30f;
     public const float RoadRadius = 46f;
+
+    /// <summary>The ring road wanders in and out as it goes round the board</summary>
+    public static float RoadRadiusAt(float angle) => RoadRadius + 4.5f * Mathf.Sin(angle * 3f + 0.4f) + 2.5f * Mathf.Sin(angle * 7f + 1.9f);
+
+    public static Vector3 RoadPoint(float angle) => new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * RoadRadiusAt(angle) + Vector3.up * GroundY;
 
     // The castle sits ahead of White, a little to the left so the board doesn't hide it.
     // A river runs right across the kingdom between the village and the castle; the castle
@@ -187,17 +191,17 @@ public static class KingdomScenery
     public static void Build(Transform root)
     {
         var rng = new System.Random(1215);
-        Material grass = new Material(Shader.Find("Standard")) { color = new Color(0.04f, 0.07f, 0.05f) };
+        Material grass = new Material(Shader.Find("Standard")) { color = new Color(0.16f, 0.36f, 0.14f) };
         grass.SetFloat("_Glossiness", 0.05f);
         OrbitScenery.Part(root, PrimitiveType.Cylinder, new Vector3(0f, GroundY, 0f), new Vector3(800f, 0.05f, 800f), grass).name = "Fields";
 
-        Material stone = OrbitScenery.Lit(new Color(0.42f, 0.38f, 0.46f), new Color(0.03f, 0.02f, 0.05f), 0.05f, 0.2f);
-        Material darkStone = OrbitScenery.Lit(new Color(0.22f, 0.2f, 0.26f), Color.black, 0.05f, 0.15f);
-        Material road = OrbitScenery.Lit(new Color(0.16f, 0.12f, 0.12f), Color.black, 0f, 0.1f);
-        Material plaster = OrbitScenery.Lit(new Color(0.6f, 0.5f, 0.45f), new Color(0.04f, 0.02f, 0.03f), 0f, 0.15f);
+        Material stone = OrbitScenery.Lit(new Color(0.6f, 0.56f, 0.64f), new Color(0.03f, 0.02f, 0.05f), 0.05f, 0.2f);
+        Material darkStone = OrbitScenery.Lit(new Color(0.42f, 0.38f, 0.48f), Color.black, 0.05f, 0.15f);
+        Material road = OrbitScenery.Lit(new Color(0.24f, 0.2f, 0.2f), Color.black, 0f, 0.1f);
+        Material plaster = OrbitScenery.Lit(new Color(0.85f, 0.76f, 0.66f), new Color(0.04f, 0.02f, 0.03f), 0f, 0.15f);
         Material timber = OrbitScenery.Lit(new Color(0.12f, 0.07f, 0.06f), Color.black, 0f, 0.2f);
         Material bark = OrbitScenery.Lit(new Color(0.14f, 0.08f, 0.07f), Color.black, 0f, 0.15f);
-        Material leaves = OrbitScenery.Lit(new Color(0.1f, 0.3f, 0.14f), new Color(0.02f, 0.12f, 0.05f), 0f, 0.3f);
+        Material leaves = OrbitScenery.Lit(new Color(0.18f, 0.5f, 0.2f), new Color(0.03f, 0.12f, 0.04f), 0f, 0.3f);
         Material[] roofs =
         {
             OrbitScenery.Lit(new Color(0.45f, 0.1f, 0.3f), new Color(0.12f, 0.02f, 0.08f), 0.1f, 0.4f),   // berry
@@ -216,23 +220,25 @@ public static class KingdomScenery
         // A cobbled road round the board, and one out to the castle gate over the river
         Material[] cobbles =
         {
-            OrbitScenery.Lit(new Color(0.42f, 0.4f, 0.46f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
-            OrbitScenery.Lit(new Color(0.34f, 0.31f, 0.38f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
-            OrbitScenery.Lit(new Color(0.5f, 0.45f, 0.48f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+            OrbitScenery.Lit(new Color(0.62f, 0.6f, 0.66f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+            OrbitScenery.Lit(new Color(0.5f, 0.47f, 0.55f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+            OrbitScenery.Lit(new Color(0.72f, 0.66f, 0.62f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
         };
-        int segments = 72;
-        float step = RoadRadius * Mathf.PI * 2f / segments;
-        for (int i = 0; i < segments; i++)
-        {
-            float a = (i + 0.5f) / segments * Mathf.PI * 2f;
-            Vector3 mid = new Vector3(Mathf.Cos(a) * RoadRadius, GroundY, Mathf.Sin(a) * RoadRadius);
-            Quaternion along = Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)));
-            Paving(still, mid, along, 5.5f, step + 0.3f, road, cobbles, rng);
-        }
+        var ring = new List<Vector3>();
+        for (int i = 0; i <= 96; i++) ring.Add(RoadPoint(i / 96f * Mathf.PI * 2f));
+        PaveAlong(still, ring, 5.5f, road, cobbles, rng);
+        // The castle road snakes from the ring to the drawbridge, then runs straight to the gate
+        float castleAngle = Mathf.Atan2(CastleDir.z, CastleDir.x);
+        float start = RoadRadiusAt(castleAngle);
         float landing = RiverCentre(0f) - RiverHalfWidth, farBank = RiverCentre(0f) + RiverHalfWidth;
-        Quaternion toCastle = Quaternion.LookRotation(CastleDir);
-        Paving(still, CastleDir * ((RoadRadius + 2.5f + landing) * 0.5f) + Vector3.up * GroundY, toCastle, 5f, landing - RoadRadius - 2.5f, road, cobbles, rng);
-        Paving(still, CastleDir * ((farBank + GateDistance) * 0.5f) + Vector3.up * GroundY, toCastle, 5f, GateDistance - farBank, road, cobbles, rng);
+        var lane = new List<Vector3>();
+        for (int i = 0; i <= 16; i++)
+        {
+            float k = i / 16f;
+            lane.Add(CastleDir * Mathf.Lerp(start, landing + 0.5f, k) + Across * (5f * Mathf.Sin(k * Mathf.PI * 2f)) + Vector3.up * GroundY);
+        }
+        PaveAlong(still, lane, 5f, road, cobbles, rng);
+        Paving(still, CastleDir * ((farBank + GateDistance) * 0.5f) + Vector3.up * GroundY, Quaternion.LookRotation(CastleDir), 5f, GateDistance - farBank, road, cobbles, rng);
 
         River(still, cyan, rng);
 
@@ -275,7 +281,7 @@ public static class KingdomScenery
             float deg = (float)rng.NextDouble() * 360f;
             if (Near(deg, 28f, 30f) || Near(deg, 167f, 18f) || Near(deg, 90f, 22f) || Near(deg, 270f, 22f)) continue;
             float a = deg * Mathf.Deg2Rad;
-            float d = (rng.NextDouble() < 0.5 ? 54f : 74f) + (float)rng.NextDouble() * 8f;
+            float d = RoadRadiusAt(a) + (rng.NextDouble() < 0.5 ? 8f : 28f) + (float)rng.NextDouble() * 8f;
             Vector3 spot = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
             if (FromRiver(spot) < RiverHalfWidth + 6f) continue;
             Cottage(still, spot, plaster, timber, roofs[rng.Next(roofs.Length)], rng.NextDouble() < 0.5 ? pink : cyan, window, shadow, rng);
@@ -289,7 +295,7 @@ public static class KingdomScenery
             if (Near(deg, 28f, 22f)) continue;
             float a = deg * Mathf.Deg2Rad;
             float d = 38f + (float)rng.NextDouble() * 55f;
-            if (Mathf.Abs(d - RoadRadius) < 4f) d += 8f;
+            if (Mathf.Abs(d - RoadRadiusAt(a)) < 5f) d += 10f;
             Vector3 at = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
             if (FromRiver(at) < RiverHalfWidth + 4f) continue;
             float h = 4f + (float)rng.NextDouble() * 3f;
@@ -306,13 +312,24 @@ public static class KingdomScenery
         root.gameObject.AddComponent<KingdomPennants>().Init(flags);
         root.gameObject.AddComponent<KingdomWindmill>().Init(mill);
         root.gameObject.AddComponent<KingdomTorches>();
-        root.gameObject.AddComponent<KingdomFireflies>();
+        root.gameObject.AddComponent<KingdomPollen>();
+        root.gameObject.AddComponent<KingdomClouds>();
         root.gameObject.AddComponent<KingdomDragons>();
         root.gameObject.AddComponent<KingdomRiver>();
         root.gameObject.AddComponent<KingdomDrawbridge>().Init(deck);
     }
 
     private static bool Near(float deg, float centre, float half) => Mathf.Abs(Mathf.DeltaAngle(deg, centre)) < half;
+
+    // A road along a path of points, a strip of paving per stretch (overlapping a little at the bends)
+    private static void PaveAlong(Transform parent, List<Vector3> path, float width, Material mortar, Material[] stones, System.Random rng)
+    {
+        for (int i = 0; i + 1 < path.Count; i++)
+        {
+            Vector3 a = path[i], b = path[i + 1];
+            Paving(parent, (a + b) * 0.5f, Quaternion.LookRotation(b - a), width, (b - a).magnitude + 0.5f, mortar, stones, rng);
+        }
+    }
 
     // A strip of road: dark mortar with rows of chunky cobbles on top, each a slightly different
     // stone and size so it reads as hand-laid
@@ -338,8 +355,8 @@ public static class KingdomScenery
     // Glassy water winding right across the kingdom, with grassy banks edged in neon
     private static void River(Transform parent, Material neon, System.Random rng)
     {
-        Material water = OrbitScenery.Lit(new Color(0.06f, 0.16f, 0.32f), new Color(0.04f, 0.18f, 0.3f), 0.7f, 0.95f);
-        Material bank = OrbitScenery.Lit(new Color(0.08f, 0.1f, 0.07f), Color.black, 0f, 0.15f);
+        Material water = OrbitScenery.Lit(new Color(0.1f, 0.4f, 0.75f), new Color(0.04f, 0.2f, 0.35f), 0.6f, 0.95f);
+        Material bank = OrbitScenery.Lit(new Color(0.2f, 0.3f, 0.14f), Color.black, 0f, 0.15f);
         const float step = 6f;
         for (float s = -330f; s < 330f; s += step)
         {
@@ -648,12 +665,12 @@ public class KingdomTorches : MonoBehaviour
         var rng = new System.Random(1066);
         Material wood = OrbitScenery.Lit(new Color(0.16f, 0.1f, 0.08f), Color.black, 0f, 0.2f);
         Material iron = OrbitScenery.Lit(new Color(0.1f, 0.09f, 0.1f), Color.black, 0.6f, 0.4f);
-        var glowMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = Soft(), color = new Color(1f, 0.6f, 0.25f, 0.55f) };
+        var glowMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = Soft(), color = new Color(1f, 0.65f, 0.3f, 0.3f) };   // faint in daylight
         const int count = 18;
         for (int i = 0; i < count; i++)
         {
             float a = (i + 0.5f) / count * Mathf.PI * 2f;
-            float d = KingdomScenery.RoadRadius + (i % 2 == 0 ? 3.5f : -3.5f);   // alternating sides of the road
+            float d = KingdomScenery.RoadRadiusAt(a) + (i % 2 == 0 ? 3.8f : -3.8f);   // alternating sides of the road
             var post = new GameObject("Torch").transform;
             post.SetParent(transform, false);
             post.position = new Vector3(Mathf.Cos(a) * d, KingdomScenery.GroundY, Mathf.Sin(a) * d);
@@ -703,8 +720,8 @@ public class KingdomTorches : MonoBehaviour
     }
 }
 
-/// <summary>Fireflies blinking and drifting low over the fields</summary>
-public class KingdomFireflies : MonoBehaviour
+/// <summary>Dandelion fluff and pollen floating lazily over the fields</summary>
+public class KingdomPollen : MonoBehaviour
 {
     private void Start()
     {
@@ -712,36 +729,84 @@ public class KingdomFireflies : MonoBehaviour
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = ps.main;
         main.loop = true;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 9f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(8f, 14f);
         main.startSpeed = 0f;
-        main.startSize = new ParticleSystem.MinMaxCurve(0.8f, 1.4f);
-        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.85f, 1f, 0.4f, 1f), new Color(1f, 0.85f, 0.35f, 1f));
+        main.startSize = new ParticleSystem.MinMaxCurve(0.5f, 1f);
+        main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 1f, 1f, 0.9f), new Color(1f, 0.95f, 0.6f, 0.9f));
         main.maxParticles = 160;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.prewarm = true;
         var emission = ps.emission;
-        emission.rateOverTime = 22f;
+        emission.rateOverTime = 14f;
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Donut;
         shape.radius = 62f;
         shape.donutRadius = 26f;
         shape.rotation = new Vector3(90f, 0f, 0f);
         shape.position = new Vector3(0f, KingdomScenery.GroundY + 3f, 0f);
+        var vel = ps.velocityOverLifetime;
+        vel.enabled = true;
+        vel.space = ParticleSystemSimulationSpace.World;
+        vel.x = new ParticleSystem.MinMaxCurve(0.8f, 1.6f);   // a light breeze, the same way the pennants blow
+        vel.y = new ParticleSystem.MinMaxCurve(0.2f, 0.6f);
+        vel.z = new ParticleSystem.MinMaxCurve(0.2f, 0.8f);
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = 1.5f;
-        noise.frequency = 0.3f;
-        noise.scrollSpeed = 0.3f;
-        // Each one blinks on and off a couple of times in its life
+        noise.strength = 1.2f;
+        noise.frequency = 0.2f;
+        noise.scrollSpeed = 0.2f;
         var fade = ps.colorOverLifetime;
         fade.enabled = true;
         var g = new Gradient();
         g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0.1f, 0.35f), new GradientAlphaKey(1f, 0.55f), new GradientAlphaKey(0.2f, 0.75f), new GradientAlphaKey(0f, 1f) });
+                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.8f), new GradientAlphaKey(0f, 1f) });
         fade.color = g;
         var r = GetComponent<ParticleSystemRenderer>();
         r.sharedMaterial = new Material(Shader.Find("Sprites/Default")) { mainTexture = KingdomTorches.Soft() };
         ps.Play();
+    }
+}
+
+/// <summary>Big puffy clouds drifting slowly round the sky above the kingdom</summary>
+public class KingdomClouds : MonoBehaviour
+{
+    private readonly List<(Transform t, float radius, float angle, float height, float speed)> clouds = new List<(Transform, float, float, float, float)>();
+
+    private void Start()
+    {
+        var rng = new System.Random(3030);
+        Material white = OrbitScenery.Lit(new Color(1f, 1f, 1f), new Color(0.55f, 0.55f, 0.62f), 0f, 0.1f);
+        Material shade = OrbitScenery.Lit(new Color(0.82f, 0.8f, 0.98f), new Color(0.35f, 0.33f, 0.5f), 0f, 0.1f);   // lavender bellies
+        for (int i = 0; i < 9; i++)
+        {
+            var cloud = new GameObject("Cloud").transform;
+            cloud.SetParent(transform, false);
+            float size = 1f + (float)rng.NextDouble() * 0.8f;
+            cloud.localScale = Vector3.one * size;
+            // A flat lavender base with a heap of white puffs on top, biggest in the middle
+            OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(0f, -1.5f, 0f), new Vector3(30f, 5f, 14f), shade);
+            int puffs = 5 + rng.Next(4);
+            for (int p = 0; p < puffs; p++)
+            {
+                float x = ((float)p / (puffs - 1) - 0.5f) * 26f;
+                float r = 7f + 6f * (1f - Mathf.Abs(x) / 13f) + (float)rng.NextDouble() * 3f;
+                OrbitScenery.Part(cloud, PrimitiveType.Sphere, new Vector3(x, r * 0.25f, ((float)rng.NextDouble() - 0.5f) * 5f), new Vector3(r, r * 0.8f, r * 0.9f), white);
+            }
+            clouds.Add((cloud, 140f + (float)rng.NextDouble() * 90f, i / 9f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.4f,
+                30f + (float)rng.NextDouble() * 35f, 0.004f + (float)rng.NextDouble() * 0.004f));
+        }
+    }
+
+    private void LateUpdate()
+    {
+        float t = AccessibilityPrefs.AmbientTime;
+        foreach (var c in clouds)
+        {
+            float a = c.angle + t * c.speed;
+            Vector3 p = new Vector3(Mathf.Cos(a) * c.radius, c.height, Mathf.Sin(a) * c.radius);
+            c.t.position = p;
+            c.t.rotation = Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)));   // long side along its path
+        }
     }
 }
 

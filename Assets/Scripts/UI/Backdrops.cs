@@ -82,7 +82,7 @@ public static class Backdrops
             case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the planets, passing comets and satellites whizzing by";
             case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
             case Kind.Graveyard: return "A moonlit cemetery with glowing tombstones, lanterns, ravens, mist, will-o'-wisps and bats";
-            case Kind.MedievalKingdom: return "A storybook castle at sunset with a drawbridge over the river, cobbled roads and dragons overhead";
+            case Kind.MedievalKingdom: return "A sunny storybook kingdom: a castle with a drawbridge over the river, winding cobbled roads and dragons overhead";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
@@ -111,7 +111,7 @@ public static class Backdrops
 
     // Color shown while a sky is still being generated
     private static Color LoadingColor(Kind kind) =>
-        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : kind == Kind.DeepSea ? new Color32(5, 23, 38, 255) : kind == Kind.Graveyard ? new Color32(20, 12, 34, 255) : kind == Kind.MedievalKingdom ? new Color32(60, 18, 60, 255) : new Color32(4, 2, 14, 255);
+        kind == Kind.NeonDesert ? new Color32(30, 4, 50, 255) : kind == Kind.CyberCity ? new Color32(20, 3, 40, 255) : kind == Kind.NeonJungle ? new Color32(6, 24, 28, 255) : kind == Kind.MeltingClocks ? new Color32(120, 90, 110, 255) : kind == Kind.DeepSea ? new Color32(5, 23, 38, 255) : kind == Kind.Graveyard ? new Color32(20, 12, 34, 255) : kind == Kind.MedievalKingdom ? new Color32(110, 170, 230, 255) : new Color32(4, 2, 14, 255);
 
     /// <summary>
     /// Apply the chosen backdrop to a camera. Returns false while a sky is still being
@@ -548,22 +548,22 @@ public static class Scenery
         root = new GameObject("Kingdom Scenery");
         KingdomScenery.Build(root.transform);
 
-        // Dusk haze: the far fields fade into the sunset glow
+        // Summer haze: the far fields fade into the pale sky
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = KingdomSky.HazeColor;
-        RenderSettings.fogStartDistance = 55f;
-        RenderSettings.fogEndDistance = 220f;
+        RenderSettings.fogStartDistance = 70f;
+        RenderSettings.fogEndDistance = 300f;
 
-        // Warm low sunlight from the sunset side, rosy violet ambient
-        RenderSettings.ambientLight = new Color(0.3f, 0.22f, 0.34f);
+        // Bright midday sun from high up, a cool sky-blue fill
+        RenderSettings.ambientLight = new Color(0.5f, 0.56f, 0.68f);
         foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
         {
             if (light.type != LightType.Directional) continue;
             savedLights[light] = (light.color, light.intensity, light.transform.rotation);
-            light.color = new Color(1f, 0.75f, 0.6f);
-            light.intensity = Mathf.Min(light.intensity, 1f);
-            light.transform.rotation = Quaternion.Euler(28f, -120f, 0f);
+            light.color = new Color(1f, 0.97f, 0.9f);
+            light.intensity = 1.15f;
+            light.transform.rotation = Quaternion.Euler(62f, -120f, 0f);
         }
     }
 
