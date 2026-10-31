@@ -22,7 +22,19 @@ public static class Backdrops
         BotanicalGarden = 10,
     }
 
-    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.EarthOrbit, Kind.DeepSea, Kind.Graveyard, Kind.BotanicalGarden, Kind.NeonGlow };
+    public static readonly Kind[] All = { Kind.DeepSpace, Kind.NeonDesert, Kind.CyberCity, Kind.NeonJungle, Kind.MeltingClocks, Kind.EarthOrbit, Kind.DeepSea, Kind.Graveyard, Kind.NeonGlow };
+
+    /// <summary>
+    /// Built but held back for a later release: not in Customize or the store. Release one by
+    /// moving it into All.
+    /// </summary>
+    public static readonly Kind[] Unreleased = { Kind.BotanicalGarden };
+
+    /// <summary>Set by editor tools (store images) so Customize also lists Unreleased</summary>
+    public static bool ShowUnreleased;
+
+    /// <summary>The backdrops Customize lists: All, plus Unreleased while ShowUnreleased</summary>
+    public static Kind[] Listed => ShowUnreleased ? System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(All, Unreleased)) : All;
 
     private const string PrefKey = "Backdrop";
 
@@ -32,7 +44,7 @@ public static class Backdrops
         get
         {
             var picked = (Kind)PlayerPrefs.GetInt(PrefKey, (int)Kind.NeonGlow);
-            return Store.Owns(picked) ? picked : Kind.NeonGlow;
+            return Store.Owns(picked) && System.Array.IndexOf(Listed, picked) >= 0 ? picked : Kind.NeonGlow;
         }
         set
         {
@@ -543,8 +555,8 @@ public static class Scenery
         RenderSettings.fogStartDistance = 70f;
         RenderSettings.fogEndDistance = 240f;
 
-        // Low rose-gold sun from the sky's sunset (ahead of White, +x), lavender sky light as ambient
-        RenderSettings.ambientLight = new Color(0.34f, 0.28f, 0.42f);
+        // Low rose-gold sun from the sky's sunset (ahead of White, +x), cool teal sky light as ambient
+        RenderSettings.ambientLight = new Color(0.28f, 0.34f, 0.42f);
         foreach (Light light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
         {
             if (light.type != LightType.Directional) continue;

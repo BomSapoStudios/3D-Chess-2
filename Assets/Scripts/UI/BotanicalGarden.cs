@@ -4,7 +4,7 @@ using UnityEngine;
 // ─────────────────────────────────────────────────────────────────────────────
 // Botanical Garden backdrop: a glowing formal garden at twilight far below the board.
 //
-//  - BotanicalSky: the 360° sky. Indigo overhead fading through violet to a rose-gold sunset,
+//  - BotanicalSky: the 360° sky. Deep teal overhead fading through turquoise to a rose-gold sunset,
 //    long pink clouds, and a skyline of rounded trees, cypress spikes, palms and a distant
 //    glasshouse whose glass glows.
 //  - BotanicalScenery: a lawn laid out in rings around the board: neon-edged gravel walks,
@@ -112,7 +112,7 @@ public static class BotanicalSky
         var stars = new HashSet<int>();
         for (int k = 0; k < 1400; k++) stars.Add(rng.Next((int)(height * 0.3f)) * width + rng.Next(width));
 
-        Color zenith = new Color(0.04f, 0.03f, 0.14f), dusk = new Color(0.3f, 0.1f, 0.42f);
+        Color zenith = new Color(0.02f, 0.06f, 0.16f), dusk = new Color(0.1f, 0.3f, 0.45f); // blue hour: deep teal overhead
         Color rose = new Color(0.98f, 0.45f, 0.55f), gold = new Color(1f, 0.76f, 0.5f);
         Color nearDark = new Color(0.02f, 0.05f, 0.06f);
 
