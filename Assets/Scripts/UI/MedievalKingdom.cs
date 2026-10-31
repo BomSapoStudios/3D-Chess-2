@@ -8,10 +8,11 @@ using UnityEngine;
 //  - KingdomSky: the 360° sky. Indigo overhead fading through magenta to a hot amber
 //    sunset, a big low sun, streaky pink clouds, purple mountains and a hilltop castle
 //    with lit windows on the far side.
-//  - KingdomScenery: grassy ground with a torch-lit road round the board, a castle with
-//    towers, cone roofs and waving pennants ahead of White, a village of glowing cottages,
-//    lollipop trees, a windmill ahead of Black and striped tournament tents to the sides.
-//    Fireflies drift about and now and then a dragon glides across the sky.
+//  - KingdomScenery: grassy ground with a torch-lit cobbled road round the board, a castle
+//    with towers, cone roofs and waving pennants ahead of White, a river winding right across
+//    the kingdom with a drawbridge on the castle road, a village of glowing cottages, lollipop
+//    trees, a windmill ahead of Black and striped tournament tents to the sides. Fireflies
+//    drift about and three dragons loop round the sky.
 //
 // Everything sits well away from the board so the board stays the focus.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,6 +164,24 @@ public static class KingdomScenery
     public const float GroundY = -30f;
     public const float RoadRadius = 46f;
 
+    // The castle sits ahead of White, a little to the left so the board doesn't hide it.
+    // A river runs right across the kingdom between the village and the castle; the castle
+    // road crosses it on a drawbridge.
+    public static readonly Vector3 CastleDir = new Vector3(0.885f, 0f, 0.466f);
+    public const float CastleDistance = 107f;
+    public const float GateDistance = CastleDistance - 21f;   // the front wall's outer face
+    public const float RiverAt = 68f, RiverHalfWidth = 5.5f;
+    public static Vector3 Across => new Vector3(-CastleDir.z, 0f, CastleDir.x);
+
+    /// <summary>How far toward the castle the river's middle is, s along it (it meanders a little)</summary>
+    public static float RiverCentre(float s) => RiverAt + 5f * Mathf.Sin(s * 0.025f);
+
+    public static Vector3 RiverPoint(float s, float offset = 0f) =>
+        CastleDir * (RiverCentre(s) + offset) + Across * s + Vector3.up * GroundY;
+
+    /// <summary>Distance from a ground point to the river's middle (roughly)</summary>
+    public static float FromRiver(Vector3 p) => Mathf.Abs(Vector3.Dot(p, CastleDir) - RiverCentre(Vector3.Dot(p, Across)));
+
     private static Mesh cone, pennant;
 
     public static void Build(Transform root)
@@ -194,17 +213,32 @@ public static class KingdomScenery
         var still = new GameObject("Kingdom").transform;
         still.SetParent(root, false);
 
-        // A dirt road round the board
+        // A cobbled road round the board, and one out to the castle gate over the river
+        Material[] cobbles =
+        {
+            OrbitScenery.Lit(new Color(0.42f, 0.4f, 0.46f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+            OrbitScenery.Lit(new Color(0.34f, 0.31f, 0.38f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+            OrbitScenery.Lit(new Color(0.5f, 0.45f, 0.48f), new Color(0.02f, 0.02f, 0.03f), 0f, 0.35f),
+        };
         int segments = 72;
+        float step = RoadRadius * Mathf.PI * 2f / segments;
         for (int i = 0; i < segments; i++)
         {
             float a = (i + 0.5f) / segments * Mathf.PI * 2f;
-            Part(still, PrimitiveType.Cube, new Vector3(Mathf.Cos(a) * RoadRadius, GroundY + 0.05f, Mathf.Sin(a) * RoadRadius),
-                new Vector3(5f, 0.1f, RoadRadius * Mathf.PI * 2f / segments + 0.3f), road, Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a))));
+            Vector3 mid = new Vector3(Mathf.Cos(a) * RoadRadius, GroundY, Mathf.Sin(a) * RoadRadius);
+            Quaternion along = Quaternion.LookRotation(new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)));
+            Paving(still, mid, along, 5.5f, step + 0.3f, road, cobbles, rng);
         }
+        float landing = RiverCentre(0f) - RiverHalfWidth, farBank = RiverCentre(0f) + RiverHalfWidth;
+        Quaternion toCastle = Quaternion.LookRotation(CastleDir);
+        Paving(still, CastleDir * ((RoadRadius + 2.5f + landing) * 0.5f) + Vector3.up * GroundY, toCastle, 5f, landing - RoadRadius - 2.5f, road, cobbles, rng);
+        Paving(still, CastleDir * ((farBank + GateDistance) * 0.5f) + Vector3.up * GroundY, toCastle, 5f, GateDistance - farBank, road, cobbles, rng);
 
-        // The castle ahead of White and a little to the left, so the board doesn't hide it
-        Castle(still, new Vector3(95f, GroundY, 50f), stone, darkStone, roofs, gold, window, pink, cyan, shadow);
+        River(still, cyan, rng);
+
+        // The castle, facing the board
+        Castle(still, CastleDir * CastleDistance + Vector3.up * GroundY, stone, darkStone, roofs, gold, window, pink, cyan, shadow);
+        Transform deck = Drawbridge(root, still, stone, timber, gold, shadow);
 
         // The windmill ahead of Black (not batched: its sails turn)
         var mill = Windmill(root, new Vector3(-82f, GroundY, 18f), plaster, timber, roofs[0], cyan, window);
@@ -242,7 +276,9 @@ public static class KingdomScenery
             if (Near(deg, 28f, 30f) || Near(deg, 167f, 18f) || Near(deg, 90f, 22f) || Near(deg, 270f, 22f)) continue;
             float a = deg * Mathf.Deg2Rad;
             float d = (rng.NextDouble() < 0.5 ? 54f : 74f) + (float)rng.NextDouble() * 8f;
-            Cottage(still, new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d), plaster, timber, roofs[rng.Next(roofs.Length)], rng.NextDouble() < 0.5 ? pink : cyan, window, shadow, rng);
+            Vector3 spot = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
+            if (FromRiver(spot) < RiverHalfWidth + 6f) continue;
+            Cottage(still, spot, plaster, timber, roofs[rng.Next(roofs.Length)], rng.NextDouble() < 0.5 ? pink : cyan, window, shadow, rng);
             placed++;
         }
 
@@ -255,6 +291,7 @@ public static class KingdomScenery
             float d = 38f + (float)rng.NextDouble() * 55f;
             if (Mathf.Abs(d - RoadRadius) < 4f) d += 8f;
             Vector3 at = new Vector3(Mathf.Cos(a) * d, GroundY, Mathf.Sin(a) * d);
+            if (FromRiver(at) < RiverHalfWidth + 4f) continue;
             float h = 4f + (float)rng.NextDouble() * 3f;
             Part(still, PrimitiveType.Cylinder, at + Vector3.up * h * 0.5f, new Vector3(0.7f, h * 0.5f, 0.7f), bark);
             float s = 4.5f + (float)rng.NextDouble() * 2.5f;
@@ -270,10 +307,102 @@ public static class KingdomScenery
         root.gameObject.AddComponent<KingdomWindmill>().Init(mill);
         root.gameObject.AddComponent<KingdomTorches>();
         root.gameObject.AddComponent<KingdomFireflies>();
-        root.gameObject.AddComponent<KingdomDragon>();
+        root.gameObject.AddComponent<KingdomDragons>();
+        root.gameObject.AddComponent<KingdomRiver>();
+        root.gameObject.AddComponent<KingdomDrawbridge>().Init(deck);
     }
 
     private static bool Near(float deg, float centre, float half) => Mathf.Abs(Mathf.DeltaAngle(deg, centre)) < half;
+
+    // A strip of road: dark mortar with rows of chunky cobbles on top, each a slightly different
+    // stone and size so it reads as hand-laid
+    private static void Paving(Transform parent, Vector3 mid, Quaternion along, float width, float length, Material mortar, Material[] stones, System.Random rng)
+    {
+        Part(parent, PrimitiveType.Cube, mid + Vector3.up * 0.05f, new Vector3(width, 0.1f, length), mortar, along);
+        const float size = 1.35f;
+        int across = Mathf.Max(1, Mathf.RoundToInt(width / size));
+        int rows = Mathf.Max(1, Mathf.RoundToInt(length / size));
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < across; c++)
+            {
+                // Every other row shifted half a stone, like laid brick
+                float x = -width * 0.5f + (c + 0.5f + (r % 2 == 0 ? 0f : 0.25f) - 0.125f) * width / across;
+                float z = -length * 0.5f + (r + 0.5f) * length / rows;
+                float w = width / across * (0.78f + (float)rng.NextDouble() * 0.12f);
+                float l = length / rows * (0.78f + (float)rng.NextDouble() * 0.12f);
+                Part(parent, PrimitiveType.Cube, mid + along * new Vector3(x, 0.14f, z), new Vector3(w, 0.18f, l), stones[rng.Next(stones.Length)],
+                    along * Quaternion.Euler(0f, ((float)rng.NextDouble() - 0.5f) * 8f, 0f));
+            }
+    }
+
+    // Glassy water winding right across the kingdom, with grassy banks edged in neon
+    private static void River(Transform parent, Material neon, System.Random rng)
+    {
+        Material water = OrbitScenery.Lit(new Color(0.06f, 0.16f, 0.32f), new Color(0.04f, 0.18f, 0.3f), 0.7f, 0.95f);
+        Material bank = OrbitScenery.Lit(new Color(0.08f, 0.1f, 0.07f), Color.black, 0f, 0.15f);
+        const float step = 6f;
+        for (float s = -330f; s < 330f; s += step)
+        {
+            Vector3 a = RiverPoint(s), b = RiverPoint(s + step);
+            Quaternion along = Quaternion.LookRotation(b - a);
+            Vector3 mid = (a + b) * 0.5f;
+            float len = (b - a).magnitude + 0.4f;
+            Part(parent, PrimitiveType.Cube, mid + Vector3.up * 0.04f, new Vector3(RiverHalfWidth * 2f, 0.1f, len), water, along);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 edge = mid + along * Vector3.right * (side * RiverHalfWidth);
+                Part(parent, PrimitiveType.Cube, edge + Vector3.up * 0.25f, new Vector3(1.4f, 0.5f, len), bank, along);       // the bank
+                Part(parent, PrimitiveType.Cube, edge + Vector3.up * 0.52f - along * Vector3.right * (side * 0.7f), new Vector3(0.15f, 0.06f, len), neon, along);   // glowing waterline
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stone gate towers on the castle bank and a plank bridge on chains across the river.
+    /// Returns the bridge's hinge, which KingdomDrawbridge raises and lowers.
+    /// </summary>
+    private static Transform Drawbridge(Transform root, Transform still, Material stone, Material timber, Material gold, Material shadow)
+    {
+        float farBank = RiverCentre(0f) + RiverHalfWidth, nearBank = RiverCentre(0f) - RiverHalfWidth;
+        Quaternion toCastle = Quaternion.LookRotation(CastleDir);
+        Vector3 hingeAt = CastleDir * farBank + Vector3.up * (GroundY + 0.6f);
+        // Gatehouse: two towers either side of the road with an arch between
+        foreach (float side in new[] { -1f, 1f })
+        {
+            Vector3 foot = CastleDir * (farBank + 2.5f) + Across * (side * 4.6f) + Vector3.up * GroundY;
+            Part(still, PrimitiveType.Cube, foot + Vector3.up * 5f, new Vector3(3.4f, 10f, 3.4f), stone, toCastle);
+            for (int m = 0; m < 4; m++)
+            {
+                float x = m % 2 == 0 ? -1.2f : 1.2f, z = m < 2 ? -1.2f : 1.2f;
+                Part(still, PrimitiveType.Cube, foot + toCastle * new Vector3(x, 10.5f, z), new Vector3(0.9f, 1f, 0.9f), stone, toCastle);
+            }
+            Part(still, PrimitiveType.Cube, foot + toCastle * new Vector3(0f, 7f, -1.73f), new Vector3(0.6f, 1.2f, 0.05f), gold, toCastle);   // window toward the board
+        }
+        Part(still, PrimitiveType.Cube, CastleDir * (farBank + 2.5f) + Vector3.up * (GroundY + 8.5f), new Vector3(5.8f, 3f, 3f), stone, toCastle);   // lintel
+        Part(still, PrimitiveType.Cube, CastleDir * (farBank + 0.98f) + Vector3.up * (GroundY + 8.5f), new Vector3(5.8f, 0.15f, 0.05f), gold, toCastle);
+        Part(still, PrimitiveType.Cube, CastleDir * (farBank + 2.5f) + Vector3.up * (GroundY + 3.5f), new Vector3(5.8f, 7f, 2.9f), shadow, toCastle);   // the dark gateway
+
+        // The bridge itself, hinged at the castle bank and reaching back over the water
+        var hinge = new GameObject("Drawbridge").transform;
+        hinge.SetParent(root, false);
+        hinge.SetPositionAndRotation(hingeAt, Quaternion.LookRotation(-CastleDir));
+        float span = farBank - nearBank + 1f;
+        Part(hinge, PrimitiveType.Cube, new Vector3(0f, 0f, span * 0.5f), new Vector3(5f, 0.4f, span), timber);
+        for (int p = 0; p < 7; p++)
+            Part(hinge, PrimitiveType.Cube, new Vector3(0f, 0.22f, 0.8f + p * (span - 1.6f) / 6f), new Vector3(5.1f, 0.08f, 0.25f), shadow);   // plank gaps
+        Part(hinge, PrimitiveType.Cube, new Vector3(-2.45f, 0.25f, span * 0.5f), new Vector3(0.1f, 0.1f, span), gold);   // neon trim
+        Part(hinge, PrimitiveType.Cube, new Vector3(2.45f, 0.25f, span * 0.5f), new Vector3(0.1f, 0.1f, span), gold);
+        // Chains from the bridge's far corners up to the towers
+        Material iron = OrbitScenery.Lit(new Color(0.12f, 0.11f, 0.13f), Color.black, 0.7f, 0.5f);
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var chain = new GameObject("Chain").transform;
+            chain.SetParent(hinge, false);
+            chain.localPosition = new Vector3(side * 2.3f, 0.3f, span - 0.4f);
+            Part(chain, PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.18f, 1f, 0.18f), iron).name = "Link";
+        }
+        return hinge;
+    }
 
     // Curtain walls with battlements, a round tower at each corner, a tall keep with a turret,
     // a glowing portcullis facing the board and lit windows
@@ -617,37 +746,50 @@ public class KingdomFireflies : MonoBehaviour
 }
 
 /// <summary>
-/// Every so often a friendly neon dragon glides across the sky beyond the castle, flapping
-/// lazily, and puffs a little flame halfway over
+/// Friendly neon dragons, always in the air: each loops round the kingdom at its own height and
+/// speed, banking into the turn, flapping lazily and now and then puffing a little flame
 /// </summary>
-public class KingdomDragon : MonoBehaviour
+public class KingdomDragons : MonoBehaviour
 {
-    private Transform body, wingL, wingR, neck, fire;
-    private readonly List<Transform> tail = new List<Transform>();
-    private Vector3 from, to;
-    private float started, next;
-    private bool flying;
-    private const float Duration = 16f;
+    private class Dragon
+    {
+        public Transform body, wingL, wingR, neck, fire;
+        public readonly List<Transform> tail = new List<Transform>();
+        public float radius, height, speed, phase, flapRate;
+    }
+
+    private readonly List<Dragon> dragons = new List<Dragon>();
 
     private void Start()
     {
-        Material scales = OrbitScenery.Lit(new Color(0.1f, 0.35f, 0.3f), new Color(0.05f, 0.3f, 0.15f), 0.3f, 0.6f);
+        // Teal with pink wings, violet with lime wings, gold with cyan wings
+        dragons.Add(Make(new Color(0.1f, 0.35f, 0.3f), new Color(0.05f, 0.3f, 0.15f), new Color(0.85f, 0.25f, 0.7f), 3.2f, 105f, 18f, 7f, 0f));
+        dragons.Add(Make(new Color(0.3f, 0.12f, 0.45f), new Color(0.15f, 0.05f, 0.3f), new Color(0.55f, 1f, 0.3f), 2.6f, 135f, 32f, -5f, 2.1f));
+        dragons.Add(Make(new Color(0.55f, 0.35f, 0.1f), new Color(0.3f, 0.15f, 0.02f), new Color(0.3f, 0.9f, 1f), 2.2f, 85f, 10f, 9f, 4.2f));
+    }
+
+    private Dragon Make(Color skin, Color glow, Color wings, float scale, float radius, float height, float speed, float phase)
+    {
+        Material scales = OrbitScenery.Lit(skin, glow, 0.3f, 0.6f);
         Material belly = OrbitScenery.Lit(new Color(0.8f, 0.7f, 0.35f), new Color(0.2f, 0.15f, 0.04f), 0f, 0.4f);
-        Material membrane = new Material(Shader.Find("Unlit/Color")) { color = new Color(0.85f, 0.25f, 0.7f) };
+        Material membrane = new Material(Shader.Find("Unlit/Color")) { color = wings };
         Material eye = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.95f, 0.4f) };
         Material flame = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.55f, 0.15f) };
+        var d = new Dragon { radius = radius, height = height, speed = speed, phase = phase, flapRate = 2.6f + phase * 0.25f };
 
-        body = new GameObject("Dragon").transform;
-        body.SetParent(transform, false);
-        body.localScale = Vector3.one * 3f;
-        OrbitScenery.Part(body, PrimitiveType.Sphere, Vector3.zero, new Vector3(1.3f, 1.1f, 3f), scales);
-        OrbitScenery.Part(body, PrimitiveType.Sphere, new Vector3(0f, -0.25f, 0.1f), new Vector3(1f, 0.7f, 2.5f), belly);
-        neck = new GameObject("Neck").transform;
-        neck.SetParent(body, false);
-        neck.localPosition = new Vector3(0f, 0.3f, 1.3f);
-        OrbitScenery.Part(neck, PrimitiveType.Cylinder, new Vector3(0f, 0.5f, 0.6f), new Vector3(0.55f, 0.8f, 0.55f), scales, Quaternion.Euler(50f, 0f, 0f));
+        d.body = new GameObject("Dragon").transform;
+        d.body.SetParent(transform, false);
+        d.body.localScale = Vector3.one * scale;
+        OrbitScenery.Part(d.body, PrimitiveType.Sphere, Vector3.zero, new Vector3(1.3f, 1.1f, 3f), scales);
+        OrbitScenery.Part(d.body, PrimitiveType.Sphere, new Vector3(0f, -0.25f, 0.1f), new Vector3(1f, 0.7f, 2.5f), belly);
+        for (int i = 0; i < 4; i++)   // glowing spines down the back
+            OrbitScenery.Part(d.body, PrimitiveType.Cube, new Vector3(0f, 0.55f, 0.9f - i * 0.6f), new Vector3(0.08f, 0.35f, 0.35f), membrane, Quaternion.Euler(45f, 0f, 0f));
+        d.neck = new GameObject("Neck").transform;
+        d.neck.SetParent(d.body, false);
+        d.neck.localPosition = new Vector3(0f, 0.3f, 1.3f);
+        OrbitScenery.Part(d.neck, PrimitiveType.Cylinder, new Vector3(0f, 0.5f, 0.6f), new Vector3(0.55f, 0.8f, 0.55f), scales, Quaternion.Euler(50f, 0f, 0f));
         var head = new GameObject("Head").transform;
-        head.SetParent(neck, false);
+        head.SetParent(d.neck, false);
         head.localPosition = new Vector3(0f, 1.1f, 1.3f);
         OrbitScenery.Part(head, PrimitiveType.Sphere, Vector3.zero, new Vector3(0.8f, 0.7f, 1.1f), scales);
         OrbitScenery.Part(head, PrimitiveType.Cube, new Vector3(0f, -0.1f, 0.65f), new Vector3(0.55f, 0.4f, 0.7f), scales);
@@ -655,19 +797,19 @@ public class KingdomDragon : MonoBehaviour
         OrbitScenery.Part(head, PrimitiveType.Sphere, new Vector3(-0.3f, 0.2f, 0.25f), Vector3.one * 0.2f, eye);
         OrbitScenery.Part(head, PrimitiveType.Cube, new Vector3(0.22f, 0.45f, -0.3f), new Vector3(0.12f, 0.5f, 0.12f), belly, Quaternion.Euler(-35f, 0f, 0f));   // horns
         OrbitScenery.Part(head, PrimitiveType.Cube, new Vector3(-0.22f, 0.45f, -0.3f), new Vector3(0.12f, 0.5f, 0.12f), belly, Quaternion.Euler(-35f, 0f, 0f));
-        fire = OrbitScenery.Part(head, PrimitiveType.Sphere, new Vector3(0f, -0.1f, 1.8f), new Vector3(0.6f, 0.6f, 2f), flame);
-        fire.gameObject.SetActive(false);
+        d.fire = OrbitScenery.Part(head, PrimitiveType.Sphere, new Vector3(0f, -0.1f, 1.8f), new Vector3(0.6f, 0.6f, 2f), flame);
+        d.fire.gameObject.SetActive(false);
 
         // Tail: a chain of shrinking balls that sways
-        Transform link = body;
+        Transform link = d.body;
         for (int i = 0; i < 6; i++)
         {
             var seg = new GameObject("Tail").transform;
             seg.SetParent(link, false);
-            seg.localPosition = new Vector3(0f, 0f, link == body ? -1.4f : -0.7f);
+            seg.localPosition = new Vector3(0f, 0f, link == d.body ? -1.4f : -0.7f);
             float s = 0.75f - i * 0.1f;
             OrbitScenery.Part(seg, PrimitiveType.Sphere, Vector3.zero, new Vector3(s, s, s * 1.4f), scales);
-            tail.Add(seg);
+            d.tail.Add(seg);
             link = seg;
         }
         OrbitScenery.Part(link, PrimitiveType.Cube, new Vector3(0f, 0f, -0.4f), new Vector3(0.5f, 0.05f, 0.5f), membrane, Quaternion.Euler(0f, 45f, 0f));   // spade tip
@@ -675,55 +817,120 @@ public class KingdomDragon : MonoBehaviour
         Transform Wing(float side)
         {
             var pivot = new GameObject("Wing").transform;
-            pivot.SetParent(body, false);
+            pivot.SetParent(d.body, false);
             pivot.localPosition = new Vector3(side * 0.5f, 0.4f, 0.3f);
             OrbitScenery.Part(pivot, PrimitiveType.Cube, new Vector3(side * 1.8f, 0f, 0.4f), new Vector3(3.6f, 0.12f, 0.15f), scales);   // the arm
             OrbitScenery.Part(pivot, PrimitiveType.Cube, new Vector3(side * 1.7f, 0f, -0.5f), new Vector3(3.2f, 0.04f, 1.8f), membrane, Quaternion.Euler(0f, side * 12f, 0f));
             return pivot;
         }
-        wingL = Wing(-1f);
-        wingR = Wing(1f);
-        body.gameObject.SetActive(false);
-        next = AccessibilityPrefs.AmbientTime + 10f;
+        d.wingL = Wing(-1f);
+        d.wingR = Wing(1f);
+        return d;
     }
 
     private void Update()
     {
         float t = AccessibilityPrefs.AmbientTime;
-        if (!flying)
+        foreach (Dragon d in dragons)
         {
-            if (t < next) return;
-            // Across the far side of the kingdom, high above the rooftops
-            float a = Random.Range(0f, Mathf.PI * 2f);
-            Vector3 side = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            Vector3 across = new Vector3(-side.z, 0f, side.x);
-            float h = Random.Range(8f, 22f);
-            from = side * 120f - across * 160f + Vector3.up * h;
-            to = side * 120f + across * 160f + Vector3.up * (h + Random.Range(-6f, 6f));
-            started = t;
-            flying = true;
-            body.gameObject.SetActive(true);
+            // A wobbly loop: the radius breathes in and out so they swing near and far
+            float a = (d.phase + t * d.speed * Mathf.Deg2Rad);
+            Vector3 Pos(float ang) => new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * (d.radius + 18f * Mathf.Sin(ang * 2f + d.phase))
+                + Vector3.up * (d.height + 4f * Mathf.Sin(ang * 3f + d.phase));
+            Vector3 p = Pos(a), ahead = Pos(a + Mathf.Sign(d.speed) * 0.02f);
+            float bob = Mathf.Sin(t * d.flapRate) * 0.8f;   // rises a little on each downbeat
+            d.body.position = p + Vector3.up * bob;
+            float bank = -Mathf.Sign(d.speed) * 18f;
+            d.body.rotation = Quaternion.LookRotation(ahead - p) * Quaternion.Euler(Mathf.Sin(t * d.flapRate + 1f) * 5f, 0f, bank);
+            float flap = Mathf.Sin(t * d.flapRate) * 35f;
+            d.wingL.localRotation = Quaternion.Euler(0f, 0f, -flap);
+            d.wingR.localRotation = Quaternion.Euler(0f, 0f, flap);
+            d.neck.localRotation = Quaternion.Euler(Mathf.Sin(t * 1.4f + d.phase) * 8f, Mathf.Sin(t * 0.9f + d.phase) * 10f, 0f);
+            for (int i = 0; i < d.tail.Count; i++)
+                d.tail[i].localRotation = Quaternion.Euler(0f, Mathf.Sin(t * 2f - i * 0.6f + d.phase) * 12f, 0f);
+            // A little puff of flame every dozen seconds or so
+            float cycle = (t + d.phase * 4f) % 13f;
+            bool puff = cycle < 1.4f;
+            d.fire.gameObject.SetActive(puff);
+            if (puff) d.fire.localScale = new Vector3(0.6f, 0.6f, 2f) * (0.8f + 0.3f * Mathf.Sin(t * 30f));
         }
-        float k = (t - started) / Duration;
-        if (k >= 1f)
+    }
+}
+
+/// <summary>Glints of sunset light drifting down the river</summary>
+public class KingdomRiver : MonoBehaviour
+{
+    private readonly List<(Transform t, float s, float offset, float phase)> glints = new List<(Transform, float, float, float)>();
+
+    private void Start()
+    {
+        var rng = new System.Random(77);
+        var mat = new Material(Shader.Find("Sprites/Default")) { mainTexture = KingdomTorches.Soft(), color = new Color(1f, 0.75f, 0.85f, 0.7f) };
+        for (int i = 0; i < 60; i++)
         {
-            flying = false;
-            body.gameObject.SetActive(false);
-            next = t + Random.Range(25f, 45f);
-            return;
+            var q = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
+            Destroy(q.GetComponent<Collider>());
+            q.name = "Glint";
+            q.SetParent(transform, false);
+            q.rotation = Quaternion.Euler(90f, 0f, 0f);   // lying flat on the water
+            var r = q.GetComponent<MeshRenderer>();
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            glints.Add((q, -200f + (float)rng.NextDouble() * 400f, ((float)rng.NextDouble() - 0.5f) * KingdomScenery.RiverHalfWidth * 1.6f, (float)rng.NextDouble() * 10f));
         }
-        Vector3 dir = (to - from).normalized;
-        body.position = Vector3.Lerp(from, to, k) + Vector3.up * Mathf.Sin(t * 1.4f) * 2f;
-        body.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(Mathf.Sin(t * 1.4f + 1f) * 6f, 0f, Mathf.Sin(t * 0.7f) * 10f);
-        float flap = Mathf.Sin(t * 3.2f) * 35f;
-        wingL.localRotation = Quaternion.Euler(0f, 0f, -flap);
-        wingR.localRotation = Quaternion.Euler(0f, 0f, flap);
-        neck.localRotation = Quaternion.Euler(Mathf.Sin(t * 1.4f) * 8f, Mathf.Sin(t * 0.9f) * 10f, 0f);
-        for (int i = 0; i < tail.Count; i++)
-            tail[i].localRotation = Quaternion.Euler(0f, Mathf.Sin(t * 2f - i * 0.6f) * 12f, 0f);
-        // A little puff of flame halfway across
-        bool puff = k > 0.45f && k < 0.58f;
-        fire.gameObject.SetActive(puff);
-        if (puff) fire.localScale = new Vector3(0.6f, 0.6f, 2f) * (0.8f + 0.3f * Mathf.Sin(t * 30f));
+    }
+
+    private void LateUpdate()
+    {
+        float t = AccessibilityPrefs.AmbientTime;
+        foreach (var g in glints)
+        {
+            float s = Mathf.Repeat(g.s + t * 3f + 200f, 400f) - 200f;   // the current carries them along
+            g.t.position = KingdomScenery.RiverPoint(s, g.offset) + Vector3.up * 0.15f;
+            float shimmer = 0.5f + 0.5f * Mathf.Sin(t * 3f + g.phase);
+            g.t.localScale = new Vector3(2.2f, 0.5f, 1f) * (0.6f + 0.8f * shimmer);
+        }
+    }
+}
+
+/// <summary>
+/// The drawbridge stays down most of the time; now and then it creaks up on its chains,
+/// waits a moment, and lowers again
+/// </summary>
+public class KingdomDrawbridge : MonoBehaviour
+{
+    private Transform hinge;
+    private readonly List<Transform> chains = new List<Transform>();
+    private Vector3[] anchors;
+    private Quaternion down;
+    private const float Cycle = 50f;
+
+    public void Init(Transform bridge)
+    {
+        hinge = bridge;
+        down = hinge.rotation;
+        foreach (Transform t in hinge) if (t.name == "Chain") chains.Add(t);
+        // The chains run to the gate towers, up above the hinge
+        anchors = new Vector3[chains.Count];
+        for (int i = 0; i < chains.Count; i++)
+            anchors[i] = hinge.position + hinge.rotation * new Vector3(chains[i].localPosition.x * 1.25f, 9f, -2f);
+    }
+
+    private void LateUpdate()
+    {
+        if (hinge == null) return;
+        float c = Mathf.Repeat(AccessibilityPrefs.AmbientTime + 20f, Cycle);
+        // Down for most of the cycle; 6 s up, 5 s held, 6 s down
+        float up = c < 33f ? 0f : c < 39f ? (c - 33f) / 6f : c < 44f ? 1f : 1f - (c - 44f) / 6f;
+        up = Mathf.SmoothStep(0f, 1f, up);
+        hinge.rotation = down * Quaternion.Euler(-70f * up, 0f, 0f);
+        for (int i = 0; i < chains.Count; i++)
+        {
+            Transform link = chains[i].Find("Link");
+            Vector3 from = chains[i].position, to = anchors[i];
+            link.position = (from + to) * 0.5f;
+            link.rotation = Quaternion.FromToRotation(Vector3.up, to - from);
+            link.localScale = new Vector3(0.18f, (to - from).magnitude * 0.5f / Mathf.Max(0.001f, chains[i].lossyScale.y), 0.18f);
+        }
     }
 }

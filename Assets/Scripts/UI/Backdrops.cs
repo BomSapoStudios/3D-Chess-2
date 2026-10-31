@@ -82,7 +82,7 @@ public static class Backdrops
             case Kind.EarthOrbit: return "Low orbit above the turning Earth, with the planets, passing comets and satellites whizzing by";
             case Kind.DeepSea: return "Dark open water full of fish that sometimes eat each other. Watch out for the tentacle";
             case Kind.Graveyard: return "A moonlit cemetery with glowing tombstones, lanterns, ravens, mist, will-o'-wisps and bats";
-            case Kind.MedievalKingdom: return "A storybook castle at sunset, a torch-lit village, windmill and the odd passing dragon";
+            case Kind.MedievalKingdom: return "A storybook castle at sunset with a drawbridge over the river, cobbled roads and dragons overhead";
             default: return "Clean violet glow, easy on the eyes";
         }
     }
