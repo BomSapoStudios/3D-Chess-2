@@ -19,13 +19,10 @@ public class GameCenter : MonoBehaviour
     /// <summary>Reaching a tier in Duel or Melee: Knight, Bishop, Rook, Queen, King</summary>
     public static string TierAchievement(string tier) => "chess3d.tier." + tier.ToLowerInvariant();
     public const string ZombieRoundsAchievement = "chess3d.zombies.round50";
-    public const string FreePuzzlesAchievement = "chess3d.blitz.allfree";
 
     /// <summary>Ratings go to Game Center once a player has this many ranked games in that mode (the server's tier threshold)</summary>
     private const int MinRatedGames = 5;
     private const int ZombieRoundsGoal = 50;
-    /// <summary>The Queen Blitz puzzles that come free with the game</summary>
-    private const int FreePuzzles = 10;
     private static readonly string[] Tiers = { "Knight", "Bishop", "Rook", "Queen", "King" }; // lowest first
 
     /// <summary>Raised when signing in to Game Center switched this device to the player's existing account (their name)</summary>
@@ -111,14 +108,6 @@ public class GameCenter : MonoBehaviour
         if (rounds >= ZombieRoundsGoal) Achieve(ZombieRoundsAchievement);
     }
 
-    /// <summary>After a Queen Blitz clear: every free puzzle done?</summary>
-    public static void CheckPuzzles()
-    {
-        int free = Mathf.Min(FreePuzzles, QueenBlitz.PuzzlesOf("starter").Length);
-        for (int i = 0; i < free; i++) if (!QueenBlitz.EverCleared(i, "starter")) return;
-        Achieve(FreePuzzlesAchievement);
-    }
-
     // ───────────────────────── Signing in ─────────────────────────
 
     [Serializable] private class Proof { public string teamPlayerId; }
@@ -167,6 +156,5 @@ public class GameCenter : MonoBehaviour
         }
         foreach (AIDifficulty d in new[] { AIDifficulty.Easy, AIDifficulty.Medium, AIDifficulty.Hard })
             if (ZombieMode.Best(d) > 0) PostScore(ZombieBoard(d), ZombieMode.Best(d));
-        CheckPuzzles();
     }
 }

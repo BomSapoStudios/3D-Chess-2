@@ -800,7 +800,6 @@ public partial class QueenBlitzDirector : MonoBehaviour
         while (filledAt != null && shownTaken < filledAt.Length) yield return null; // let the last silhouettes fill in
         yield return new WaitForSeconds(0.35f);
         var (paid, _) = QueenBlitz.RecordClear();
-        GameCenter.CheckPuzzles();
         QueenBlitz.LastPaid = paid;
         // New pawns fly into the tally before the result shows (the pawns speak for themselves there)
         if (paid > 0) yield return Funnel(paid);
