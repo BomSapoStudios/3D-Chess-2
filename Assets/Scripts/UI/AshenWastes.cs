@@ -162,7 +162,7 @@ public static class AshenScenery
 
     // The volcano looms ahead of White, a little to the left so the board doesn't hide it; the
     // dark tower stands off to the right.
-    public static readonly Vector3 VolcanoDir = new Vector3(0.871f, 0f, 0.491f);
+    public static readonly Vector3 VolcanoDir = new Vector3(0.809f, 0f, 0.588f);
     public const float VolcanoDistance = 150f, VolcanoHeight = 62f, VolcanoBase = 58f, CraterRadius = 9f;
     public static readonly Vector3 TowerDir = new Vector3(0.8f, 0f, -0.6f);
     public const float TowerDistance = 120f;
@@ -174,14 +174,22 @@ public static class AshenScenery
     public static Vector3 TowerTip { get; private set; }
 
     /// <summary>The volcano's radius at angle a round it, t from its foot (0) to the crater rim (1)</summary>
-    public static float VolcanoRadius(float a, float t) =>
-        (CraterRadius + (VolcanoBase - CraterRadius) * Mathf.Pow(1f - t, 1.7f))
-        * (1f + 0.08f * Mathf.Sin(a * 5f + 1f) + 0.05f * Mathf.Sin(a * 11f + 3f) + 0.04f * Mathf.Sin(a * 23f + t * 6f));
+    public static float VolcanoRadius(float a, float t)
+    {
+        // The rock is smoothed where the demon face is carved, so the face sits evenly on it
+        float fromFace = Mathf.DeltaAngle(a * Mathf.Rad2Deg, FaceAngle * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+        float rough = 1f - 0.9f * Mathf.Exp(-fromFace * fromFace / 0.2f);
+        return (CraterRadius + (VolcanoBase - CraterRadius) * Mathf.Pow(1f - t, 1.7f))
+            * (1f + rough * (0.08f * Mathf.Sin(a * 5f + 1f) + 0.05f * Mathf.Sin(a * 11f + 3f) + 0.04f * Mathf.Sin(a * 23f + t * 6f)));
+    }
+
+    /// <summary>The angle round the volcano that faces the board, where the demon face is</summary>
+    public static float FaceAngle => Mathf.Atan2(-VolcanoDir.z, -VolcanoDir.x);
 
     /// <summary>The demon face's eyes and mouth: AshenVolcano makes them throb</summary>
     public static Material DemonGlow { get; private set; }
     public static readonly List<Vector3> DemonSpots = new List<Vector3>();
-    public const float MouthT = 0.4f;   // how far up the volcano the demon's mouth is, where the big flow starts
+    public const float MouthT = 0.36f;   // how far up the volcano the demon's mouth is, where the big flow starts
 
     /// <summary>The loop the ore carts run: out on one side of the haul road, back on the other</summary>
     public static readonly List<Vector3> HaulLoop = new List<Vector3>();
@@ -356,7 +364,7 @@ public static class AshenScenery
         OrbitScenery.Part(parent, PrimitiveType.Cylinder, CraterTop - Vector3.up * 2.5f, new Vector3(CraterRadius * 1.6f, 0.2f, CraterRadius * 1.6f), lava);
 
         // Lava flows down the slopes, the widest facing the board
-        float faceBoard = Mathf.Atan2(-VolcanoDir.z, -VolcanoDir.x);
+        float faceBoard = FaceAngle;
         var flows = new List<float> { faceBoard };
         for (int i = 0; i < 6; i++) flows.Add(faceBoard + (i + 1) * Mathf.PI * 2f / 7f + ((float)rng.NextDouble() - 0.5f) * 0.4f);
         for (int f = 0; f < flows.Count; f++)
@@ -384,17 +392,29 @@ public static class AshenScenery
     // burning eyes, slit nostrils and a fanged maw full of lava, which spills on down the slope
     private static void DemonFace(Transform parent, Material rock, Material shadow, Material bone)
     {
-        float a = Mathf.Atan2(-VolcanoDir.z, -VolcanoDir.x);
+        const float F = 1.4f;   // the face is laid out at 1 unit = F metres
+        float a = FaceAngle;
         const float t = 0.5f;
         float r = VolcanoRadius(a, t);
         Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
         var face = new GameObject("Demon Face").transform;
         face.SetParent(parent, false);
-        face.localPosition = VolcanoFoot + dir * (r + 0.3f) + Vector3.up * (t * VolcanoHeight);
+        face.localPosition = VolcanoFoot + dir * r + Vector3.up * (t * VolcanoHeight);
         face.localRotation = Quaternion.LookRotation((dir + Vector3.up * 0.8f).normalized, Vector3.up);   // lying back on the slope
 
-        // Bend points back round the cone so the edges of the face stay on the rock
-        Vector3 P(float x, float y, float z) => new Vector3(x, y, z - x * x / (2f * r));
+        // x across and y up the face, then dropped onto the actual rock there (the cone curves
+        // away from a flat face both round and up) and lifted z out of it
+        Vector3 P(float x, float y, float z)
+        {
+            Vector3 w = face.position + face.right * (x * F) + face.up * (y * F);
+            Vector3 flat = w - VolcanoFoot;
+            flat.y = 0f;
+            float wa = Mathf.Atan2(flat.z, flat.x);
+            float h = w.y - VolcanoFoot.y;
+            Vector3 onRock = VolcanoFoot + new Vector3(Mathf.Cos(wa), 0f, Mathf.Sin(wa)) * VolcanoRadius(wa, Mathf.Clamp01(h / VolcanoHeight)) + Vector3.up * h;
+            return face.InverseTransformPoint(onRock + face.forward * (z * F));
+        }
+        Vector3 S(float x, float y, float z) => new Vector3(x, y, z) * F;
 
         DemonGlow = new Material(Shader.Find("Unlit/Color")) { color = new Color(1f, 0.75f, 0.2f) };
         DemonSpots.Clear();
@@ -402,27 +422,27 @@ public static class AshenScenery
         {
             float s = side;
             Quaternion slant = Quaternion.Euler(0f, 0f, s * 20f);   // inner ends low: a scowl
-            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 5.5f, 5.2f, 1.2f), new Vector3(11f, 2.4f, 3f), rock, slant);          // brow
-            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 0.6f), new Vector3(7f, 3.4f, 1.6f), shadow, slant);         // socket
-            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 1.1f), new Vector3(5f, 1.8f, 1.4f), DemonGlow, slant);      // burning eye
-            DemonSpots.Add(face.TransformPoint(P(s * 5f, 2f, 2f)));
-            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 1.3f, -3f, 1.3f), new Vector3(0.6f, 1.8f, 0.5f), DemonGlow, Quaternion.Euler(0f, 0f, -s * 15f));   // nostril
-            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 7.5f, -2.5f, 0.4f), new Vector3(6f, 4f, 3f), rock);                 // cheekbone
+            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 5.5f, 5.2f, 1.4f), S(11f, 2.4f, 3f), rock, slant);          // brow
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 0.9f), S(7f, 3.4f, 1.8f), shadow, slant);         // socket
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 5f, 2f, 1.5f), S(5f, 1.8f, 1.4f), DemonGlow, slant);      // burning eye
+            DemonSpots.Add(face.TransformPoint(P(s * 5f, 2f, 2.5f)));
+            OrbitScenery.Part(face, PrimitiveType.Cube, P(s * 1.3f, -3f, 1.6f), S(0.6f, 1.8f, 0.5f), DemonGlow, Quaternion.Euler(0f, 0f, -s * 15f));   // nostril
+            OrbitScenery.Part(face, PrimitiveType.Sphere, P(s * 7.5f, -2.5f, 0.6f), S(6f, 4f, 3f), rock);                 // cheekbone
             // A horn sweeping up and out, its tip curling back in
             Quaternion outward = Quaternion.Euler(0f, 0f, -s * 38f);
-            Vector3 hornFoot = P(s * 10.5f, 7.5f, 0.5f);
-            Rock(face, hornFoot, 2.4f, 1.3f, 7f, 7, 3, 0.08f, 90, bone).localRotation = outward;
-            Rock(face, hornFoot + outward * Vector3.up * 6.6f, 1.4f, 0.05f, 8f, 7, 3, 0.08f, 91, bone).localRotation = Quaternion.Euler(0f, 0f, s * 12f);
+            Vector3 hornFoot = P(s * 10.5f, 7.5f, 0.6f);
+            Rock(face, hornFoot, 2.4f * F, 1.3f * F, 7f * F, 7, 3, 0.08f, 90, bone).localRotation = outward;
+            Rock(face, hornFoot + outward * Vector3.up * (6.6f * F), 1.4f * F, 0.05f, 8f * F, 7, 3, 0.08f, 91, bone).localRotation = Quaternion.Euler(0f, 0f, s * 12f);
         }
-        OrbitScenery.Part(face, PrimitiveType.Cube, P(0f, -0.5f, 1f), new Vector3(2.4f, 5f, 2f), rock);                              // nose ridge
-        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8f, 0.5f), new Vector3(17f, 6.5f, 2.4f), shadow);                      // the maw
-        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8.3f, 0.9f), new Vector3(13f, 3.6f, 2f), DemonGlow);                   // lava in its throat
-        DemonSpots.Add(face.TransformPoint(P(0f, -8f, 2.5f)));
+        OrbitScenery.Part(face, PrimitiveType.Cube, P(0f, -0.5f, 1.2f), S(2.4f, 5f, 2f), rock);                                    // nose ridge
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8f, 0.8f), S(17f, 6.5f, 2.4f), shadow);                               // the maw
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -8.3f, 1.2f), S(13f, 3.6f, 2f), DemonGlow);                            // lava in its throat
+        DemonSpots.Add(face.TransformPoint(P(0f, -8f, 2.8f)));
         for (int i = 0; i < 6; i++)   // upper fangs, the outer two longest
-            Rock(face, P((i - 2.5f) * 2.5f, -5.2f, 1.4f), 0.7f, 0.05f, i == 0 || i == 5 ? 3.6f : 2.4f, 5, 2, 0f, 100 + i, bone).localRotation = Quaternion.Euler(0f, 0f, 180f);
+            Rock(face, P((i - 2.5f) * 2.5f, -5.2f, 1.7f), 0.7f * F, 0.05f, (i == 0 || i == 5 ? 3.6f : 2.4f) * F, 5, 2, 0f, 100 + i, bone).localRotation = Quaternion.Euler(0f, 0f, 180f);
         for (int i = 0; i < 5; i++)   // lower fangs
-            Rock(face, P((i - 2f) * 2.7f, -10.8f, 1.4f), 0.6f, 0.05f, i == 0 || i == 4 ? 3f : 2f, 5, 2, 0f, 110 + i, bone);
-        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -13.3f, 0.3f), new Vector3(12f, 4f, 3f), rock);                         // chin
+            Rock(face, P((i - 2f) * 2.7f, -10.8f, 1.7f), 0.6f * F, 0.05f, (i == 0 || i == 4 ? 3f : 2f) * F, 5, 2, 0f, 110 + i, bone);
+        OrbitScenery.Part(face, PrimitiveType.Sphere, P(0f, -13.3f, 0.5f), S(12f, 4f, 3f), rock);                                  // chin
     }
 
     // The orcs' mine: a timbered tunnel into the volcano's flank on White's left, a haul road
