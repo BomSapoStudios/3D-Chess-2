@@ -56,7 +56,7 @@ public static class HangingGardensSky
         float zx = ZigguratU * width, zBase = hy - 4f;
         for (int step = 0; step < ZigSteps; step++)
         {
-            float half = ZigHalf - step * 19f;
+            float half = ZigHalf - step * 14f;
             Rect(layer, width, height, Zig, zx - half, zx + half, zBase - (step + 1) * ZigStepH, zBase);
         }
         Rect(layer, width, height, Zig, zx - 14f, zx + 14f, zBase - ZigSteps * ZigStepH - 16f, zBase); // the shrine
@@ -73,12 +73,12 @@ public static class HangingGardensSky
         // Near trees, cypresses and palms, leaving the sun clear
         bool NearSun(float x) => Mathf.Abs(WrapPx(x - sunX, width)) < width * 0.045f;
         bool NearLandmark(float x) => Mathf.Abs(WrapPx(x - ZigguratU * width, width)) < ZigHalf + 20f || Mathf.Abs(WrapPx(x - GateU * width, width)) < 70f;
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 10; i++)
         {
             float cx = rng.Next(width);
             if (NearSun(cx) || NearLandmark(cx)) continue;
-            float r = 26f + (float)rng.NextDouble() * 30f;
-            float lift = 18f + (float)rng.NextDouble() * 22f;
+            float r = 14f + (float)rng.NextDouble() * 14f;
+            float lift = 12f + (float)rng.NextDouble() * 12f;
             Disc(layer, width, height, Near, cx, hy - lift - r, r);
             Disc(layer, width, height, Near, cx - r * 0.7f, hy - lift - r * 0.6f, r * 0.7f);
             Disc(layer, width, height, Near, cx + r * 0.7f, hy - lift - r * 0.55f, r * 0.65f);
@@ -89,14 +89,14 @@ public static class HangingGardensSky
             float cx = rng.Next(width);
             if (NearSun(cx) || NearLandmark(cx)) continue;
             float w = 6f + (float)rng.NextDouble() * 7f;
-            float h = 55f + (float)rng.NextDouble() * 80f;
+            float h = 40f + (float)rng.NextDouble() * 45f;
             Flame(layer, width, height, Near, cx, hy, w, h);
         }
         for (int i = 0; i < 14; i++)
         {
             float cx = rng.Next(width);
             if (NearSun(cx) || NearLandmark(cx)) continue;
-            float h = 90f + (float)rng.NextDouble() * 50f;
+            float h = 50f + (float)rng.NextDouble() * 30f;
             float lean = ((float)rng.NextDouble() - 0.5f) * 30f;
             Palm(layer, width, height, Near, cx, hy, h, lean, rng);
         }
@@ -124,7 +124,7 @@ public static class HangingGardensSky
 
         Color zenith = new Color(0.02f, 0.06f, 0.16f), dusk = new Color(0.1f, 0.3f, 0.45f); // blue hour: deep teal overhead
         Color rose = new Color(0.98f, 0.45f, 0.55f), gold = new Color(1f, 0.76f, 0.5f);
-        Color nearDark = new Color(0.02f, 0.05f, 0.06f);
+        Color nearDark = new Color(0.1f, 0.07f, 0.16f); // dusk silhouettes, not black
 
         for (int y = 0; y < height; y++)
         {
@@ -227,7 +227,7 @@ public static class HangingGardensSky
     }
 
     private const int ZigSteps = 7;
-    private const float ZigHalf = 150f, ZigStepH = 15f, GateH = 70f;
+    private const float ZigHalf = 110f, ZigStepH = 11f, GateH = 52f;
 
     // Mud-brick steps, each edged with a glowing blue band and trailing green gardens, with lit doorways
     private static Color ZigguratColor(int x, int y, float zx, float zBase, int width, float sunSide)
@@ -297,7 +297,7 @@ public static class HangingGardensSky
         for (int f = 0; f < 8; f++)
         {
             float a = f / 8f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.3f;
-            float len = 34f + (float)rng.NextDouble() * 16f;
+            float len = 22f + (float)rng.NextDouble() * 10f;
             float dir = Mathf.Cos(a);           // left/right reach
             float rise = Mathf.Sin(a) * 0.5f + 0.25f;
             for (int s = 0; s < 40; s++)
