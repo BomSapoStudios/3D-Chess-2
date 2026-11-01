@@ -93,16 +93,6 @@ public static class BoardView
     /// <summary>A board direction (e.g. a pawn's forward) as drawn, in the Pieces Container</summary>
     public static Vector3 Dir(Vector3 board) => Tilted ? new Vector3(board.x, -board.z, board.y) : board;
 
-    /// <summary>
-    /// A point given in untipped container space (cell centres at index * cell size) as drawn.
-    /// Used for things placed relative to the cube's edges, like coordinate labels.
-    /// </summary>
-    public static Vector3 Point(Vector3 board, float cellSize = 2.8f)
-    {
-        if (!Tilted) return board;
-        return new Vector3(board.x, (Dims.z - 1) * cellSize - board.z, board.y);
-    }
-
     /// <summary>Which drawn floor (counted from the bottom) a square is on, for Floors and sounds</summary>
     public static int Level(BoardPosition p) => ToView(p).y;
 

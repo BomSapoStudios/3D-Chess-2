@@ -146,7 +146,7 @@ public class LayerViewUI : MonoBehaviour
         for (int level = levels - 1; level >= 0; level--)
         {
             y += height + gap;
-            if (TouchGUI.NeonButton(new Rect(x, y, width, height), $"{level + 1}", NeonTheme.Pink, NeonTheme.Cyan, outlined: selectedLevel != level, fontSize: 16))
+            if (TouchGUI.NeonButton(new Rect(x, y, width, height), LevelName(level), NeonTheme.Pink, NeonTheme.Cyan, outlined: selectedLevel != level, fontSize: 16))
             {
                 ShowAll();
                 selectedLevel = level;
@@ -159,5 +159,17 @@ public class LayerViewUI : MonoBehaviour
         }
 
         TouchGUI.End();
+    }
+
+    /// <summary>
+    /// A drawn floor's name, matching square names. Normally the floor number; on the tipped cube
+    /// (BoardView, Yellow/Orange online) each drawn layer is a rank, so it's that rank's letter.
+    /// </summary>
+    private static string LevelName(int level)
+    {
+        if (!BoardView.Tilted) return $"{level + 1}";
+        int rank = BoardView.FromView(new Vector3Int(0, level, 0)).z;
+        string[] ranks = ChessNotationConverter.GetRankLabels();
+        return rank >= 0 && rank < ranks.Length ? ranks[rank].ToLowerInvariant() : $"{level + 1}";
     }
 }
