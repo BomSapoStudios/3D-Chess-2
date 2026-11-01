@@ -201,7 +201,9 @@ public class EmergencyChessBoard : MonoBehaviour
 
         // Position plane at actual cell bottom
         // Each cell spans 2.8 units, so bottom of cell is at y*2.8 - 1.4
-        floorPlane.transform.position = new Vector3(x * 2.8f, (y * 2.8f) - 1.4f, z * 2.8f);
+        // Named by board square; drawn where BoardView puts that square (tipped for Yellow/Orange online)
+        Vector3Int v = BoardView.ToView(new BoardPosition(x, y, z));
+        floorPlane.transform.position = new Vector3(v.x * 2.8f, (v.y * 2.8f) - 1.4f, v.z * 2.8f);
 
         // Scale plane to fit cell area (planes are 10x10 units by default)
         floorPlane.transform.localScale = new Vector3(0.26f, 1f, 0.26f); // Slightly smaller for clear boundaries

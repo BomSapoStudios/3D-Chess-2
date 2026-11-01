@@ -26,7 +26,7 @@ public class LayerViewUI : MonoBehaviour
     {
         get
         {
-            if (BoardDimensionsManager.Instance != null) return BoardDimensionsManager.Instance.GetDimensions().y;
+            if (BoardDimensionsManager.Instance != null) return BoardView.Levels; // drawn floors (BoardView tips the cube for Yellow/Orange online)
             return 4;
         }
     }
@@ -57,9 +57,9 @@ public class LayerViewUI : MonoBehaviour
             foreach (MeshRenderer r in FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 string[] parts = r.name.Split('_');
-                if (parts.Length == 4 && parts[0] == "Floor" && int.TryParse(parts[2], out int y))
+                if (parts.Length == 4 && parts[0] == "Floor" && int.TryParse(parts[1], out int x) && int.TryParse(parts[2], out int y) && int.TryParse(parts[3], out int z))
                 {
-                    floors.Add((r, y));
+                    floors.Add((r, BoardView.Level(new BoardPosition(x, y, z))));
                 }
             }
         }
@@ -72,22 +72,22 @@ public class LayerViewUI : MonoBehaviour
         {
             BoardPosition pos = piece.CurrentPosition;
             bool onBoard = pos.IsValid() && !piece.IsInTray();
-            bool visible = !onBoard || pos.y == selectedLevel;
+            bool visible = !onBoard || BoardView.Level(pos) == selectedLevel;
             foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, visible);
             foreach (Collider c in piece.GetComponentsInChildren<Collider>()) SetEnabled(c, visible);
         }
 
         foreach (QueenBlitzBlock block in FindObjectsByType<QueenBlitzBlock>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(block.gameObject, block.at.y);
+            HideIfOtherLevel(block.gameObject, BoardView.Level(block.at));
         }
         foreach (PlacementTargetData target in FindObjectsByType<PlacementTargetData>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(target.gameObject, target.targetPosition.y);
+            HideIfOtherLevel(target.gameObject, BoardView.Level(target.targetPosition));
         }
         foreach (MoveTargetData target in FindObjectsByType<MoveTargetData>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(target.gameObject, target.targetPosition.y);
+            HideIfOtherLevel(target.gameObject, BoardView.Level(target.targetPosition));
         }
     }
 

@@ -5,6 +5,7 @@ using UnityEngine;
 /// A row of player view buttons along the bottom of the game screen. Tapping one swings the
 /// camera to look at the board from that player's side, as if sitting behind their pieces.
 /// Yellow (bottom face) looks up from underneath; Orange (top face) looks down from above.
+/// (Online as Yellow/Orange, the cube is drawn tipped so their faces are at the front/back: BoardView.)
 /// </summary>
 public class PlayerViewUI : MonoBehaviour
 {
@@ -123,16 +124,8 @@ public class PlayerViewUI : MonoBehaviour
     /// <summary>World direction from the board's centre toward this player's home face</summary>
     public static Vector3 HomeSideDirection(PieceColor color, out Vector3 up)
     {
-        Vector3 local;
-        switch (color)
-        {
-            case PieceColor.White: local = Vector3.left; break;     // starts at x = 0, advances +x
-            case PieceColor.Black: local = Vector3.right; break;    // starts at x = max
-            case PieceColor.Green: local = Vector3.back; break;     // starts at z = 0
-            case PieceColor.Purple: local = Vector3.forward; break; // starts at z = max
-            case PieceColor.Yellow: local = Vector3.down; break;    // starts at y = 0
-            default: local = Vector3.up; break;                     // Orange starts at y = max
-        }
+        // As drawn: BoardView tips the cube for Yellow/Orange online, putting their faces at the front/back
+        Vector3 local = BoardView.HomeSideDrawn(color);
 
         // Board axes follow the Pieces Container, which turns with the board (and Chaos Mode)
         GameObject container = GameObject.Find("Pieces Container");

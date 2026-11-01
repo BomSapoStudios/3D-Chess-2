@@ -807,10 +807,12 @@ public class ChessBoard : MonoBehaviour
         // The container is already centered at (-4.2, -4.2, -4.2) to match the board
         // Floor planes are at: (x * 2.8, y * 2.8 - 1.4, z * 2.8) relative to board parent
         // Position piece GameObject at floor level; piece visual has +1.05 offset to rest on floor
+        // Drawn position: tipped for Yellow/Orange online (BoardView); identical otherwise
+        Vector3Int v = BoardView.ToView(boardPosition);
         return new Vector3(
-            boardPosition.x * cellSize,                    // X: match floor plane X
-            (boardPosition.y * cellSize) - 1.4f,          // Y: exactly at floor plane level
-            boardPosition.z * cellSize                     // Z: match floor plane Z
+            v.x * cellSize,                    // X: match floor plane X
+            (v.y * cellSize) - 1.4f,          // Y: exactly at floor plane level
+            v.z * cellSize                     // Z: match floor plane Z
         );
     }
     

@@ -129,7 +129,7 @@ public class CoordinateLabelsUI : MonoBehaviour
         for (int x = 0; x < boardDims.x; x++)
         {
             string text = labels[x].ToUpperInvariant();
-            Vector3 local = new Vector3(x * Cell, -Half, -Half - Margin);
+            Vector3 local = BoardView.Point(new Vector3(x * Cell, -Half, -Half - Margin), Cell); // tipped for Yellow/Orange online
             GameObject label = CreateLabel($"FileLabel_{text}", text, local, display: true);
             fileLabels.Add(label);
         }
@@ -143,7 +143,7 @@ public class CoordinateLabelsUI : MonoBehaviour
         string[] labels = ChessNotationConverter.GetLevelLabels();
         for (int y = 0; y < boardDims.y; y++)
         {
-            Vector3 local = new Vector3(-Half - Margin, y * Cell, -Half - Margin);
+            Vector3 local = BoardView.Point(new Vector3(-Half - Margin, y * Cell, -Half - Margin), Cell); // tipped for Yellow/Orange online
             GameObject label = CreateLabel($"LevelLabel_{labels[y]}", labels[y], local, display: true);
             levelLabels.Add(label);
         }
@@ -158,7 +158,7 @@ public class CoordinateLabelsUI : MonoBehaviour
         for (int z = 0; z < boardDims.z; z++)
         {
             string text = labels[z].ToLowerInvariant();
-            Vector3 local = new Vector3(-Half - Margin, -Half, z * Cell);
+            Vector3 local = BoardView.Point(new Vector3(-Half - Margin, -Half, z * Cell), Cell); // tipped for Yellow/Orange online
             // Bungee has no lowercase letters, so the ranks use the rounded body font
             GameObject label = CreateLabel($"RankLabel_{text}", text, local, display: false);
             rankLabels.Add(label);
