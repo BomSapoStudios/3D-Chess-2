@@ -118,11 +118,11 @@ public partial class QueenBlitzDirector
         if (current && QueenBlitz.IsDaily(selectorPack))
         {
             // Dailies step through the days, each its own pack of one
-            string before = QueenBlitz.DailyNeighbour(selectorPack, -1), after = QueenBlitz.DailyNeighbour(selectorPack, 1);
-            GUI.enabled = before != null;
-            if (TouchGUI.NeonButton(new Rect(x, y, arrowW, rowH), "< Prev", NeonTheme.Lime, NeonTheme.Pink, outlined: before == null, fontSize: 15)) Jump(before, 0);
-            GUI.enabled = after != null;
-            if (TouchGUI.NeonButton(new Rect(card.xMax - pad - arrowW, y, arrowW, rowH), "Next >", NeonTheme.Lime, NeonTheme.Pink, outlined: after == null, fontSize: 15)) Jump(after, 0);
+            string prevDaily = QueenBlitz.DailyNeighbour(selectorPack, -1), nextDaily = QueenBlitz.DailyNeighbour(selectorPack, 1);
+            GUI.enabled = prevDaily != null;
+            if (TouchGUI.NeonButton(new Rect(x, y, arrowW, rowH), "< Prev", NeonTheme.Lime, NeonTheme.Pink, outlined: prevDaily == null, fontSize: 15)) Jump(prevDaily, 0);
+            GUI.enabled = nextDaily != null;
+            if (TouchGUI.NeonButton(new Rect(card.xMax - pad - arrowW, y, arrowW, rowH), "Next >", NeonTheme.Lime, NeonTheme.Pink, outlined: nextDaily == null, fontSize: 15)) Jump(nextDaily, 0);
             GUI.enabled = true;
         }
         else if (current)
