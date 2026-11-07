@@ -115,7 +115,17 @@ public partial class QueenBlitzDirector
         bool current = selectorPack == QueenBlitz.PackId;
         float rowH = 36f, arrowW = Mathf.Min(110f, inner * 0.24f);
         int prev = -1, next = -1;
-        if (current)
+        if (current && QueenBlitz.IsDaily(selectorPack))
+        {
+            // Dailies step through the days, each its own pack of one
+            string before = QueenBlitz.DailyNeighbour(selectorPack, -1), after = QueenBlitz.DailyNeighbour(selectorPack, 1);
+            GUI.enabled = before != null;
+            if (TouchGUI.NeonButton(new Rect(x, y, arrowW, rowH), "< Prev", NeonTheme.Lime, NeonTheme.Pink, outlined: before == null, fontSize: 15)) Jump(before, 0);
+            GUI.enabled = after != null;
+            if (TouchGUI.NeonButton(new Rect(card.xMax - pad - arrowW, y, arrowW, rowH), "Next >", NeonTheme.Lime, NeonTheme.Pink, outlined: after == null, fontSize: 15)) Jump(after, 0);
+            GUI.enabled = true;
+        }
+        else if (current)
         {
             for (int i = QueenBlitz.Index - 1; i >= 0 && prev < 0; i--) if (QueenBlitz.PuzzleOpen(selectorPack, i)) prev = i;
             for (int i = QueenBlitz.Index + 1; i < puzzles.Length && next < 0; i++) if (QueenBlitz.PuzzleOpen(selectorPack, i)) next = i;
@@ -125,7 +135,8 @@ public partial class QueenBlitzDirector
             if (TouchGUI.NeonButton(new Rect(card.xMax - pad - arrowW, y, arrowW, rowH), "Next >", NeonTheme.Lime, NeonTheme.Pink, outlined: next < 0, fontSize: 15)) Jump(selectorPack, next);
             GUI.enabled = true;
         }
-        string heading = current ? $"Puzzle {QueenBlitz.Index + 1} of {puzzles.Length}" : $"{QueenBlitz.Info(selectorPack).name}: {QueenBlitz.ClearedCount(selectorPack)} of {puzzles.Length} cleared";
+        string heading = current && QueenBlitz.IsDaily(selectorPack) ? QueenBlitz.Info(selectorPack).name
+            : current ? $"Puzzle {QueenBlitz.Index + 1} of {puzzles.Length}" : $"{QueenBlitz.Info(selectorPack).name}: {QueenBlitz.ClearedCount(selectorPack)} of {puzzles.Length} cleared";
         GUI.Label(new Rect(x + arrowW + 8f, y, inner - arrowW * 2f - 16f, rowH), heading, NeonTheme.GUILabelStyle(NeonTheme.Lavender, 15, true, TextAnchor.MiddleCenter));
         y += rowH + 8f;
 
