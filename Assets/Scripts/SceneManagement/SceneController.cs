@@ -251,12 +251,8 @@ public class SceneController : MonoBehaviour
             yield return null;
         }
         
-        // Ensure minimum loading time for smooth UX
-        float elapsedTime = Time.time - startTime;
-        if (elapsedTime < minimumLoadTime)
-        {
-            yield return new WaitForSecondsRealtime(minimumLoadTime - elapsedTime);
-        }
+        // No minimum wait here: the new scene is already on screen, and holding isLoading for
+        // minimumLoadTime only made a puzzle picked right after the menu opened wait up to a second
         
         isLoading = false;
         Debug.Log($"SceneController: Completed async load of scene '{sceneName}' in {Time.time - startTime:F2} seconds");
