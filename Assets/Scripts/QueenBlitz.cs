@@ -231,6 +231,33 @@ public static partial class QueenBlitz
         return streak;
     }
 
+    /// <summary>The daily to play after (step 1) or before (step -1) this one: the nearest day the phone
+    /// has, up to today, like the next puzzle in a pack. Null when there's none (after today's, the next
+    /// one comes out tomorrow).</summary>
+    public static string DailyNeighbour(string id, int step)
+    {
+        if (!IsDaily(id)) return null;
+        // Asked every frame by the panels, so the answer is kept for a second (it checks files)
+        if (Time.unscaledTime >= neighboursUntil)
+        {
+            neighbours.Clear();
+            neighboursUntil = Time.unscaledTime + 1f;
+        }
+        string key = id + "|" + step;
+        if (!neighbours.TryGetValue(key, out string found)) neighbours[key] = found = FindDailyNeighbour(id, step);
+        return found;
+    }
+
+    private static readonly Dictionary<string, string> neighbours = new Dictionary<string, string>();
+    private static float neighboursUntil;
+
+    private static string FindDailyNeighbour(string id, int step)
+    {
+        for (System.DateTime day = DailyDate(id).AddDays(step); day >= DailyEpoch && day <= Today; day = day.AddDays(step))
+            if (HasDaily(day)) return DailyId(day);
+        return null;
+    }
+
     /// <summary>Download any of these days' dailies the phone doesn't have yet. Days before Daily #1
     /// are skipped; a missing file (not made yet, or offline) is simply left for next time.</summary>
     public static IEnumerator FetchDailies(System.DateTime first, System.DateTime last, System.Action done = null)
