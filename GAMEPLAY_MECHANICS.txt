@@ -560,6 +560,16 @@ VIEW BUTTONS (bottom of the screen)
   Swing the camera behind any player's pieces, about 25° up, framing the
   whole cube. Yellow looks up from underneath; Orange looks down from above.
 
+TIPPED CUBE FOR YELLOW AND ORANGE (online only)
+  Playing Yellow or Orange online, your device draws the cube tipped a
+  quarter turn so your pawns march away from you like everyone else's,
+  instead of up or down. All pieces still stand upright and floors still lie
+  flat; Green and Purple advance up and down for you instead. Your bench is
+  in front of the cube, the Level buttons count the floors as drawn, and the
+  View buttons follow the tipped cube. Only the picture changes: rules,
+  moves and other players' screens are untouched (Assets/Scripts/Board/
+  BoardView.cs). Local games and every other seat look as before.
+
 LEVEL BUTTONS (right edge)
   Show a single floor of the cube, hiding the others so the inside can be
   seen and tapped. "All" shows everything again.

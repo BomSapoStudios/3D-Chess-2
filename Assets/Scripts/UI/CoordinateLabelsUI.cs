@@ -129,7 +129,7 @@ public class CoordinateLabelsUI : MonoBehaviour
         for (int x = 0; x < boardDims.x; x++)
         {
             string text = labels[x].ToUpperInvariant();
-            Vector3 local = new Vector3(x * Cell, -Half, -Half - Margin);
+            Vector3 local = new Vector3(x * Cell, -Half, -Half - Margin); // files stay along the bottom front edge, tipped or not
             GameObject label = CreateLabel($"FileLabel_{text}", text, local, display: true);
             fileLabels.Add(label);
         }
@@ -143,7 +143,9 @@ public class CoordinateLabelsUI : MonoBehaviour
         string[] labels = ChessNotationConverter.GetLevelLabels();
         for (int y = 0; y < boardDims.y; y++)
         {
-            Vector3 local = new Vector3(-Half - Margin, y * Cell, -Half - Margin);
+            Vector3 local = BoardView.Tilted
+                ? new Vector3(-Half - Margin, -Half, BoardView.ToView(new BoardPosition(0, y, 0)).z * Cell) // tipped (BoardView): floors run into the depth, along the bottom left edge
+                : new Vector3(-Half - Margin, y * Cell, -Half - Margin);
             GameObject label = CreateLabel($"LevelLabel_{labels[y]}", labels[y], local, display: true);
             levelLabels.Add(label);
         }
@@ -158,7 +160,9 @@ public class CoordinateLabelsUI : MonoBehaviour
         for (int z = 0; z < boardDims.z; z++)
         {
             string text = labels[z].ToLowerInvariant();
-            Vector3 local = new Vector3(-Half - Margin, -Half, z * Cell);
+            Vector3 local = BoardView.Tilted
+                ? new Vector3(-Half - Margin, BoardView.ToView(new BoardPosition(0, 0, z)).y * Cell, -Half - Margin) // tipped (BoardView): ranks run up the front left edge
+                : new Vector3(-Half - Margin, -Half, z * Cell);
             // Bungee has no lowercase letters, so the ranks use the rounded body font
             GameObject label = CreateLabel($"RankLabel_{text}", text, local, display: false);
             rankLabels.Add(label);

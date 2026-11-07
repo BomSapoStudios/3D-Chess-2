@@ -21,9 +21,10 @@ public static class GameSounds
         if (IsZombie(piece)) { Sfx.Play("zombie_step", 0.8f); return; }
         Harmony.Beat();
         float pan = ScreenPan(piece.transform.position);
-        int zap = Harmony.PlaneNote(to.y, Planes);
+        Vector3Int drawn = BoardView.ToView(to); // pitched by the floor it's drawn on (BoardView)
+        int zap = Harmony.PlaneNote(drawn.y, Planes);
         Sfx.Play("move", 1f, zap, vary: false, pan: pan);
-        Sfx.Play("move_chime", 0.3f, Harmony.Tone(1 + to.z % 3, zap + 1), vary: false, pan: pan);
+        Sfx.Play("move_chime", 0.3f, Harmony.Tone(1 + drawn.z % 3, zap + 1), vary: false, pan: pan);
         Sfx.Play("move_bass", 0.5f, Harmony.RootShift, vary: false);
     }
 
@@ -53,7 +54,7 @@ public static class GameSounds
     public static void YourTurn() => Sfx.Play("your_turn", 1f, Harmony.RootShift, vary: false);
 
     // How many planes tall the cube is
-    private static int Planes => BoardDimensionsManager.Instance != null ? BoardDimensionsManager.Instance.GetDimensions().y : 5;
+    private static int Planes => BoardDimensionsManager.Instance != null ? BoardView.Levels : 5;
 
     /// <summary>-0.7 (left of the screen) to 0.7 (right)</summary>
     private static float ScreenPan(Vector3 world)

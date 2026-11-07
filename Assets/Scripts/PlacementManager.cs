@@ -1321,7 +1321,7 @@ public class PlacementManager : MonoBehaviour
         // Attempt to place the piece
         PlacePieceOnBoard(selectedTrayPiece, targetPosition);
         Haptics.Light(); // set down
-        GameSounds.Placed(targetPosition.y);
+        GameSounds.Placed(BoardView.Level(targetPosition)); // the floor it's drawn on (BoardView)
     }
     
     /// <summary>

@@ -141,6 +141,14 @@ public static class PieceModels
 
     private static float FacingYaw(PieceColor color)
     {
+        if (BoardView.Tilted)
+        {
+            // Tipped cube (BoardView): Yellow/Orange advance along the drawn z like Green/Purple
+            // normally do, and Green/Purple go up and down, where there's no way to look
+            if (color == PieceColor.Yellow) color = PieceColor.Green;
+            else if (color == PieceColor.Orange) color = PieceColor.Purple;
+            else if (color == PieceColor.Green || color == PieceColor.Purple) return 0f;
+        }
         switch (color)
         {
             case PieceColor.White: return -90f;

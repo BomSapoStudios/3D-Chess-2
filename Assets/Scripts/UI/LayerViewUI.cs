@@ -26,7 +26,7 @@ public class LayerViewUI : MonoBehaviour
     {
         get
         {
-            if (BoardDimensionsManager.Instance != null) return BoardDimensionsManager.Instance.GetDimensions().y;
+            if (BoardDimensionsManager.Instance != null) return BoardView.Levels; // drawn floors (BoardView tips the cube for Yellow/Orange online)
             return 4;
         }
     }
@@ -57,9 +57,9 @@ public class LayerViewUI : MonoBehaviour
             foreach (MeshRenderer r in FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 string[] parts = r.name.Split('_');
-                if (parts.Length == 4 && parts[0] == "Floor" && int.TryParse(parts[2], out int y))
+                if (parts.Length == 4 && parts[0] == "Floor" && int.TryParse(parts[1], out int x) && int.TryParse(parts[2], out int y) && int.TryParse(parts[3], out int z))
                 {
-                    floors.Add((r, y));
+                    floors.Add((r, BoardView.Level(new BoardPosition(x, y, z))));
                 }
             }
         }
@@ -72,22 +72,22 @@ public class LayerViewUI : MonoBehaviour
         {
             BoardPosition pos = piece.CurrentPosition;
             bool onBoard = pos.IsValid() && !piece.IsInTray();
-            bool visible = !onBoard || pos.y == selectedLevel;
+            bool visible = !onBoard || BoardView.Level(pos) == selectedLevel;
             foreach (Renderer r in piece.GetComponentsInChildren<Renderer>()) SetVisible(r, visible);
             foreach (Collider c in piece.GetComponentsInChildren<Collider>()) SetEnabled(c, visible);
         }
 
         foreach (QueenBlitzBlock block in FindObjectsByType<QueenBlitzBlock>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(block.gameObject, block.at.y);
+            HideIfOtherLevel(block.gameObject, BoardView.Level(block.at));
         }
         foreach (PlacementTargetData target in FindObjectsByType<PlacementTargetData>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(target.gameObject, target.targetPosition.y);
+            HideIfOtherLevel(target.gameObject, BoardView.Level(target.targetPosition));
         }
         foreach (MoveTargetData target in FindObjectsByType<MoveTargetData>(FindObjectsSortMode.None))
         {
-            HideIfOtherLevel(target.gameObject, target.targetPosition.y);
+            HideIfOtherLevel(target.gameObject, BoardView.Level(target.targetPosition));
         }
     }
 
@@ -146,7 +146,7 @@ public class LayerViewUI : MonoBehaviour
         for (int level = levels - 1; level >= 0; level--)
         {
             y += height + gap;
-            if (TouchGUI.NeonButton(new Rect(x, y, width, height), $"{level + 1}", NeonTheme.Pink, NeonTheme.Cyan, outlined: selectedLevel != level, fontSize: 16))
+            if (TouchGUI.NeonButton(new Rect(x, y, width, height), LevelName(level), NeonTheme.Pink, NeonTheme.Cyan, outlined: selectedLevel != level, fontSize: 16))
             {
                 ShowAll();
                 selectedLevel = level;
@@ -159,5 +159,17 @@ public class LayerViewUI : MonoBehaviour
         }
 
         TouchGUI.End();
+    }
+
+    /// <summary>
+    /// A drawn floor's name, matching square names. Normally the floor number; on the tipped cube
+    /// (BoardView, Yellow/Orange online) each drawn layer is a rank, so it's that rank's letter.
+    /// </summary>
+    private static string LevelName(int level)
+    {
+        if (!BoardView.Tilted) return $"{level + 1}";
+        int rank = BoardView.FromView(new Vector3Int(0, level, 0)).z;
+        string[] ranks = ChessNotationConverter.GetRankLabels();
+        return rank >= 0 && rank < ranks.Length ? ranks[rank].ToLowerInvariant() : $"{level + 1}";
     }
 }

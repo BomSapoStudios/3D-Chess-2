@@ -203,6 +203,9 @@ public class PieceTray : MonoBehaviour
         Debug.Log($"PieceTray: {trayColor} tray setup complete at {transform.position}");
     }
     
+    /// <summary>Benches on the front or back face lie along x (Green/Purple, or Yellow/Orange when tipped)</summary>
+    private bool OnFrontOrBack => Mathf.Abs(BoardView.HomeSideDrawn(trayColor).z) > 0.5f;
+
     /// <summary>
     /// Position the tray beside the board with proper coordinate system alignment
     /// Dynamically scales tray position based on board size (4x4x4, 6x6x6, or 8x8x8)
@@ -239,51 +242,23 @@ public class PieceTray : MonoBehaviour
 
         Vector3 trayPosition;
 
-        // Position trays based on player color
-        switch (trayColor)
-        {
-            case PieceColor.White:
-                // Left side (negative X)
-                trayPosition = new Vector3(boardLeftEdge - traySpacing, trayHeight, 0f);
-                Debug.Log($"PieceTray: White tray positioned on LEFT at {trayPosition}");
-                break;
+        // Position trays beside the face each player starts on, as drawn (BoardView tips the cube
+        // for Yellow/Orange online, which moves their benches to the front/back)
+        Vector3 side = BoardView.HomeSideDrawn(trayColor);
+        if (side.x < -0.5f)
+            trayPosition = new Vector3(boardLeftEdge - traySpacing, trayHeight, 0f);   // left (White)
+        else if (side.x > 0.5f)
+            trayPosition = new Vector3(boardRightEdge + traySpacing, trayHeight, 0f);  // right (Black)
+        else if (side.z < -0.5f)
+            trayPosition = new Vector3(0f, trayHeight, boardFrontEdge - traySpacing);  // front (Green)
+        else if (side.z > 0.5f)
+            trayPosition = new Vector3(0f, trayHeight, boardBackEdge + traySpacing);   // back (Purple)
+        else if (side.y < -0.5f)
+            trayPosition = new Vector3(0f, boardBottomEdge - traySpacing, 0f);         // bottom (Yellow)
+        else
+            trayPosition = new Vector3(0f, boardTopEdge + traySpacing, 0f);            // top (Orange)
+        Debug.Log($"PieceTray: {trayColor} tray positioned at {trayPosition}");
 
-            case PieceColor.Black:
-                // Right side (positive X)
-                trayPosition = new Vector3(boardRightEdge + traySpacing, trayHeight, 0f);
-                Debug.Log($"PieceTray: Black tray positioned on RIGHT at {trayPosition}");
-                break;
-
-            case PieceColor.Green:
-                // Front side (negative Z)
-                trayPosition = new Vector3(0f, trayHeight, boardFrontEdge - traySpacing);
-                Debug.Log($"PieceTray: Green tray positioned on FRONT at {trayPosition}");
-                break;
-
-            case PieceColor.Purple:
-                // Back side (positive Z)
-                trayPosition = new Vector3(0f, trayHeight, boardBackEdge + traySpacing);
-                Debug.Log($"PieceTray: Purple tray positioned on BACK at {trayPosition}");
-                break;
-
-            case PieceColor.Yellow:
-                // Bottom (negative Y)
-                trayPosition = new Vector3(0f, boardBottomEdge - traySpacing, 0f);
-                Debug.Log($"PieceTray: Yellow tray positioned on BOTTOM at {trayPosition}");
-                break;
-
-            case PieceColor.Orange:
-                // Top (positive Y)
-                trayPosition = new Vector3(0f, boardTopEdge + traySpacing, 0f);
-                Debug.Log($"PieceTray: Orange tray positioned on TOP at {trayPosition}");
-                break;
-
-            default:
-                Debug.LogError($"PieceTray: Unknown color {trayColor}, defaulting to origin");
-                trayPosition = Vector3.zero;
-                break;
-        }
-        
         // Find the Board Rotator to ensure trays are children and rotate with the board
         GameObject boardRotator = GameObject.Find("Board Rotator");
         if (boardRotator != null)
@@ -338,7 +313,7 @@ public class PieceTray : MonoBehaviour
         trayBase.transform.localScale = new Vector3(trayWidth, trayHeight, trayDepth);
 
         // Rotate trays that are positioned on front/back sides
-        if (trayColor == PieceColor.Green || trayColor == PieceColor.Purple)
+        if (OnFrontOrBack)
         {
             // Rotate 90 degrees around Y-axis so tray extends along X-axis instead of Z-axis
             trayBase.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
@@ -417,7 +392,7 @@ public class PieceTray : MonoBehaviour
         piecePositions.Clear();
 
         // Determine which axis to arrange pieces along based on tray orientation
-        bool arrangeAlongX = (trayColor == PieceColor.Green || trayColor == PieceColor.Purple);
+        bool arrangeAlongX = OnFrontOrBack;
 
         // Arrange pieces in a line along the appropriate axis
         float startOffset = -(maxPieces - 1) * pieceSpacing * 0.5f;
