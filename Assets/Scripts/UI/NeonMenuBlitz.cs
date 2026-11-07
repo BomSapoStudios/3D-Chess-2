@@ -534,10 +534,19 @@ public partial class NeonMenu
     public void DebugBlitzFromMenu() => ShowBlitzPicker();
 #endif
 
+    private bool blitzStarting;
+
     private void StartBlitz(int index)
     {
+        if (blitzStarting) return; // a second tap while the puzzle loads would load it twice
         Haptics.Selection(); Sfx.Tap();
-        blitzPicker.SetActive(false);
+        // Keep the picker up until the puzzle scene replaces the menu: hiding it here showed the
+        // home screen for a moment while the puzzle loaded. Just stop it taking more taps.
+        blitzStarting = true;
+        CanvasGroup lockPicker = blitzPicker.GetComponent<CanvasGroup>();
+        if (lockPicker == null) lockPicker = blitzPicker.AddComponent<CanvasGroup>();
+        lockPicker.interactable = false;
+        lockPicker.blocksRaycasts = true;
         QueenBlitz.Puzzle puzzle = QueenBlitz.Puzzles[index];
         playerCount = 2;
         boardSize = QueenBlitz.BoardFor(puzzle.size);
@@ -554,5 +563,11 @@ public partial class NeonMenu
         StartFromSetup();
         blitzRun = false;
         quickPlay = false;
+        if (SceneController.Instance == null)
+        {
+            // Nothing is loading (StartFromSetup showed a toast): give the picker back
+            blitzStarting = false;
+            lockPicker.interactable = true;
+        }
     }
 }
