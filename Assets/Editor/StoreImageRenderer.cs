@@ -153,6 +153,7 @@ public static class StoreImageRenderer
     private static IEnumerator Run()
     {
         failures.Clear();
+        Backdrops.ShowUnreleased = true;   // held-back backdrops get their store images ahead of release
         Application.runInBackground = true;   // keep going when the editor isn't in front
         Debug.Log("STORE IMAGES: started");
         NeonMenu menu = null;
@@ -173,6 +174,7 @@ public static class StoreImageRenderer
         if (!timingCandidates) yield return Step(PawnTopUpImages());
 
         PieceShapes.Showing = null;
+        Backdrops.ShowUnreleased = false;
         Debug.Log("STORE IMAGES: done" + (failures.Count > 0 ? " — failed: " + string.Join(", ", failures) : ""));
         EditorApplication.ExitPlaymode();
     }
@@ -200,7 +202,7 @@ public static class StoreImageRenderer
     }
 
     private static IEnumerable<PieceShapes.Kind> LockedSets => PieceShapes.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
-    private static IEnumerable<Backdrops.Kind> LockedBackdrops => Backdrops.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
+    private static IEnumerable<Backdrops.Kind> LockedBackdrops => Backdrops.Listed.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
     private static IEnumerable<PromotionStyle.Kind> LockedPromotions => PromotionStyle.All.Where(k => !Store.Free(k) && Wanted(Store.Id(k)));
 
     // "New Items Only": just the items missing an image in the output folder (the promo or the
