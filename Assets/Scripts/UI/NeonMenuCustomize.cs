@@ -745,8 +745,8 @@ public partial class NeonMenu
                 }
                 break;
             case CustomizeTab.Backdrop:
-                gridTitle.text = "Backdrop the board floats in"; gridHint.text = $"{Backdrops.All.Length} scenes";
-                foreach (Backdrops.Kind k in Sorted(Backdrops.All, Store.Free, Store.Owns, Backdrops.DisplayName))
+                gridTitle.text = "Backdrop the board floats in"; gridHint.text = $"{Backdrops.Listed.Length} scenes";
+                foreach (Backdrops.Kind k in Sorted(Backdrops.Listed, Store.Free, Store.Owns, Backdrops.DisplayName))
                 {
                     Backdrops.Kind kind = k;
                     AddCard(Backdrops.DisplayName(k), Thumb("Backdrop_" + k), () => Backdrops.Current == kind, () => ShownBackdrop == kind,
