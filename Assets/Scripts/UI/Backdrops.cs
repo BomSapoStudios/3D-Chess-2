@@ -152,12 +152,14 @@ public static class Backdrops
                 return true;
             }
 
-            var tex = new Texture2D(SkyWidth, SkyHeight, TextureFormat.RGBA32, true);
+            // No mip chain: the sky is always magnified on screen, and mips only make Skybox/Panoramic
+            // draw a dotted seam where it wraps round (behind Black's seat)
+            var tex = new Texture2D(SkyWidth, SkyHeight, TextureFormat.RGBA32, false);
             tex.wrapModeU = TextureWrapMode.Repeat;
             tex.wrapModeV = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Trilinear;
+            tex.filterMode = FilterMode.Bilinear;
             tex.SetPixels32(task.Result);
-            tex.Apply(true, true);
+            tex.Apply(false, true);
 
             Shader shader = Shader.Find("Skybox/Panoramic");
             if (shader == null)
