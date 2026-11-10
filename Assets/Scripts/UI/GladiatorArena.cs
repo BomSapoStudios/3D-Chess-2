@@ -5,7 +5,7 @@ using UnityEngine;
 // Gladiator Arena backdrop: the board floats high over the sand of a great oval colosseum at
 // sunset. Built so that every way you turn shows something different:
 //
-//   ahead of White  (~30°)   the Emperor's Box: porphyry and gold, a canopy on marble columns
+//   ahead of White  (~42°)   the Emperor's Box: porphyry and gold, a canopy on marble columns
 //                            with a golden eagle, the emperor on his throne (thumb up now and
 //                            then), guards, braziers, rose petals, and a purple carpet of honour
 //                            laid up the stands behind it. Musicians with great curled horns and
@@ -14,7 +14,7 @@ using UnityEngine;
 //                            the outer wall stand black against the setting sun, and through the
 //                            gap lies the countryside: hills, cypresses, an aqueduct, a hill
 //                            temple and a little town. Golden dust hangs in the air.
-//   ahead of Black  (~205°)  the Great Gate: a monumental arch, portcullis up and torchlight in
+//   ahead of Black  (~218°)  the Great Gate: a monumental arch, portcullis up and torchlight in
 //                            the tunnel, flanked by two colossal bronze gladiators. Dropped
 //                            shields on the sand. A lion in its cage rides the lift up through a
 //                            trapdoor nearby, paces, and sinks again.
@@ -357,8 +357,8 @@ public static class ArenaScenery
     private const float Tread = 1.5f, Rise = 0.8f, WallRise = 1.6f, Walk = 2.2f;
     private const int Seg = 240;   // slices round the stands
 
-    public const float EmperorDeg = 30f, GateDeg = 205f, RuinDeg = 92f, RuinHalf = 24f;
-    public const float AwningFrom = 238f, AwningTo = 324f, MusicDeg = 334f, LionDeg = 158f, ChariotDeg = 62f, RackDeg = 300f;
+    public const float EmperorDeg = 42f, GateDeg = 218f, RuinDeg = 92f, RuinHalf = 24f;
+    public const float AwningFrom = 238f, AwningTo = 324f, MusicDeg = 334f, LionDeg = 158f, ChariotDeg = 64f, RackDeg = 300f;
 
     /// <summary>Toward the light: the low sun, lifted a little so the pieces are lit</summary>
     public static Vector3 SunLight => ArenaSky.Dir(ArenaSky.SunDeg, 17f);
@@ -817,7 +817,7 @@ public static class ArenaScenery
             k.Cylinder(Matrix4x4.TRS(col + Vector3.up * 2.8f, Quaternion.identity, new Vector3(0.76f, 5.6f, 0.76f)), 8, Marble);
             k.Box(Matrix4x4.TRS(col + Vector3.up * 5.4f, Quaternion.LookRotation(-Outward(t1)), new Vector3(1.1f, 0.4f, 1.1f)), Travertine);
             k.Box(Matrix4x4.TRS(col + Vector3.up * 0.2f, Quaternion.LookRotation(-Outward(t1)), new Vector3(1.0f, 0.4f, 1.0f)), Travertine);
-            if (Within(deg, 222f, 236f) || Within(deg, 168f, 186f))
+            if (Near(deg, GateDeg + 11f, 6f) || Near(deg, GateDeg - 41f, 9f))
             {
                 var b = new ArenaBasis(Ell(tm, po + 3.2f, py), -Outward(tm), 1.3f);
                 c.metal.Box(b.M(0f, 0.3f, 0f, 0.9f, 0.6f, 0.9f), Bronze);
@@ -1562,26 +1562,37 @@ public static class ArenaScenery
 
     private static void Birds(Ctx c)
     {
+        // A gull-like shape: slim body, fanned tail, long swept wings with dark tips
         var body = new ArenaKit(c.pal);
-        Color white = new Color(0.96f, 0.94f, 0.9f);
-        body.Box(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(0.3f, 0.28f, 0.8f)), white);
-        body.Box(Matrix4x4.TRS(new Vector3(0f, 0.08f, 0.48f), Quaternion.identity, new Vector3(0.22f, 0.22f, 0.24f)), white);
-        body.Box(Matrix4x4.TRS(new Vector3(0f, 0.04f, 0.64f), Quaternion.identity, new Vector3(0.08f, 0.06f, 0.1f)), Gold);
-        body.Box(Matrix4x4.TRS(new Vector3(0f, 0f, -0.55f), Quaternion.identity, new Vector3(0.34f, 0.05f, 0.35f)), white);
+        Color white = new Color(0.96f, 0.94f, 0.9f), tip = new Color(0.25f, 0.24f, 0.28f);
+        body.Box(Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(0.2f, 0.2f, 0.62f)), white);
+        body.Box(Matrix4x4.TRS(new Vector3(0f, 0.06f, 0.38f), Quaternion.identity, new Vector3(0.17f, 0.17f, 0.2f)), white);
+        body.Box(Matrix4x4.TRS(new Vector3(0f, 0.04f, 0.52f), Quaternion.identity, new Vector3(0.05f, 0.05f, 0.12f)), Gold);
+        body.Tri(new Vector3(0f, 0f, -0.25f), new Vector3(-0.2f, 0f, -0.62f), new Vector3(0.2f, 0f, -0.62f), white, Vector3.up);
+        body.Tri(new Vector3(0f, 0f, -0.25f), new Vector3(-0.2f, 0f, -0.62f), new Vector3(0.2f, 0f, -0.62f), white, Vector3.down);
         Mesh bodyMesh = Keep(body.Build("Bird"));
-        var wingR = new ArenaKit(c.pal);
-        wingR.Box(Matrix4x4.TRS(new Vector3(0.55f, 0f, 0f), Quaternion.identity, new Vector3(1.1f, 0.05f, 0.45f)), white);
-        var wingL = new ArenaKit(c.pal);
-        wingL.Box(Matrix4x4.TRS(new Vector3(-0.55f, 0f, 0f), Quaternion.identity, new Vector3(1.1f, 0.05f, 0.45f)), white);
-        Mesh rMesh = Keep(wingR.Build("Wing")), lMesh = Keep(wingL.Build("Wing"));
+        Mesh WingMesh(float side)
+        {
+            var w = new ArenaKit(c.pal);
+            Vector3 a = new Vector3(0f, 0f, 0.16f), b = new Vector3(0f, 0f, -0.16f);
+            Vector3 elbowF = new Vector3(side * 0.65f, 0.08f, 0.12f), elbowB = new Vector3(side * 0.65f, 0.08f, -0.24f);
+            Vector3 wrist = new Vector3(side * 1.05f, 0.05f, -0.02f), wristB = new Vector3(side * 1.05f, 0.05f, -0.3f);
+            Vector3 point = new Vector3(side * 1.55f, -0.02f, -0.42f);
+            w.Quad2(a, elbowF, elbowB, b, white);
+            w.Quad2(elbowF, wrist, wristB, elbowB, white);
+            w.Tri(wrist, point, wristB, tip, Vector3.up);
+            w.Tri(wrist, point, wristB, tip, Vector3.down);
+            return Keep(w.Build("Wing"));
+        }
+        Mesh rMesh = WingMesh(1f), lMesh = WingMesh(-1f);
 
         var rng = c.rng;
         for (int j = 0; j < 12; j++)
         {
             Transform b = Piece(c.root, "Bird", bodyMesh, c.lit, Vector3.zero);
             b.localScale = Vector3.one * R(rng, 1.8f, 2.4f);
-            Transform r = Piece(b, "Wing", rMesh, c.lit, new Vector3(0.15f, 0f, 0f));
-            Transform l = Piece(b, "Wing", lMesh, c.lit, new Vector3(-0.15f, 0f, 0f));
+            Transform r = Piece(b, "Wing", rMesh, c.lit, new Vector3(0.1f, 0.05f, 0.05f));
+            Transform l = Piece(b, "Wing", lMesh, c.lit, new Vector3(-0.1f, 0.05f, 0.05f));
             c.life.Birds.Add(new ArenaLife.Bird
             {
                 body = b, wingL = l, wingR = r,
@@ -1756,9 +1767,9 @@ public class ArenaLife : MonoBehaviour
             Vector3 fwd = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)) * dir;
             b.body.localRotation = Quaternion.LookRotation(fwd) * Quaternion.Euler(0f, 0f, 14f * dir);
             float glide = Mathf.Clamp01(Mathf.Sin(t * 0.7f + b.phase * 3f) * 2f);
-            float flap = 35f * Mathf.Sin(t * 13f + b.phase) * (1f - 0.8f * glide);
-            b.wingL.localRotation = Quaternion.Euler(0f, 0f, flap);
-            b.wingR.localRotation = Quaternion.Euler(0f, 0f, -flap);
+            float flap = 10f + 40f * Mathf.Sin(t * 9f + b.phase) * (1f - 0.85f * glide);   // slow deep beats, wings held a little up when gliding
+            b.wingL.localRotation = Quaternion.Euler(0f, 0f, -flap);
+            b.wingR.localRotation = Quaternion.Euler(0f, 0f, flap);
         }
     }
 }
