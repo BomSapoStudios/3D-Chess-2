@@ -508,6 +508,7 @@ public static class ArenaScenery
     public static void Build(Transform root)
     {
         made = root.gameObject.AddComponent<ArenaCleanup>().Made;
+        pennants.Clear();   // the last build's pennant meshes go with its cleanup (and its palette)
         Profile();
 
         var pal = new ArenaPalette();
