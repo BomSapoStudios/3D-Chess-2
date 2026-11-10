@@ -14,7 +14,7 @@ using UnityEngine;
 //                            the outer wall stand black against the setting sun, and through the
 //                            gap lies the countryside: hills, cypresses, an aqueduct, a hill
 //                            temple and a little town. Golden dust hangs in the air.
-//   ahead of Black  (~218°)  the Great Gate: a monumental arch, portcullis up and torchlight in
+//   ahead of Black  (~229°)  the Great Gate: a monumental arch, portcullis up and torchlight in
 //                            the tunnel, flanked by two colossal bronze gladiators. Dropped
 //                            shields on the sand. A lion in its cage rides the lift up through a
 //                            trapdoor nearby, paces, and sinks again.
@@ -357,7 +357,7 @@ public static class ArenaScenery
     private const float Tread = 1.5f, Rise = 0.8f, WallRise = 1.6f, Walk = 2.2f;
     private const int Seg = 240;   // slices round the stands
 
-    public const float EmperorDeg = 42f, GateDeg = 218f, RuinDeg = 92f, RuinHalf = 24f;
+    public const float EmperorDeg = 42f, GateDeg = 229f, RuinDeg = 92f, RuinHalf = 24f;
     public const float AwningFrom = 238f, AwningTo = 324f, MusicDeg = 334f, LionDeg = 158f, ChariotDeg = 64f, RackDeg = 300f;
 
     /// <summary>Toward the light: the low sun, lifted a little so the pieces are lit</summary>
