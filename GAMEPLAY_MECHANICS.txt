@@ -827,7 +827,10 @@ The home screen's Settings button (beside Customize) opens:
                    buttons return to Settings)
   Help           — Support (apps.bomsapostudios.com/3dchess/support.html),
                    Email us (support@bomsapostudios.com), Privacy Policy
-                   (apps.bomsapostudios.com/3dchess/privacy.html), and the
+                   (apps.bomsapostudios.com/3dchess/privacy.html), Rate 3D
+                   Chess (iPhone only: opens the App Store's write-a-review
+                   page once AppStoreId is set at release; until then the
+                   iOS rating prompt, which TestFlight never shows), and the
                    app version
 
 
