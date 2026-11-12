@@ -78,7 +78,11 @@ public partial class NeonMenu
         RectTransform help = Row(settingsRight);
         NeonButton(help, "Support", new Vector2(0, 44), NeonTheme.Yellow, NeonTheme.Pink, 0f, 15, () => Application.OpenURL(SupportUrl));
         NeonButton(help, "Email us", new Vector2(0, 44), NeonTheme.Yellow, NeonTheme.Pink, 0f, 15, EmailSupport);
-        NeonButton(Row(settingsRight), "Privacy Policy", new Vector2(0, 44), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, () => Application.OpenURL(PrivacyUrl));
+        RectTransform links = Row(settingsRight);
+        NeonButton(links, "Privacy Policy", new Vector2(0, 44), NeonTheme.Cyan, NeonTheme.Pink, 0f, 15, () => Application.OpenURL(PrivacyUrl));
+#if !UNITY_WEBGL || UNITY_EDITOR
+        NeonButton(links, "Rate 3D Chess", new Vector2(0, 44), NeonTheme.Lime, NeonTheme.Pink, 0f, 15, RateApp);
+#endif
 
         TextMeshProUGUI version = NewText("Version", settingsRight, $"3D Chess Ultra {Application.version} · {SupportEmail}", 13, NeonTheme.Muted, TextAlignmentOptions.Left);
         version.fontStyle = FontStyles.Normal;
@@ -144,6 +148,25 @@ public partial class NeonMenu
         });
         ResetFriendsCache();
         RefreshSettings();
+    }
+
+    // "Rate 3D Chess": once the app is on the App Store (AppStoreId set in NeonMenuUpdate.cs) it opens
+    // the App Store's write-a-review page. Before that the page doesn't exist yet, so it asks iOS for
+    // the in-app rating prompt instead: that shows on builds installed from Xcode (Submit greyed out)
+    // and does nothing on TestFlight, which is how Apple handles it. Hidden on the web.
+    private static void RateApp()
+    {
+        Haptics.Selection(); Sfx.Tap();
+        if (!string.IsNullOrEmpty(AppStoreId))
+        {
+            Application.OpenURL($"itms-apps://apps.apple.com/app/id{AppStoreId}?action=write-review");
+            return;
+        }
+#if UNITY_IOS && !UNITY_EDITOR
+        UnityEngine.iOS.Device.RequestStoreReview();
+#else
+        Debug.Log("Rate 3D Chess: no App Store id yet, so there is no review page to open.");
+#endif
     }
 
     private void EmailSupport()
